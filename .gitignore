@@ -4,3 +4,8 @@
 .vscode/
 .idea/
 wacc-compiler
+
+
+# Added by cargo
+
+/target
