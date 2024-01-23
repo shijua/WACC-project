@@ -4,6 +4,6 @@
 # but do *not* change its name.
 
 # feel free to adjust to suit the specific internal flags of your compiler
-./target/debug/wacc_36 $@
+./target/debug/wacc_36 "$@"
 
 exit $?
