@@ -1,0 +1,20 @@
+# this file is a template
+
+image: "rust:latest"
+
+stages:
+  - build
+  - test
+
+build:
+  stage: build
+  script:
+    - make whack
+
+unitTest:
+  stage: test
+  script:
+    - make test
+
+#integrationTest:
+#  stage: test
