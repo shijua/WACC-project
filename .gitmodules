@@ -1,3 +1,3 @@
 [submodule "wacc-examples-36"]
 	path = wacc-examples-36
-	url = https://gitlab.doc.ic.ac.uk/yz9522/wacc-examples-36.git?job_token=glptt-6791cbcd1e7897cac445ba5773ebd18c68298c17
+	url = https://gitlab-ci-token:glptt-6791cbcd1e7897cac445ba5773ebd18c68298c17@gitlab.doc.ic.ac.uk/yz9522/wacc-examples-36.git
