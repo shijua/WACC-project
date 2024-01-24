@@ -20,5 +20,5 @@ unitTest:
 integrationTest:
   stage: test
   script:
-    - git submodule update --init
+    - git clone https://gitlab+deploy-token-74:gldt-rnEPvS7oCQYNgBGpeS5F@gitlab.doc.ic.ac.uk/yz9522/wacc-examples-36.git
     - python3 integration_test.py
