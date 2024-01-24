@@ -20,6 +20,6 @@ unitTest:
 integrationTest:
   stage: test
   script:
-    - rm -r wacc-examples-36 || true
+    - rm -rf wacc-examples-36 || true
     - git clone https://$username:$token@gitlab.doc.ic.ac.uk/yz9522/wacc-examples-36.git
     - python3 integration_test.py
