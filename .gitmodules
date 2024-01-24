@@ -1,3 +1,4 @@
 [submodule "wacc-examples-36"]
 	path = wacc-examples-36
-	url = https://gitlab.doc.ic.ac.uk/yz9522/wacc-examples-36.git
+	# url = https://gitlab.doc.ic.ac.uk/yz9522/wacc-examples-36.git
+	url = ../../yz9522/wacc-examples-36.git
