@@ -27,8 +27,10 @@ class incorrect_test():
 
 # variable defined for result output
 runned_test_cases: int = 0
-syntax_error_test_cases: int = 0
-semantic_error_test_cases: int = 0
+actual_syntax_error_test_cases: int = 0
+actual_semantic_error_test_cases: int = 0
+expected_syntax_error_test_cases: int = 0
+expected_semantic_error_test_cases: int = 0
 incorrect_list: list[incorrect_test] = []
 
 def get_total_test_cases(path: str = TEST_PATH) -> int:
@@ -42,7 +44,7 @@ def get_total_test_cases(path: str = TEST_PATH) -> int:
   return total_test_cases
 
 def running_our_single_test_cases(path: str) -> int:
-  global runned_test_cases, syntax_error_test_cases, semantic_error_test_cases
+  global runned_test_cases, actual_syntax_error_test_cases, actual_semantic_error_test_cases
   result: int = subprocess.run([WACC_PATH, path], stdout=subprocess.PIPE).returncode
   print(f"running {path} in our compiler: ", end="")
   runned_test_cases += 1
@@ -50,10 +52,10 @@ def running_our_single_test_cases(path: str) -> int:
     print("PASS")
   elif result == 100:
     print("SYNTAX ERROR")
-    syntax_error_test_cases += 1
+    actual_syntax_error_test_cases += 1
   elif result == 200:
     print("SEMANTIC ERROR")
-    semantic_error_test_cases += 1
+    actual_semantic_error_test_cases += 1
   else:
     print("UNKNOWN ERROR")
     exit(1)
@@ -65,9 +67,11 @@ def running_ref_single_test_cases(path: str) -> int:
   result: int = 0
   if output.find("Errors detected during compilation! Exit code 100 returned.") != -1:
     result = 100
+    expected_syntax_error_test_cases += 1
     print("SYNTAX ERROR")
   elif output.find("Errors detected during compilation! Exit code 200 returned.") != -1:
     result = 200
+    expected_semantic_error_test_cases += 1
     print("SEMANTIC ERROR")
   else:
     print("PASS")
@@ -116,7 +120,10 @@ if __name__ == "__main__":
   # print the result
   print("============================================================")
   print(f"runned test cases: {runned_test_cases}")
-  print(f"currect test cases: {runned_test_cases - syntax_error_test_cases - semantic_error_test_cases}")
-  print(f"syntax error test cases: {syntax_error_test_cases}")
-  print(f"semantic error test cases: {semantic_error_test_cases}")
+  print(f"actual passed test cases: {runned_test_cases - actual_syntax_error_test_cases - actual_semantic_error_test_cases}")
+  print(f"expected passed test cases: {runned_test_cases - expected_syntax_error_test_cases - expected_semantic_error_test_cases}")
+  print(f"actual syntax error test cases: {actual_syntax_error_test_cases}")
+  print(f"expected syntax error test cases: {expected_syntax_error_test_cases}")
+  print(f"actual semantic error test cases: {actual_semantic_error_test_cases}")
+  print(f"expected semantic error test cases: {expected_semantic_error_test_cases}")
   print(f"remaining test cases: {get_total_test_cases() - runned_test_cases}")
