@@ -1,5 +1,3 @@
-# this file is a template
-
 image: "rust:latest"
 
 stages:
@@ -10,11 +8,16 @@ build:
   stage: build
   script:
     - make whack
+  artifacts:
+    paths:
+      - target
 
 unitTest:
   stage: test
   script:
     - make test
 
-#integrationTest:
-#  stage: test
+integrationTest:
+  stage: test
+  script:
+    - python3 integration_test.py
