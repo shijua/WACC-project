@@ -14,7 +14,7 @@ build-docker-image:
     - curl -fsSL https://get.docker.com -o get-docker.sh
     - sh ./get-docker.sh
     - apt install sudo
-    - sudo usermod -aG docker $USER
+    - sudo systemctl start docker
     
   script:
     - docker stop $IMAGE_TAG || true
