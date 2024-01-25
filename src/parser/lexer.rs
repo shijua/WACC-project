@@ -1,22 +1,24 @@
 use chumsky::{Parser, text};
-use chumsky::prelude::end;
+use chumsky::prelude::{just, none_of, end};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Token {
+pub enum Token<'src> {
     IntLiter(i32),
+    StrLiter(&'src str),
     Misc
 }
 
-impl std::fmt::Display for Token {
+impl<'src> std::fmt::Display for Token<'src> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Token::IntLiter(n) => write!(f, "Int {}", n),
+            Token::StrLiter(s) => write!(f, "{}", s),
             Token::Misc => write!(f, "Unidentified Token"),
         }
     }
 }
 
-fn lexer<'src>() -> impl Parser<'src, &'src str, Token> {
+fn lexer<'src>() -> impl Parser<'src, &'src str, Token<'src>> {
     let num = text::int(10)
         .from_str()
         .unwrapped()
