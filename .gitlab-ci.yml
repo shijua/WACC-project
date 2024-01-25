@@ -16,18 +16,18 @@ build-docker-image:
     - apt install sudo
     
   script:
-    - docker -v /var/run/docker.sock:/var/run/docker.sock stop $IMAGE_TAG || true
-    - docker -v /var/run/docker.sock:/var/run/docker.sock rm $IMAGE_TAG || true
-    - docker -v /var/run/docker.sock:/var/run/docker.sock rmi $IMAGE_TAG || true
-    - docker -v /var/run/docker.sock:/var/run/docker.sock build -t $IMAGE_TAG .
-    - docker -v /var/run/docker.sock:/var/run/docker.sock run -it -d --name $IMAGE_TAG $IMAGE_TAG /bin/bash
+    - docker stop -v /var/run/docker.sock:/var/run/docker.sock  $IMAGE_TAG || true
+    - docker rm -v /var/run/docker.sock:/var/run/docker.sock  $IMAGE_TAG || true
+    - docker rmi -v /var/run/docker.sock:/var/run/docker.sock  $IMAGE_TAG || true
+    - docker build -v /var/run/docker.sock:/var/run/docker.sock  -t $IMAGE_TAG .
+    - docker run-v /var/run/docker.sock:/var/run/docker.sock -it -d --name $IMAGE_TAG $IMAGE_TAG /bin/bash
 
 unitTest:
   stage: test
   script:
-    - docker -v /var/run/docker.sock:/var/run/docker.sock exec -i $IMAGE_TAG /bin/sh -c "make test"
+    - docker exec -v /var/run/docker.sock:/var/run/docker.sock -i $IMAGE_TAG /bin/sh -c "make test"
 
 integrationTest:
   stage: test
   script:
-    - docker -v /var/run/docker.sock:/var/run/docker.sock exec -i $IMAGE_TAG /bin/sh -c "python3 integration_test.py"
+    - docker exec -v /var/run/docker.sock:/var/run/docker.sock -i $IMAGE_TAG /bin/sh -c "python3 integration_test.py"
