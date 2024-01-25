@@ -19,5 +19,10 @@ unitTest:
 
 integrationTest:
   stage: test
+  before_script:
+    - git submodule update --init --recursive
+    - apt-get update
+    - apt-get install -y ruby
+    - gem install rest-client
   script:
     - python3 integration_test.py
