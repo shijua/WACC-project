@@ -11,23 +11,25 @@ build-docker-image:
   stage: build
   before_script:
     # install docker
+    - apt update
+    - apt install apt-utils
+    - apt install sudo
     - curl -fsSL https://get.docker.com -o get-docker.sh
     - sh ./get-docker.sh
-    - apt install sudo
     
   script:
-    - docker stop -v /var/run/docker.sock:/var/run/docker.sock $IMAGE_TAG || true
-    - docker rm -v /var/run/docker.sock:/var/run/docker.sock $IMAGE_TAG || true
-    - docker rmi -v /var/run/docker.sock:/var/run/docker.sock $IMAGE_TAG || true
-    - docker build -v /var/run/docker.sock:/var/run/docker.sock -t $IMAGE_TAG .
-    - docker run -v /var/run/docker.sock:/var/run/docker.sock -it -d --name $IMAGE_TAG $IMAGE_TAG /bin/bash
+    - docker stop $IMAGE_TAG || true
+    - docker rm $IMAGE_TAG || true
+    - docker rmi $IMAGE_TAG || true
+    - docker build -t $IMAGE_TAG .
+    - docker run -it -d --name $IMAGE_TAG $IMAGE_TAG /bin/bash
 
 unitTest:
   stage: test
   script:
-    - docker exec -v /var/run/docker.sock:/var/run/docker.sock -i $IMAGE_TAG /bin/sh -c "make test"
+    - docker exec -i $IMAGE_TAG /bin/sh -c "make test"
 
 integrationTest:
   stage: test
   script:
-    - docker exec -v /var/run/docker.sock:/var/run/docker.sock -i $IMAGE_TAG /bin/sh -c "python3 integration_test.py"
+    - docker exec -i $IMAGE_TAG /bin/sh -c "python3 integration_test.py"
