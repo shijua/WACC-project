@@ -1,11 +1,41 @@
-use chumsky::{extra, Parser, text};
 use chumsky::prelude::*;
+use chumsky::{extra, text, Parser};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token<'src> {
     IntToken(i32),
     StrToken(&'src str),
-    BoolToken(bool),
+    Ident(&'src str),
+    Bool(bool),
+    Begin,
+    End,
+    Is,
+    Skip,
+    Read,
+    Free,
+    Return,
+    Exit,
+    Print,
+    Println,
+    If,
+    Then,
+    Else,
+    Fi,
+    While,
+    Do,
+    Done,
+    NewPair,
+    Call,
+    Fst,
+    Snd,
+    IntType,
+    BoolType,
+    CharType,
+    StringType,
+    PairType,
+    Len,
+    Ord,
+    Chr,
 }
 
 type Span = SimpleSpan<usize>;
@@ -15,12 +45,43 @@ impl<'src> std::fmt::Display for Token<'src> {
         match self {
             Token::IntToken(n) => write!(f, "Int {}", n),
             Token::StrToken(s) => write!(f, "{}", s),
-            Token::BoolToken(b) => write!(f, "{}", b),
+            Token::Ident(id) => write!(f, "{}", id),
+            Token::Bool(b) => write!(f, "{}", b),
+            Token::Begin => write!(f, "begin"),
+            Token::End => write!(f, "end"),
+            Token::Is => write!(f, "is"),
+            Token::Skip => write!(f, "skip"),
+            Token::Read => write!(f, "read"),
+            Token::Free => write!(f, "free"),
+            Token::Return => write!(f, "return"),
+            Token::Exit => write!(f, "exit"),
+            Token::Print => write!(f, "print"),
+            Token::Println => write!(f, "println"),
+            Token::If => write!(f, "if"),
+            Token::Then => write!(f, "then"),
+            Token::Else => write!(f, "else"),
+            Token::Fi => write!(f, "fi"),
+            Token::While => write!(f, "while"),
+            Token::Do => write!(f, "do"),
+            Token::Done => write!(f, "done"),
+            Token::NewPair => write!(f, "newpair"),
+            Token::Call => write!(f, "call"),
+            Token::Fst => write!(f, "fst"),
+            Token::Snd => write!(f, "snd"),
+            Token::IntType => write!(f, "int"),
+            Token::BoolType => write!(f, "bool"),
+            Token::CharType => write!(f, "char"),
+            Token::StringType => write!(f, "string"),
+            Token::PairType => write!(f, "pair"),
+            Token::Len => write!(f, "len"),
+            Token::Ord => write!(f, "ord"),
+            Token::Chr => write!(f, "chr"),
         }
     }
 }
 
-pub fn lexer<'src>() -> impl Parser<'src, &'src str, Vec<(Token<'src>, Span)>, extra::Err<Rich<'src, char, Span>>> {
+pub fn lexer<'src>(
+) -> impl Parser<'src, &'src str, Vec<(Token<'src>, Span)>, extra::Err<Rich<'src, char, Span>>> {
     // A parser for numbers
     let num = text::int(10)
         .to_slice()
@@ -35,7 +96,51 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Vec<(Token<'src>, Span)>, e
         .to_slice()
         .map(Token::StrToken);
 
-    let token = num.or(str_);
+    // A parser for keywords and identifiers.
+    // Here is a list of keywords in WACC:
+    // "begin" | "end" | "is" | "skip" | "read" | "free" | "return" | "exit" | "print" | "println"
+    // | "if" | "then" | "else" | "fi" | "while" | "do" | "done" | "newpair" | "call" | "fst"
+    // | "snd" | "int" | "bool" | "char" | "string" | "pair" | "len" | "ord" | "chr" | "true"
+    // | "false" | "null"
+    // And don't forget to add identifiers
+    // TODO: WACC Only Accepts Graphical ASCII Chars
+
+    let ident = text::ascii::ident().map(|ident: &str| match ident {
+        "begin" => Token::Begin,
+        "end" => Token::End,
+        "is" => Token::Is,
+        "skip" => Token::Skip,
+        "read" => Token::Read,
+        "free" => Token::Free,
+        "return" => Token::Return,
+        "exit" => Token::Exit,
+        "print" => Token::Print,
+        "println" => Token::Println,
+        "if" => Token::If,
+        "then" => Token::Then,
+        "else" => Token::Else,
+        "fi" => Token::Fi,
+        "while" => Token::While,
+        "do" => Token::Do,
+        "done" => Token::Done,
+        "newpair" => Token::NewPair,
+        "call" => Token::Call,
+        "fst" => Token::Fst,
+        "snd" => Token::Snd,
+        "int" => Token::IntType,
+        "bool" => Token::BoolType,
+        "char" => Token::CharType,
+        "string" => Token::StringType,
+        "pair" => Token::PairType,
+        "len" => Token::Len,
+        "ord" => Token::Ord,
+        "chr" => Token::Chr,
+        "true" => Token::Bool(true),
+        "false" => Token::Bool(false),
+        _ => Token::Ident(ident),
+    });
+
+    let token = num.or(str_).or(ident);
 
     let comment = just("#")
         .then(any().and_is(just('\n').not()).repeated())
@@ -63,8 +168,8 @@ pub fn work(s: &str) -> Vec<Token> {
 
 #[cfg(test)]
 mod lexer_tests {
-    use crate::parser::lexer::Token;
     use crate::parser::lexer::work;
+    use crate::parser::lexer::Token;
 
     #[test]
     fn can_lex_single_digit() {
@@ -81,13 +186,21 @@ mod lexer_tests {
     #[test]
     fn can_lex_multiple_numbers() {
         let input = "123 234 442 881";
-        assert_eq!(work(input), vec![Token::IntToken(123), Token::IntToken(234), Token::IntToken(442), Token::IntToken(881)])
+        assert_eq!(
+            work(input),
+            vec![
+                Token::IntToken(123),
+                Token::IntToken(234),
+                Token::IntToken(442),
+                Token::IntToken(881)
+            ]
+        )
     }
 
     #[test]
     #[should_panic]
     fn cannot_lex_oversize_ints() {
-        let input= "100000000000000000";
+        let input = "100000000000000000";
         work(input);
     }
 
@@ -104,19 +217,22 @@ mod lexer_tests {
         work(input);
     }
 
-
-
     #[test]
     fn can_lex_mixture() {
         let input = r#"123 "string" 908"#;
-        assert_eq!(work(input), vec![Token::IntToken(123), Token::StrToken(r#""string""#), Token::IntToken(908)]);
+        assert_eq!(
+            work(input),
+            vec![
+                Token::IntToken(123),
+                Token::StrToken(r#""string""#),
+                Token::IntToken(908)
+            ]
+        );
     }
 
     #[test]
-    #[should_panic]
-    fn cannot_lex_unidentified() {
-        let input = "Bocchi";
-        work(input);
+    fn can_lex_identifiers() {
+        let input = "ryo";
+        assert_eq!(work(input), vec![Token::Ident("ryo")])
     }
-
 }
