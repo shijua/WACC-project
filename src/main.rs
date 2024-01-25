@@ -1,5 +1,7 @@
 mod parser;
 
 fn main() {
-    println!("{}",parser::lexer::work("42"));
+    let input = "0";
+    parser::lexer::work(input);
+    println!("Hello World");
 }
