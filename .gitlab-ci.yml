@@ -25,4 +25,4 @@ integrationTest:
     - apt-get install -y ruby
     - gem install rest-client
   script:
-    - python3 integration_test.py wacc-examples-36
+    - python3 integration_test.py
