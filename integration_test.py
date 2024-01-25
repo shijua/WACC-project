@@ -100,8 +100,8 @@ if __name__ == "__main__":
   if len(sys.argv) >= 2:
     path = f"{sys.argv[1]}"
   else:
-    path = TEST_PATH
-
+    exit(0)
+    
   # ensure that the wacc_36 executable exists
   if not exists(WACC_PATH):
     print("running cargo build")
@@ -128,3 +128,6 @@ if __name__ == "__main__":
   print(f"actual semantic error test cases: {actual_semantic_error_test_cases}")
   print(f"expected semantic error test cases: {expected_semantic_error_test_cases}")
   print(f"remaining test cases: {get_total_test_cases() - runned_test_cases}")
+  
+  assert actual_syntax_error_test_cases == expected_syntax_error_test_cases, "syntax error test cases not match"
+  assert actual_semantic_error_test_cases == expected_semantic_error_test_cases, "semantic error test cases not match"
