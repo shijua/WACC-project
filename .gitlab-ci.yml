@@ -9,7 +9,7 @@ stages:
 
 build-docker-image:
   stage: build
-  befoire_script:
+  before_script:
     - apt-get update -y
     - apt-get install -y docker
   script:
