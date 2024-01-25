@@ -19,7 +19,7 @@ unitTest:
 
 integrationTest:
   stage: test
-  before-script:
+  before_script:
     - git submodule update --init --recursive
     - apt-get update
     - apt-get install -y ruby
