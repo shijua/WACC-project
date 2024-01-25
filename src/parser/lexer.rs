@@ -5,6 +5,7 @@ use chumsky::prelude::*;
 pub enum Token<'src> {
     IntToken(i32),
     StrToken(&'src str),
+    BoolToken(bool),
 }
 
 type Span = SimpleSpan<usize>;
@@ -14,11 +15,13 @@ impl<'src> std::fmt::Display for Token<'src> {
         match self {
             Token::IntToken(n) => write!(f, "Int {}", n),
             Token::StrToken(s) => write!(f, "{}", s),
+            Token::BoolToken(b) => write!(f, "{}", b),
         }
     }
 }
 
 pub fn lexer<'src>() -> impl Parser<'src, &'src str, Vec<(Token<'src>, Span)>, extra::Err<Rich<'src, char, Span>>> {
+    // A parser for numbers
     let num = text::int(10)
         .to_slice()
         .from_str()
@@ -82,6 +85,13 @@ mod lexer_tests {
     }
 
     #[test]
+    #[should_panic]
+    fn cannot_lex_oversize_ints() {
+        let input= "100000000000000000";
+        work(input);
+    }
+
+    #[test]
     fn can_lex_string_literals() {
         let input = r#""hello""#;
         assert_eq!(work(input), vec![Token::StrToken(r#""hello""#)]);
@@ -94,16 +104,19 @@ mod lexer_tests {
         work(input);
     }
 
+
+
     #[test]
-    fn can_lex_mixture_of_strings_and_numbers() {
+    fn can_lex_mixture() {
         let input = r#"123 "string" 908"#;
         assert_eq!(work(input), vec![Token::IntToken(123), Token::StrToken(r#""string""#), Token::IntToken(908)]);
     }
 
     #[test]
     #[should_panic]
-    fn cannot_lex_oversize_ints() {
-        let input= "100000000000000000";
+    fn cannot_lex_unidentified() {
+        let input = "Bocchi";
         work(input);
     }
+
 }
