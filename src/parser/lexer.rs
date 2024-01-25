@@ -5,8 +5,10 @@ use chumsky::{extra, text, Parser};
 pub enum Token<'src> {
     IntToken(i32),
     StrToken(&'src str),
+    CharToken(&'src str),
     Ident(&'src str),
     Bool(bool),
+    Op(&'src str),
     Begin,
     End,
     Is,
@@ -36,6 +38,8 @@ pub enum Token<'src> {
     Len,
     Ord,
     Chr,
+    Null,
+    Ctrl(char),
 }
 
 type Span = SimpleSpan<usize>;
@@ -45,8 +49,10 @@ impl<'src> std::fmt::Display for Token<'src> {
         match self {
             Token::IntToken(n) => write!(f, "Int {}", n),
             Token::StrToken(s) => write!(f, "{}", s),
+            Token::CharToken(c) => write!(f, "{}", c),
             Token::Ident(id) => write!(f, "{}", id),
             Token::Bool(b) => write!(f, "{}", b),
+            Token::Op(op) => write!(f, "{}", op),
             Token::Begin => write!(f, "begin"),
             Token::End => write!(f, "end"),
             Token::Is => write!(f, "is"),
@@ -76,6 +82,8 @@ impl<'src> std::fmt::Display for Token<'src> {
             Token::Len => write!(f, "len"),
             Token::Ord => write!(f, "ord"),
             Token::Chr => write!(f, "chr"),
+            Token::Null => write!(f, "null"),
+            Token::Ctrl(ctrl) => write!(f, "{}", ctrl),
         }
     }
 }
@@ -83,18 +91,34 @@ impl<'src> std::fmt::Display for Token<'src> {
 pub fn lexer<'src>(
 ) -> impl Parser<'src, &'src str, Vec<(Token<'src>, Span)>, extra::Err<Rich<'src, char, Span>>> {
     // A parser for numbers
-    let num = text::int(10)
+    let num_token = text::int(10)
         .to_slice()
         .from_str()
         .unwrapped()
         .map(Token::IntToken);
 
     // A parser for strings
-    let str_ = just('"')
-        .ignore_then(none_of('"').repeated())
-        .then_ignore(just('"'))
+    let str_token = just('\"')
+        .ignore_then(none_of('\"').repeated())
+        .then_ignore(just('\"'))
         .to_slice()
         .map(Token::StrToken);
+
+    let char_token = just('\'')
+        .ignore_then(none_of('\'').repeated())
+        .then_ignore(just('\''))
+        .to_slice()
+        .map(Token::CharToken);
+
+    // A parser for operators
+    let op = one_of("+-!*%/>=<&|")
+        .repeated()
+        .at_least(1)
+        .to_slice()
+        .map(Token::Op);
+
+    // A parser for scope control brackets and separation symbols
+    let ctrl = one_of("()[],;").map(Token::Ctrl);
 
     // A parser for keywords and identifiers.
     // Here is a list of keywords in WACC:
@@ -103,7 +127,6 @@ pub fn lexer<'src>(
     // | "snd" | "int" | "bool" | "char" | "string" | "pair" | "len" | "ord" | "chr" | "true"
     // | "false" | "null"
     // And don't forget to add identifiers
-    // TODO: WACC Only Accepts Graphical ASCII Chars
 
     let ident = text::ascii::ident().map(|ident: &str| match ident {
         "begin" => Token::Begin,
@@ -137,10 +160,16 @@ pub fn lexer<'src>(
         "chr" => Token::Chr,
         "true" => Token::Bool(true),
         "false" => Token::Bool(false),
+        "null" => Token::Null,
         _ => Token::Ident(ident),
     });
 
-    let token = num.or(str_).or(ident);
+    let token = num_token
+        .or(str_token)
+        .or(char_token)
+        .or(ident)
+        .or(op)
+        .or(ctrl);
 
     let comment = just("#")
         .then(any().and_is(just('\n').not()).repeated())
