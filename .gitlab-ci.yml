@@ -18,18 +18,18 @@ build-docker-image:
     - sh ./get-docker.sh
     
   script:
-    - docker stop $IMAGE_TAG || true
-    - docker rm $IMAGE_TAG || true
-    - docker rmi $IMAGE_TAG || true
-    - docker build -t $IMAGE_TAG .
-    - docker run -it -d --name $IMAGE_TAG $IMAGE_TAG /bin/bash
+    - sudo docker stop $IMAGE_TAG || true
+    - sudo docker rm $IMAGE_TAG || true
+    - sudo docker rmi $IMAGE_TAG || true
+    - sudo docker build -t $IMAGE_TAG .
+    - sudo docker run -it -d --name $IMAGE_TAG $IMAGE_TAG /bin/bash
 
 unitTest:
   stage: test
   script:
-    - docker exec -i $IMAGE_TAG /bin/sh -c "make test"
+    - sudo docker exec -i $IMAGE_TAG /bin/sh -c "make test"
 
 integrationTest:
   stage: test
   script:
-    - docker exec -i $IMAGE_TAG /bin/sh -c "python3 integration_test.py"
+    - sudo docker exec -i $IMAGE_TAG /bin/sh -c "python3 integration_test.py"
