@@ -7,30 +7,25 @@ stages:
   - build
   - test
 
-build-docker-image:
+build:
   stage: build
-  before_script:
-    # install docker
-    - apt update
-    - apt install apt-utils
-    - apt install sudo
-    - curl -fsSL https://get.docker.com -o get-docker.sh
-    - sh ./get-docker.sh
-    - sudo dockerd
-    
   script:
-    - sudo docker stop $IMAGE_TAG || true
-    - sudo docker rm $IMAGE_TAG || true
-    - sudo docker rmi $IMAGE_TAG || true
-    - sudo docker build -t $IMAGE_TAG .
-    - sudo docker run -it -d --name $IMAGE_TAG $IMAGE_TAG /bin/bash
+    - make build
+  artifects:
+    paths:
+      - target
 
 unitTest:
   stage: test
   script:
-    - sudo docker exec -i $IMAGE_TAG /bin/sh -c "make test"
+    - make test
 
 integrationTest:
   stage: test
+  before-script:
+    - git submodule update --init --recursive
+    - apt-get update
+    - apt-get install -y ruby
+    - gem install rest-client
   script:
-    - sudo docker exec -i $IMAGE_TAG /bin/sh -c "python3 integration_test.py"
+    - python3 intregraionTest.py
