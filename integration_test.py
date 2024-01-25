@@ -62,6 +62,7 @@ def running_our_single_test_cases(path: str) -> int:
   return result
   
 def running_ref_single_test_cases(path: str) -> int:
+  global expected_syntax_error_test_cases, expected_semantic_error_test_cases
   output: str = subprocess.run([REF_PATH, "-s", path], stdout=subprocess.PIPE).stdout.decode("utf-8")
   print(f"running {path} in reference compiler: ", end="")
   result: int = 0
