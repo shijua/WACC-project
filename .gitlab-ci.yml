@@ -1,26 +1,27 @@
 image: "rust:latest"
 
+variables:
+  IMAGE_TAG: whack
+
 stages:
   - build
   - test
 
-build:
+build-docker-image:
   stage: build
   script:
-    - make whack
-  artifacts:
-    paths:
-      - target
+    - docker stop $IMAGE_TAG || true
+    - docker rm $IMAGE_TAG || true
+    - docker rmi $IMAGE_TAG || true
+    - docker build -t $IMAGE_TAG .
+    - docker run -it -d --name $IMAGE_TAG $IMAGE_TAG /bin/bash
 
 unitTest:
   stage: test
   script:
-    - make test
+    - docker exec -i $IMAGE_TAG /bin/sh -c "make test"
 
 integrationTest:
   stage: test
   script:
-    - rm -rf wacc-examples-36
-    - git clone https://gitlab+deploy-token-75:gldt-eyyTYifR7xrDo45XoZwD@gitlab.doc.ic.ac.uk/yz9522/wacc-examples-36.git
-    - python3 integration_test.py
-    - echo "hello"
+    - docker exec -i $IMAGE_TAG /bin/sh -c "python3 integration_test.py"
