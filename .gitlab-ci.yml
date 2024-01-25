@@ -20,7 +20,6 @@ unitTest:
 integrationTest:
   stage: test
   before_script:
-    - rm -rf wacc-examples-36 || true
-    - git clone https://$username:$token@gitlab.doc.ic.ac.uk/yz9522/wacc-examples-36.git
+    - git submodule update --remote
   script:
     - python3 integration_test.py
