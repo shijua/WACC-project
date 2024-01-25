@@ -9,6 +9,9 @@ stages:
 
 build-docker-image:
   stage: build
+  befoire_script:
+    - apt-get update -y
+    - apt-get install -y docker
   script:
     - docker stop $IMAGE_TAG || true
     - docker rm $IMAGE_TAG || true
