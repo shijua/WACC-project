@@ -15,6 +15,9 @@ build-docker-image:
     - sh ./get-docker.sh
     - apt install sudo
     - sudo systemctl start docker
+    - sudo groupadd docker
+    - sudo usermod -aG docker $USER
+    
   script:
     - docker stop $IMAGE_TAG || true
     - docker rm $IMAGE_TAG || true
