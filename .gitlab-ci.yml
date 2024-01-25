@@ -10,11 +10,11 @@ stages:
 build-docker-image:
   stage: build
   before_script:
-    # Add Docker's official GPG key:
+    # install docker
     - curl -fsSL https://get.docker.com -o get-docker.sh
     - sh ./get-docker.sh
     - apt install sudo
-    - systemctl start docker
+    - sudo systemctl start docker
   script:
     - docker stop $IMAGE_TAG || true
     - docker rm $IMAGE_TAG || true
