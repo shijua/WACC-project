@@ -1,3 +1,4 @@
+use chumsky::combinator::ToSlice;
 use chumsky::prelude::*;
 use chumsky::{extra, text, Parser};
 
@@ -108,11 +109,16 @@ pub fn lexer<'src>(
         .to_slice()
         .map(Token::StrToken);
 
-    // let char_token = just('\'')
-    //     .ignore_then(none_of('\'').repeated())
-    //     .then_ignore(just('\''))
-    //     .to_slice()
-    //     .map(Token::CharToken);
+    // A parser for characters
+    let char_token = just('\'')
+        .ignore_then(none_of('\'').repeated())
+        .then_ignore(just('\''))
+        .to_slice()
+        .map(Token::StrToken)
+        .map(|s| match s {
+            Token::StrToken(c) => Token::CharToken(c.chars().nth(1).unwrap()),
+            _ => panic!("This should never happen"),
+        });
 
     // A parser for operators
     let op = one_of("+-!*%/>=<&|")
@@ -170,7 +176,7 @@ pub fn lexer<'src>(
 
     let token = num_token
         .or(str_token)
-        // .or(char_token)
+        .or(char_token)
         .or(ident)
         .or(op)
         .or(ctrl);
@@ -276,5 +282,31 @@ mod lexer_tests {
             work(input),
             vec![Token::Println, Token::Op("-"), Token::IntToken(1)]
         );
+    }
+
+    #[test]
+    #[should_panic]
+    fn cannot_lex_string_with_unusual_ascii() {
+        let input = (5u8 as char).to_string();
+        work(&input);
+    }
+    
+    #[test]
+    fn can_lex_string_with_usual_ascii() {
+        let input = (48u8 as char).to_string();
+        assert_eq!(work(&input), vec![Token::IntToken(0)]);
+    }
+    
+    #[test]
+    fn can_lex_char() {
+        let input = "\'a\'";
+        assert_eq!(work(input), vec![Token::CharToken('a')]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn cannot_lex_char_unusual_ascii() {
+        let input = "👨";
+        work(input);
     }
 }
