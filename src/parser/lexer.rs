@@ -5,7 +5,7 @@ use chumsky::{extra, text, Parser};
 pub enum Token<'src> {
     IntToken(i32),
     StrToken(&'src str),
-    CharToken(&'src str),
+    CharToken(char),
     Ident(&'src str),
     Bool(bool),
     Op(&'src str),
@@ -108,11 +108,11 @@ pub fn lexer<'src>(
         .to_slice()
         .map(Token::StrToken);
 
-    let char_token = just('\'')
-        .ignore_then(none_of('\'').repeated())
-        .then_ignore(just('\''))
-        .to_slice()
-        .map(Token::CharToken);
+    // let char_token = just('\'')
+    //     .ignore_then(none_of('\'').repeated())
+    //     .then_ignore(just('\''))
+    //     .to_slice()
+    //     .map(Token::CharToken);
 
     // A parser for operators
     let op = one_of("+-!*%/>=<&|")
@@ -170,7 +170,7 @@ pub fn lexer<'src>(
 
     let token = num_token
         .or(str_token)
-        .or(char_token)
+        // .or(char_token)
         .or(ident)
         .or(op)
         .or(ctrl);
