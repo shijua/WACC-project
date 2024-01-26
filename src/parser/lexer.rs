@@ -271,7 +271,10 @@ mod lexer_tests {
 
     #[test]
     fn can_lex_mixed_format() {
-        let input = "println";
-        assert_eq!(work(input), vec![Token::Println]);
+        let input = "println-1";
+        assert_eq!(
+            work(input),
+            vec![Token::Println, Token::Op("-"), Token::IntToken(1)]
+        );
     }
 }
