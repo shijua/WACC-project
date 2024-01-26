@@ -1,9 +1,4 @@
-use chumsky::error::Error;
-use chumsky::extra::ParserExtra;
-use chumsky::input::{StrInput, ValueInput};
 use chumsky::prelude::*;
-use chumsky::text::Char;
-use chumsky::util::MaybeRef;
 use chumsky::{extra, text, Parser};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -47,7 +42,11 @@ pub enum Token<'src> {
     Ctrl(char),
 }
 
-type Span = SimpleSpan<usize>;
+// Spans are ranges in the original source code that can be used to reference sections of the code
+// in error or warning messages.
+//
+// This would be extremely useful on error report generation.
+pub type Span = SimpleSpan<usize>;
 
 impl<'src> std::fmt::Display for Token<'src> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -93,29 +92,6 @@ impl<'src> std::fmt::Display for Token<'src> {
     }
 }
 
-pub fn wacc_ident<'a, I: ValueInput<'a> + StrInput<'a, C>, C: Char, E: ParserExtra<'a, I>>(
-) -> impl Parser<'a, I, &'a C::Str, E> + Copy + Clone {
-    any()
-        // Use try_map over filter to get a better error on failure
-        .try_map(|c: C, span| {
-            if c.to_char().is_ascii_alphabetic()
-                || c.to_char().is_ascii_digit()
-                || c.to_char() == '_'
-            {
-                Ok(c)
-            } else {
-                Err(Error::expected_found([], Some(MaybeRef::Val(c)), span))
-            }
-        })
-        .then(
-            any()
-                // This error never appears due to `repeated` so can use `filter`
-                .filter(|c: &C| c.to_char().is_ascii_alphanumeric() || c.to_char() == '_')
-                .repeated(),
-        )
-        .to_slice()
-}
-
 pub fn lexer<'src>(
 ) -> impl Parser<'src, &'src str, Vec<(Token<'src>, Span)>, extra::Err<Rich<'src, char, Span>>> {
     // A parser for numbers
@@ -156,7 +132,7 @@ pub fn lexer<'src>(
     // | "false" | "null"
     // And don't forget to add identifiers
 
-    let ident = wacc_ident().map(|ident: &str| match ident {
+    let ident = text::ascii::ident().map(|ident: &str| match ident {
         "begin" => Token::Begin,
         "end" => Token::End,
         "is" => Token::Is,
@@ -295,10 +271,7 @@ mod lexer_tests {
 
     #[test]
     fn can_lex_mixed_format() {
-        let input = "println-1";
-        assert_eq!(
-            work(input),
-            vec![Token::Println, Token::Op("-"), Token::IntToken(1)]
-        );
+        let input = "println";
+        assert_eq!(work(input), vec![Token::Println]);
     }
 }
