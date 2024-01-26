@@ -108,6 +108,7 @@ pub fn lexer<'src>(
         .to_slice()
         .map(Token::StrToken);
 
+    // A parser for characters
     // let char_token = just('\'')
     //     .ignore_then(none_of('\'').repeated())
     //     .then_ignore(just('\''))
@@ -276,5 +277,25 @@ mod lexer_tests {
             work(input),
             vec![Token::Println, Token::Op("-"), Token::IntToken(1)]
         );
+    }
+
+    #[test]
+    #[should_panic]
+    fn can_lex_string_with_unusual_ascii() {
+        let input = (5u8 as char).to_string();
+        work(&input);
+    }
+    
+    #[test]
+    fn can_lex_string_with_usual_ascii() {
+        let input = (48u8 as char).to_string();
+        assert_eq!(work(&input), vec![Token::IntToken(0)]);
+    }
+    
+    #[test]
+    #[ignore = "not implemented"]
+    fn can_lex_char() {
+        let input = "\'a\'";
+        assert_eq!(work(input), vec![Token::CharToken('a')]);
     }
 }
