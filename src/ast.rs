@@ -85,5 +85,5 @@ pub enum Expr<'src> {
         BinaryOperator,
         Box<Spanned<Expr<'src>>>,
     ),
-    Bracketed(Self),
+    Bracketed(Box<Spanned<Expr<'src>>>),
 }
