@@ -1,22 +1,20 @@
 use crate::parser::lexer::Spanned;
 
 // Abstract Syntax Tree Node Specification
-#[derive(PartialEq, Clone, Debug)]
-pub enum UnaryOperator {
+#[derive(PartialEq, Debug, Clone)]
+pub enum Operator {
+    // Unary Operators
     Bang,
-    Negate,
     Len,
     Ord,
     Chr,
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub enum BinaryOperator {
+    // Duplicated Operator: Minus (works both as unary "negate" or binary "subtraction")
+    Minus,
+    // Binary Operators
     Mul,
     Div,
     Modulo,
     Add,
-    Sub,
     Gt,
     Gte,
     Lt,
@@ -75,15 +73,7 @@ pub enum Expr<'src> {
     ArrayElem(ArrayElem<'src>),
     // PairElem: i.e. NULL is integrated as BaseValue(BaseValue::Null)
     Ident(&'src str),
-    UnaryApp(
-        UnaryOperator,
-        Box<Spanned<Expr<'src>>>,
-        Box<Spanned<Expr<'src>>>,
-    ),
-    BinaryApp(
-        Box<Spanned<Expr<'src>>>,
-        BinaryOperator,
-        Box<Spanned<Expr<'src>>>,
-    ),
+    UnaryApp(Operator, Box<Spanned<Expr<'src>>>, Box<Spanned<Expr<'src>>>),
+    BinaryApp(Box<Spanned<Expr<'src>>>, Operator, Box<Spanned<Expr<'src>>>),
     Bracketed(Box<Spanned<Expr<'src>>>),
 }
