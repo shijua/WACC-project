@@ -4,10 +4,22 @@ use crate::ast::BaseValue::*;
 use crate::ast::{ArrayElem, Expr, Operator};
 use crate::parser::lexer::{ParserInput, Span, Spanned, Token};
 use chumsky::error::Rich;
-use chumsky::pratt::{infix, prefix};
+use chumsky::pratt::{infix, left, prefix};
 use chumsky::prelude::*;
 use chumsky::recursive::recursive;
 use chumsky::{extra, select, Parser};
+
+fn unary_combine(op: Operator, r: Spanned<Expr>) -> Expr {
+    Expr::UnaryApp(op, Box::new(r))
+}
+
+fn binary_combine<'src>(
+    op: Operator,
+    l: Spanned<Expr<'src>>,
+    r: Spanned<Expr<'src>>,
+) -> Expr<'src> {
+    Expr::BinaryApp(op, Box::new(l), Box::new(r))
+}
 
 pub fn expr_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     'tokens,
@@ -15,7 +27,7 @@ pub fn expr_parser<'tokens, 'src: 'tokens>() -> impl Parser<
     Spanned<Expr<'src>>,
     extra::Err<Rich<'tokens, Token<'src>, Span>>,
 > + Clone {
-    recursive(|expr| {
+    let base_expr = recursive(|expr| {
         // The Basic Literal Values of Expr
         let base_value = select! {
             Token::Null => Expr::BaseValue(Null),
@@ -27,19 +39,11 @@ pub fn expr_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         .labelled("base value");
 
         // Identifiers
-        // TODO: What about Scoping?
         let ident = select! {
             Token::Ident(x) => x,
         }
         .labelled("identifiers");
 
-        // Bracketed Expressions
-        // let bracketed = expr
-        //     .clone()
-        //     .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
-        //     .map(|inner_expr| Expr::Bracketed(Box::new(inner_expr)));
-
-        // TODO: Array Parsing
         // Array indices
         let array_indices = expr
             .clone()
@@ -59,21 +63,7 @@ pub fn expr_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         // map array_elem to the ArrayElem Structure
 
         // 'Atom' are expressions (at this stage) without possibility of ambiguity
-        let atom = base_value
-            .or(array_elem)
-            .or(ident.map(Expr::Ident))
-            .map_with(|expr, e| (expr, e.span()))
-            .or(expr
-                .clone()
-                .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')'))))
-            // Attempt to recover anything that looks like a parenthesised expression but contains errors
-            // .recover_with(via_parser(nested_delimiters(
-            //     Token::Ctrl('('),
-            //     Token::Ctrl(')'),
-            //     [(Token::Ctrl('['), Token::Ctrl(']'))],
-            //     |span| (Expr::Error, span),
-            // )))
-            ;
+        let atom = base_value.or(array_elem).or(ident.map(Expr::Ident));
 
         // Then we come to handling unary applications and binary applications.
         // Chumsky library provides us with the newest "pratt parsing" functionality.
@@ -104,16 +94,52 @@ pub fn expr_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         // We would be needing a precedence table for pratt parsing.
         // The WACC Specification has already given us one, but the precedence in that
         // should be flipped to match Parser::pratt.
-        // Now, 7 to 1 is from tightest bindings to weakest.
-        // 7: prefix, ‘!’, ‘-’, ‘len’, ‘ord’, ‘chr’
-        // 6: infix left, ‘*’, ‘%’, ‘/’
-        // 5: infix left, ‘+’, ‘-’
-        // 4: infix non, ‘>’, ‘>=’, ‘<’, ‘<=’
-        // 3: infix non, ‘==’, ‘!=’
-        // 2: infix right, ‘&&’
-        // 1: infix right, ‘||’
+        // Now, 6 to 0 is from tightest bindings to weakest.
+        // 6: prefix, ‘!’, ‘-’, ‘len’, ‘ord’, ‘chr’
+        // 5: infix left, ‘*’, ‘%’, ‘/’
+        // 4: infix left, ‘+’, ‘-’
+        // 3: infix non, ‘>’, ‘>=’, ‘<’, ‘<=’
+        // 2: infix non, ‘==’, ‘!=’
+        // 1: infix right, ‘&&’
+        // 0: infix right, ‘||’
         // TODO: Implement Pratt Parsing (see official doc for examples)
 
-        atom.clone()
-    })
+        let atomic_parser = atom
+            .clone()
+            // .pratt((
+            //     infix(left(4), just('+'), |l, r| {
+            //         binary_combine(Operator::Add, l, r)
+            //     }),
+            //     infix(left(0), just('-'), |l, r| {
+            //         binary_combine(Operator::Minus, l, r)
+            //     }),
+            // ))
+            .map_with(|expr, e| (expr, e.span()))
+            // bracketed expressions
+            .or(expr
+                .clone()
+                .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')'))))
+            // attempt to recover anything that looks like a parenthesised expression but contains errors
+            .recover_with(via_parser(nested_delimiters(
+                Token::Ctrl('('),
+                Token::Ctrl(')'),
+                [(Token::Ctrl('['), Token::Ctrl(']'))],
+                |span| (Expr::Error, span),
+            )));
+        atomic_parser
+    });
+    base_expr
+    // let atomic = base_expr.clone().pratt((
+    //     infix::<_, _, Operator, Expr>(
+    //         left(4),
+    //         just::<Token<'_>, _, extra::Err<Rich<'tokens, Token<'src>, Span>>>(
+    //             Token::Op("+"),
+    //         ),
+    //         |l, r| binary_combine(Operator::Add, l, r),
+    //     ),
+    //     // infix(left(0), just(Token::Op("-")), |l, r| {
+    //     //     binary_combine(Operator::Minus, l, r)
+    //     // }),
+    // ));
+    // atomic //.map_with(|expr, e| (expr, e.span()))
 }

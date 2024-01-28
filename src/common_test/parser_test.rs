@@ -50,4 +50,10 @@ mod parser_tests {
         let input = "ident[11][12]";
         workout_absolutely_correct_expr(input);
     }
+
+    #[test]
+    fn can_parse_nested_expr() {
+        let input = "(ident[(11)])";
+        workout_absolutely_correct_expr(input);
+    }
 }
