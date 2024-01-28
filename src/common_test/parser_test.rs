@@ -39,6 +39,12 @@ mod parser_tests {
         );
     }
 
+    #[test]
+    fn can_parse_bracketed() {
+        let input = "(12)";
+        workout_absolutely_correct_expr(input);
+    }
+
     // #[test]
     // fn can_parse_array() {
     //     let input = "ident[11]";

@@ -76,7 +76,7 @@ pub enum Expr<'src> {
     ArrayElem(ArrayElem<'src>),
     // PairElem: i.e. NULL is integrated as BaseValue(BaseValue::Null)
     Ident(&'src str),
-    UnaryApp(Operator, Box<Spanned<Expr<'src>>>, Box<Spanned<Expr<'src>>>),
-    BinaryApp(Box<Spanned<Expr<'src>>>, Operator, Box<Spanned<Expr<'src>>>),
+    UnaryApp(Operator, Box<Spanned<Expr<'src>>>),
+    BinaryApp(Operator, Box<Spanned<Expr<'src>>>, Box<Spanned<Expr<'src>>>),
     Bracketed(Box<Spanned<Expr<'src>>>),
 }
