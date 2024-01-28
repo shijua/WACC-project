@@ -58,7 +58,10 @@ impl<'src> std::fmt::Display for BaseValue<'src> {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct ArrayElem<'src>(pub &'src str, pub Vec<Spanned<Expr<'src>>>);
+pub struct ArrayElem<'src> {
+    pub ident: &'src str,
+    pub indices: Vec<Spanned<Expr<'src>>>,
+}
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum PairElem<'src> {
