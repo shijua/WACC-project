@@ -45,9 +45,9 @@ mod parser_tests {
         workout_absolutely_correct_expr(input);
     }
 
-    // #[test]
-    // fn can_parse_array() {
-    //     let input = "ident[11]";
-    //     workout_absolutely_correct_expr(input);
-    // }
+    #[test]
+    fn can_parse_array() {
+        let input = "ident[11][12]";
+        workout_absolutely_correct_expr(input);
+    }
 }

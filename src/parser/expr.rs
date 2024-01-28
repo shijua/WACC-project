@@ -34,10 +34,10 @@ pub fn expr_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         .labelled("identifiers");
 
         // Bracketed Expressions
-        let bracketed = expr
-            .clone()
-            .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
-            .map(|inner_expr| Expr::Bracketed(Box::new(inner_expr)));
+        // let bracketed = expr
+        //     .clone()
+        //     .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
+        //     .map(|inner_expr| Expr::Bracketed(Box::new(inner_expr)));
 
         // TODO: Array Parsing
         // Array indices
@@ -53,24 +53,27 @@ pub fn expr_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             .map(|(ident_name, indices_vec)| {
                 Expr::ArrayElem(ArrayElem {
                     ident: ident_name,
-                    indices: indices_vec,
+                    indices: indices_vec.clone(),
                 })
             });
         // map array_elem to the ArrayElem Structure
 
         // 'Atom' are expressions (at this stage) without possibility of ambiguity
         let atom = base_value
-            .or(ident.map(Expr::Ident))
-            .or(bracketed)
             .or(array_elem)
+            .or(ident.map(Expr::Ident))
             .map_with(|expr, e| (expr, e.span()))
+            .or(expr
+                .clone()
+                .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')'))))
             // Attempt to recover anything that looks like a parenthesised expression but contains errors
-            .recover_with(via_parser(nested_delimiters(
-                Token::Ctrl('('),
-                Token::Ctrl(')'),
-                [(Token::Ctrl('['), Token::Ctrl(']'))],
-                |span| (Expr::Error, span),
-            )));
+            // .recover_with(via_parser(nested_delimiters(
+            //     Token::Ctrl('('),
+            //     Token::Ctrl(')'),
+            //     [(Token::Ctrl('['), Token::Ctrl(']'))],
+            //     |span| (Expr::Error, span),
+            // )))
+            ;
 
         // Then we come to handling unary applications and binary applications.
         // Chumsky library provides us with the newest "pratt parsing" functionality.

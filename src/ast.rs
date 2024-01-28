@@ -78,5 +78,4 @@ pub enum Expr<'src> {
     Ident(&'src str),
     UnaryApp(Operator, Box<Spanned<Expr<'src>>>),
     BinaryApp(Operator, Box<Spanned<Expr<'src>>>, Box<Spanned<Expr<'src>>>),
-    Bracketed(Box<Spanned<Expr<'src>>>),
 }
