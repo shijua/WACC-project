@@ -1,11 +1,11 @@
 // <Expr> (expressions) syntax parser & analysis
 
 use crate::ast::BaseValue::*;
-use crate::ast::{Expr, Operator};
+use crate::ast::{ArrayElem, Expr, Operator};
 use crate::parser::lexer::{ParserInput, Span, Spanned, Token};
 use chumsky::error::Rich;
 use chumsky::pratt::{infix, prefix};
-use chumsky::prelude::{just, nested_delimiters, via_parser};
+use chumsky::prelude::*;
 use chumsky::recursive::recursive;
 use chumsky::{extra, select, Parser};
 
@@ -29,7 +29,7 @@ pub fn expr_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         // Identifiers
         // TODO: What about Scoping?
         let ident = select! {
-            Token::Ident(x) => Expr::Ident(x),
+            Token::Ident(x) => x,
         }
         .labelled("identifiers");
 
@@ -41,19 +41,28 @@ pub fn expr_parser<'tokens, 'src: 'tokens>() -> impl Parser<
 
         // TODO: Array Parsing
         // Array indices
-        // let array_indices = expr
-        //     .clone()
-        //     .delimited_by(just(Token::Ctrl('[')), just(Token::Ctrl(']')))
-        //     .repeated()
-        //     .at_least(1)
-        //     .collect::<Vec<_>>();
-        // let array_elem = ident.clone().then(array_indices);
+        let array_indices = expr
+            .clone()
+            .delimited_by(just(Token::Ctrl('[')), just(Token::Ctrl(']')))
+            .repeated()
+            .at_least(1)
+            .collect::<Vec<_>>();
+        let array_elem = ident
+            .clone()
+            .then(array_indices)
+            .map(|(ident_name, indices_vec)| {
+                Expr::ArrayElem(ArrayElem {
+                    ident: ident_name,
+                    indices: indices_vec,
+                })
+            });
         // map array_elem to the ArrayElem Structure
 
         // 'Atom' are expressions (at this stage) without possibility of ambiguity
         let atom = base_value
-            .or(ident)
+            .or(ident.map(Expr::Ident))
             .or(bracketed)
+            .or(array_elem)
             .map_with(|expr, e| (expr, e.span()))
             // Attempt to recover anything that looks like a parenthesised expression but contains errors
             .recover_with(via_parser(nested_delimiters(
