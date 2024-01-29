@@ -1,12 +1,11 @@
 use nom::branch::alt;
-use nom::bytes::complete::is_not;
-use nom::character::complete::char as char_nom;
-use nom::combinator::{opt, value};
-use nom::multi::many0;
+use nom::bytes::complete::{is_not, tag};
+use nom::character::complete::{alpha1, alphanumeric1, char as char_nom};
+use nom::combinator::{map, opt, recognize, value, verify};
+use nom::multi::{many0, many0_count};
 use nom::sequence::{pair, terminated};
-use nom::{
-    character::complete::multispace0, error::ParseError, sequence::delimited, IResult, Parser,
-};
+use nom::{error::ParseError, IResult, Parser};
+use nom_supreme::error::ErrorTree;
 
 // https://github.com/rust-bakery/nom/blob/main/doc/nom_recipes.md
 // fn ws<'a, F, O, E: ParseError<&'a str>>(inner: F) -> impl Parser<&'a str, O, E>
@@ -55,4 +54,55 @@ where
     F: Parser<&'a str, O, E>,
 {
     terminated(inner, unused_comment_or_whitespace)
+}
+
+fn is_wacc_keyword(ident: &str) -> bool {
+    match ident {
+        "true" | "false" | "null" | "len" | "ord" | "chr" | "int" | "bool" | "char" | "string"
+        | "pair" | "begin" | "end" | "is" | "skip" | "read" | "free" | "return" | "exit"
+        | "print" | "println" | "if" | "then" | "else" | "fi" | "while" | "do" | "done"
+        | "newpair" | "call" | "fst" | "snd" => true,
+        _ => false,
+    }
+}
+
+/*
+   Identifier Recognition ( ‘_’ | ‘a’-‘z’ | ‘A’-‘Z’ ) ( ‘_’ | ‘a’-‘z’ | ‘A’-‘Z’ | ‘0’-‘9’ )*
+   However,
+*/
+pub fn ident(input: &str) -> IResult<&str, String, ErrorTree<&str>> {
+    let ident_parser = map(
+        recognize(pair(
+            alt((alpha1, tag("_"))),
+            many0_count(alt((alphanumeric1, tag("_")))),
+        )),
+        |x: &str| x.to_string(),
+    );
+
+    consume_meaningless(verify(ident_parser, |id| !is_wacc_keyword(id)))(input)
+}
+
+/*
+    many0, but each of the elements are seperated by another parser, and delimited,
+    the result of which is thrown away.
+*/
+pub fn many0_delimited<'a, Oe, Od, Ep: 'a, Dp: 'a, E>(
+    element: Ep,
+    delimiter: Dp,
+) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<Oe>, E>
+where
+    E: ParseError<&'a str>,
+    Ep: Parser<&'a str, Oe, E> + Copy,
+    Dp: Parser<&'a str, Od, E>,
+{
+    map(
+        opt(pair(many0(terminated(element, delimiter)), element)),
+        |x| match x {
+            Some((mut elements, last)) => {
+                elements.push(last);
+                elements
+            }
+            None => Vec::new(),
+        },
+    )
 }
