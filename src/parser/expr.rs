@@ -119,13 +119,69 @@ pub fn expr_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             )))
             .boxed();
 
-        let op = just(Token::Op("*")).to(Operator::Mul);
-        let product = atomic_parser
+        // let binary_app = |a, (op, b), e| (Expr::BinaryApp(op, Box::new(a), Box::new(b)), e.span());
+
+        // 5: infix left, ‘*’, ‘%’, ‘/’
+        let op = select! {
+            Token::Op("*") => Operator::Mul,
+            Token::Op("%") => Operator::Modulo,
+            Token::Op("/") => Operator::Div,
+        };
+        let prec_5 = atomic_parser
             .clone()
             .foldl_with(op.then(atomic_parser).repeated(), |a, (op, b), e| {
                 (Expr::BinaryApp(op, Box::new(a), Box::new(b)), e.span())
             });
-        product
+
+        // 4: infix left, ‘+’, ‘-’
+        let op = select! {
+            Token::Op("+") => Operator::Add,
+            Token::Op("-") => Operator::Sub,
+        };
+        let prec_4 = prec_5
+            .clone()
+            .foldl_with(op.then(prec_5).repeated(), |a, (op, b), e| {
+                (Expr::BinaryApp(op, Box::new(a), Box::new(b)), e.span())
+            });
+
+        // // 3: infix non, ‘>’, ‘>=’, ‘<’, ‘<=’
+        // let op = select! {
+        //     Token::Op(">") => Operator::Gt,
+        //     Token::Op(">=") => Operator::Gte,
+        //     Token::Op("<") => Operator::Lt,
+        //     Token::Op("<=") => Operator::Lte,
+        // };
+        // let prec_3 = prec_4
+        //     .clone()
+        //     .then(op)
+        //     .then(prec_4.clone())
+        //     .map_with(|((a, op), b), e| (Expr::BinaryApp(op, Box::new(a), Box::new(b)), e.span()));
+        //
+        // // 2: infix non, ‘==’, ‘!=’
+        // let op = select! {
+        //     Token::Op("==") => Operator::Eq,
+        //     Token::Op("!=") => Operator::Neq,
+        // };
+        // let prec_2 = prec_3
+        //     .clone()
+        //     .then(op)
+        //     .then(prec_3.clone())
+        //     .map_with(|((a, op), b), e| (Expr::BinaryApp(op, Box::new(a), Box::new(b)), e.span()));
+
+        // 1: infix right, ‘&&’
+        // let op = select! {
+        //     Token::Op("&&") => Operator::And,
+        // };
+
+        //let prec_1 = prec_4.clone().then(op);
+
+        // let prec_1 = prec_4
+        //     .clone()
+        //     .foldr_with(op.then(prec_4).repeated(), |a, (op, b), e| {
+        //         //(Expr::BinaryApp(op, Box::new(a), Box::new(b)), e.span())
+        //     });
+
+        prec_4.clone()
     });
     base_expr
     // let atomic = base_expr.clone().pratt((

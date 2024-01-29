@@ -65,7 +65,27 @@ mod parser_tests {
 
     #[test]
     fn can_parse_nested_mul() {
-        let input = "(1 * 2) * (3 * 4)";
+        let input = "(1 * 2) % (3 / 4)";
+        workout_absolutely_correct_expr(input);
+    }
+
+    #[test]
+    fn can_parse_consecutive() {
+        let input = "1 + 2 + 3";
+        workout_absolutely_correct_expr(input);
+    }
+
+    #[test]
+    #[should_panic]
+    fn cannot_parse_non_associative_consecutive() {
+        let input = "1 + 2 < 3 + 4 < 5 + 6";
+        workout_absolutely_correct_expr(input);
+    }
+
+    #[test]
+    #[ignore]
+    fn can_work_with_multiple() {
+        let input = "((1 < 2) == (3 < 4))";
         workout_absolutely_correct_expr(input);
     }
 }

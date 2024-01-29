@@ -8,7 +8,6 @@ pub enum Operator {
     Len,
     Ord,
     Chr,
-    // Duplicated Operator: Minus (works both as unary "negate" or binary "subtraction")
     Neg,
     // Binary Operators
     Mul,
