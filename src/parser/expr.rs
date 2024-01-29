@@ -4,7 +4,6 @@ use crate::ast::BaseValue::*;
 use crate::ast::{ArrayElem, Expr, Operator};
 use crate::parser::lexer::{ParserInput, Span, Spanned, Token};
 use chumsky::error::Rich;
-use chumsky::pratt::{infix, left, prefix};
 use chumsky::prelude::*;
 use chumsky::recursive::recursive;
 use chumsky::{extra, select, Parser};
