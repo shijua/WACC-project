@@ -9,12 +9,13 @@ pub enum Operator {
     Ord,
     Chr,
     // Duplicated Operator: Minus (works both as unary "negate" or binary "subtraction")
-    Minus,
+    Neg,
     // Binary Operators
     Mul,
     Div,
     Modulo,
     Add,
+    Sub,
     Gt,
     Gte,
     Lt,
