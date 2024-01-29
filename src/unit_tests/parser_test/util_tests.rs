@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod parser_tests {
+mod util_tests {
     use crate::parser::util::{ident, process_comment, unused_comment_or_whitespace};
     #[test]
     fn simple_comments() {
