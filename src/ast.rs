@@ -1,4 +1,4 @@
-use crate::parser::lexer::Spanned;
+use crate::parser::util::Spanned;
 
 // Abstract Syntax Tree Node Specification
 #[derive(PartialEq, Debug, Clone)]

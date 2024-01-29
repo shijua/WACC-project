@@ -2,7 +2,8 @@
 
 use crate::ast::BaseValue::*;
 use crate::ast::{ArrayElem, Expr, Operator};
-use crate::parser::lexer::{ParserInput, Span, Spanned, Token};
+use crate::parser::lexer::{ParserInput, Token};
+use crate::parser::util::{Span, Spanned};
 use chumsky::error::Rich;
 use chumsky::prelude::*;
 use chumsky::recursive::recursive;
