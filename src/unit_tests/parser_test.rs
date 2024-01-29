@@ -18,6 +18,8 @@ mod parser_tests {
         // ident can recognize keywords and would not accept them
         assert!(ident("true").is_err());
         assert!(ident("  free   ").is_err());
+        // ident can recognize keywords even separated by non-space delimiters
+        assert!(ident("println-1").is_err());
         // ident know split keywords are not keywords
         assert!(matches!(ident("le n"), Ok(("n", ast)) if ast == "le".to_string()));
         // ident can recognize concatenation of two keywords without delimiters

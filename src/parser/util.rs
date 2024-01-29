@@ -1,19 +1,13 @@
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag};
-use nom::character::complete::{alpha1, alphanumeric1, char as char_nom};
-use nom::combinator::{map, opt, recognize, value, verify};
+use nom::character::complete::{alpha1, alphanumeric1, anychar, char as char_nom, multispace0};
+use nom::combinator::{map, not, opt, recognize, value, verify};
 use nom::multi::{many0, many0_count};
-use nom::sequence::{pair, terminated};
+use nom::sequence::{delimited, pair, terminated};
 use nom::{error::ParseError, IResult, Parser};
 use nom_supreme::error::ErrorTree;
 
 // https://github.com/rust-bakery/nom/blob/main/doc/nom_recipes.md
-// fn ws<'a, F, O, E: ParseError<&'a str>>(inner: F) -> impl Parser<&'a str, O, E>
-// where
-//     F: Parser<&'a str, O, E>,
-// {
-//     delimited(multispace0, inner, multispace0)
-// }
 
 /*
     Drops and eats comment.
@@ -56,14 +50,48 @@ where
     terminated(inner, unused_comment_or_whitespace)
 }
 
+pub fn lex<'a, E: 'a + ParseError<&'a str>>(
+    input: &'a str,
+) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, E> {
+    consume_meaningless(tag(input))
+}
+
 fn is_wacc_keyword(ident: &str) -> bool {
-    match ident {
-        "true" | "false" | "null" | "len" | "ord" | "chr" | "int" | "bool" | "char" | "string"
-        | "pair" | "begin" | "end" | "is" | "skip" | "read" | "free" | "return" | "exit"
-        | "print" | "println" | "if" | "then" | "else" | "fi" | "while" | "do" | "done"
-        | "newpair" | "call" | "fst" | "snd" => true,
-        _ => false,
-    }
+    matches!(
+        ident,
+        "true"
+            | "false"
+            | "null"
+            | "len"
+            | "ord"
+            | "chr"
+            | "int"
+            | "bool"
+            | "char"
+            | "string"
+            | "pair"
+            | "begin"
+            | "end"
+            | "is"
+            | "skip"
+            | "read"
+            | "free"
+            | "return"
+            | "exit"
+            | "print"
+            | "println"
+            | "if"
+            | "then"
+            | "else"
+            | "fi"
+            | "while"
+            | "do"
+            | "done"
+            | "newpair"
+            | "call"
+            | "fst"
+            | "snd"
+    )
 }
 
 /*
@@ -80,6 +108,20 @@ pub fn ident(input: &str) -> IResult<&str, String, ErrorTree<&str>> {
     );
 
     consume_meaningless(verify(ident_parser, |id| !is_wacc_keyword(id)))(input)
+}
+
+/*
+   Recognize keyword patterns
+*/
+pub fn keyword<'a, E: 'a + ParseError<&'a str>>(
+    input: &'a str,
+) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, E> {
+    let ident_checker = not(verify(anychar, |c| c.is_alphanumeric() || (*c) == '_'));
+    delimited(
+        multispace0,
+        terminated(tag(input), ident_checker),
+        multispace0,
+    )
 }
 
 /*
