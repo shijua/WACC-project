@@ -6,4 +6,4 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-chumsky = {version = "1.0.0-alpha.6", features = ["pratt"]}
+nom = {version = "7.1.3"}

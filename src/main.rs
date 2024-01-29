@@ -1,5 +1,6 @@
 mod parser;
+mod unit_tests;
 
 fn main() {
-    println!("{}",parser::lexer::work("42"));
+    println!("hello world");
 }
