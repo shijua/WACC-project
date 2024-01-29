@@ -1,0 +1,68 @@
+use crate::ast::Expr;
+use crate::parser::util::{consume_meaningless, ident, lex};
+use nom::branch::alt;
+use nom::bytes::complete::tag;
+use nom::character::complete::satisfy;
+use nom::combinator::{map, value};
+use nom::multi::many0;
+use nom::sequence::{delimited, preceded};
+use nom::IResult;
+use nom_supreme::error::ErrorTree;
+
+fn is_valid_single_ascii(chr: u8) -> bool {
+    (chr >= 0x20 && chr < 0x80) && (chr != b'\'') && (chr != b'\"') && (chr != b'\\')
+}
+
+fn char_parser(input: &str) -> IResult<&str, char, ErrorTree<&str>> {
+    // <escaped_char> ::= ‘0’|‘b’|‘t’|‘n’|‘f’|‘r’|‘"’|‘'’|‘\’
+    let escaped_char = alt((
+        value('\0', tag("0")),
+        value('\u{8}', tag("b")), // Backspace Representation in Rust
+        value('\t', tag("t")),
+        value('\n', tag("n")),
+        value('\u{c}', tag("f")), // Form Feed Representation in Rust
+        value('\r', tag("r")),
+        value('\"', tag("\"")),
+        value('\'', tag("\'")),
+        value('\\', tag("\\")),
+    ));
+    // available characters should either be escaped char patterns or graphic ascii characters without \, ', ".
+    alt((
+        satisfy(|c| is_valid_single_ascii(c as u8)),
+        preceded(tag("\\"), escaped_char),
+    ))(input)
+}
+
+pub fn expr_atom_literal(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
+    // <bool-liter> ::= ‘true’ | ‘false’
+    let bool_liter = alt((
+        value(Expr::BoolLiter(true), lex("true")),
+        value(Expr::BoolLiter(false), lex("false")),
+    ));
+
+    // <char-liter> ::= ::= ‘'’ ⟨character⟩ ‘'’
+    let char_liter = consume_meaningless(delimited(
+        tag("\'"),
+        map(char_parser, Expr::CharLiter),
+        tag("\'"),
+    ));
+
+    // <str-liter> ::= ‘"’ ⟨character⟩* ‘"’
+    let str_liter = consume_meaningless(delimited(
+        tag("\""),
+        map(many0(char_parser), |char_vec| {
+            Expr::StrLiter(char_vec.iter().collect()) // collect a Vec<char> to String
+        }),
+        tag("\""),
+    ));
+
+    // <pair-liter> ::= ‘null’
+    let pair_liter = consume_meaningless(value(Expr::PairLiter, lex("null")));
+
+    let ident_atom = map(ident, Expr::Ident);
+
+    let (mut input, mut e) =
+        alt((bool_liter, char_liter, str_liter, pair_liter, ident_atom))(input)?;
+
+    Ok((input, e))
+}
