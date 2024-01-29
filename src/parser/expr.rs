@@ -5,6 +5,8 @@ use crate::ast::{ArrayElem, Expr, Operator};
 use crate::parser::lexer::{ParserInput, Token};
 use crate::parser::util::{Span, Spanned};
 use chumsky::error::Rich;
+use chumsky::input::MapExtra;
+use chumsky::pratt::{infix, left};
 use chumsky::prelude::*;
 use chumsky::recursive::recursive;
 use chumsky::{extra, select, Parser};
@@ -182,7 +184,21 @@ pub fn expr_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         //         //(Expr::BinaryApp(op, Box::new(a), Box::new(b)), e.span())
         //     });
 
-        prec_4.clone()
+        let expanded = prec_4.clone();
+
+        // let pratt_parser = expanded.map_with(|expr, e| (expr, e.span())).pratt(
+        //     (infix(
+        //         left(4),
+        //         just::<Token<'_>, ParserInput, extra::Err<Rich<'tokens, Token<'src>, Span>>>(
+        //             Token::Op("+"),
+        //         ),
+        //         |lhs, op, rhs, e: &mut MapExtra<_, _>| {
+        //             (Expr::BinaryApp(Operator::Add, lhs, rhs), e.span())
+        //         },
+        //     )),
+        // );
+
+        expanded.clone()
     });
     base_expr
     // let atomic = base_expr.clone().pratt((
