@@ -1,2 +1,2 @@
-mod lexer_test;
-mod parser_test;
+pub mod lexer_test;
+pub mod parser_test;
