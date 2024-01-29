@@ -40,7 +40,7 @@ mod lexer_tests {
     #[test]
     fn can_lex_string_literals() {
         let input = r#""hello""#;
-        assert_eq!(work(input), vec![Token::StrToken(r#""hello""#)]);
+        assert_eq!(work(input), vec![Token::StrToken(r#"hello"#)]);
     }
 
     #[test]
@@ -52,6 +52,21 @@ mod lexer_tests {
 
     #[test]
     fn can_lex_mixture() {
+        let input = r#"123 "string" 908"#;
+        assert_eq!(
+            work(input),
+            vec![
+                Token::IntToken(123),
+                Token::StrToken(r#"string"#),
+                Token::IntToken(908)
+            ]
+        );
+    }
+
+    // This test should panic. 
+    #[test]
+    #[ignore = "This test should panic."]
+    fn cannot_lex_mixture() {
         let input = r#"123 "string" 908"#;
         assert_eq!(
             work(input),

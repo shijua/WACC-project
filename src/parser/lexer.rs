@@ -114,7 +114,11 @@ pub fn lexer<'src>(
         .ignore_then(none_of('\"').repeated())
         .then_ignore(just('\"'))
         .to_slice()
-        .map(Token::StrToken);
+        .map(Token::StrToken)
+        .map(|s| match s {
+            Token::StrToken(s) => Token::StrToken(&s[1..s.len() - 1]),
+            _ => panic!("This should never happen"),
+        });
 
     // A parser for characters
     let char_token = just('\'')
