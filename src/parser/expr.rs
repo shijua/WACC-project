@@ -102,18 +102,10 @@ pub fn expr_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         // 2: infix non, ‘==’, ‘!=’
         // 1: infix right, ‘&&’
         // 0: infix right, ‘||’
-        // TODO: Implement Pratt Parsing (see official doc for examples)
+        // Maybe Pratt Parsing?
 
         let atomic_parser = atom
             .clone()
-            // .pratt((
-            //     infix(left(4), just('+'), |l, r| {
-            //         binary_combine(Operator::Add, l, r)
-            //     }),
-            //     infix(left(0), just('-'), |l, r| {
-            //         binary_combine(Operator::Minus, l, r)
-            //     }),
-            // ))
             .map_with(|expr, e| (expr, e.span()))
             // bracketed expressions
             .or(expr
@@ -125,8 +117,16 @@ pub fn expr_parser<'tokens, 'src: 'tokens>() -> impl Parser<
                 Token::Ctrl(')'),
                 [(Token::Ctrl('['), Token::Ctrl(']'))],
                 |span| (Expr::Error, span),
-            )));
-        atomic_parser
+            )))
+            .boxed();
+
+        let op = just(Token::Op("*")).to(Operator::Mul);
+        let product = atomic_parser
+            .clone()
+            .foldl_with(op.then(atomic_parser).repeated(), |a, (op, b), e| {
+                (Expr::BinaryApp(op, Box::new(a), Box::new(b)), e.span())
+            });
+        product
     });
     base_expr
     // let atomic = base_expr.clone().pratt((

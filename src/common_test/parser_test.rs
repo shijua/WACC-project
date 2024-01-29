@@ -56,4 +56,16 @@ mod parser_tests {
         let input = "(ident[(11)])";
         workout_absolutely_correct_expr(input);
     }
+
+    #[test]
+    fn can_parse_binary_mul() {
+        let input = "1*2";
+        workout_absolutely_correct_expr(input);
+    }
+
+    #[test]
+    fn can_parse_nested_mul() {
+        let input = "(1 * 2) * (3 * 4)";
+        workout_absolutely_correct_expr(input);
+    }
 }
