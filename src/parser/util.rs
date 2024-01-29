@@ -1,6 +1,8 @@
 use nom::branch::alt;
-use nom::bytes::complete::{is_not, tag};
-use nom::character::complete::{alpha1, alphanumeric1, anychar, char as char_nom, multispace0};
+use nom::bytes::complete::tag;
+use nom::character::complete::{
+    alpha1, alphanumeric1, anychar, char as char_nom, multispace0, not_line_ending,
+};
 use nom::combinator::{map, not, opt, recognize, value, verify};
 use nom::multi::{many0, many0_count};
 use nom::sequence::{delimited, pair, terminated};
@@ -15,7 +17,7 @@ use nom_supreme::error::ErrorTree;
 pub fn process_comment<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, &'a str, E> {
     value(
         "", // Output is thrown away.
-        pair(char_nom('#'), opt(is_not("\n\r"))),
+        pair(char_nom('#'), opt(not_line_ending)),
     )(i)
 }
 
