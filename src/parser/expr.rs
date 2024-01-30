@@ -5,15 +5,14 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{char as char_nom, digit1, satisfy};
 use nom::combinator::{map, opt, value};
-use nom::error::ErrorKind::Not;
 use nom::multi::many0;
 use nom::sequence::{delimited, pair, preceded};
 use nom::IResult;
 use nom_supreme::error::{BaseErrorKind, ErrorTree, Expectation};
 
-const HIGHEST_BINARY_PRECEDENCE: i32 = 0;
+const BASELINE_BINDING_POWER: u32 = 0;
 
-const NORMALIZE_FACTOR: i32 = 10;
+const NORMALIZE_FACTOR: u32 = 10;
 
 fn is_valid_single_ascii(chr: u8) -> bool {
     (chr >= 0x20 && chr < 0x80) && (chr != b'\'') && (chr != b'\"') && (chr != b'\\')
@@ -169,17 +168,18 @@ fn binary_operator_precedence<'a>(
     }
 }
 
+// Implemented Pratt Parsing
 enum Associativity {
     Left,
     Right,
     NotApplicable,
 }
 
-fn normalize_binding_power(bp: i32) -> i32 {
+fn normalize_binding_power(bp: u32) -> u32 {
     bp * NORMALIZE_FACTOR
 }
 
-fn fetch_binding_power(assoc: Associativity, bp: i32) -> (i32, i32, i32) {
+fn fetch_binding_power(assoc: Associativity, bp: u32) -> (u32, u32, u32) {
     let n = normalize_binding_power(bp);
     match assoc {
         Left => (n, n + 1, n),
@@ -205,19 +205,8 @@ fn binary_operator_parser(input: &str) -> IResult<&str, BinaryOperator, ErrorTre
         value(BinaryOperator::Or, token("||")),
     ))(input)
 }
-fn infix_binding_power(binop: &BinaryOperator) -> (i32, i32) {
-    use BinaryOperator::*;
-    match binop {
-        Or => (2, 1),
-        And => (4, 3),
-        Eq | Neq => (5, 5),
-        Gt | Gte | Lt | Lte => (7, 7),
-        Add | Sub => (9, 10),
-        Mul | Modulo | Div => (11, 12),
-    }
-}
 
-fn binding_power(binop: &BinaryOperator) -> (i32, i32, i32) {
+fn binding_power(binop: &BinaryOperator) -> (u32, u32, u32) {
     use BinaryOperator::*;
     match binop {
         Or => fetch_binding_power(Right, 1),
@@ -231,12 +220,12 @@ fn binding_power(binop: &BinaryOperator) -> (i32, i32, i32) {
 
 fn expr_binary_app(
     input: &str,
-    min_binding_power: i32,
+    min_binding_power: u32,
     // r_bound: i32,
 ) -> IResult<&str, Expr, ErrorTree<&str>> {
     let (mut input, mut lhs) = expr_atom_literal(input)?;
 
-    let mut actual_bound = i32::MAX;
+    let mut actual_bound = u32::MAX;
 
     while let Ok((i, op)) = binary_operator_parser(input) {
         // let (l_bp, r_bp) = infix_binding_power(&op);
@@ -259,5 +248,5 @@ fn expr_binary_app(
 
 pub fn expr(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
     // Either be captured by a binary application, or be captured by other detections within.
-    expr_binary_app(input, 0)
+    expr_binary_app(input, BASELINE_BINDING_POWER)
 }
