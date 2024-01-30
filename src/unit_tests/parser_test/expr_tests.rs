@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod atomic_tests {
-    use crate::ast::Expr;
-    use crate::parser::expr::expr_atom_literal;
+    use crate::ast::{BinaryOperator, Expr};
+    use crate::parser::expr::{expr, expr_atom_literal};
 
     #[test]
     fn parse_expr_atomic_literals() {
@@ -58,6 +58,45 @@ mod atomic_tests {
         assert!(matches!(
             expr_consecutive,
             Ok(("fal", Expr::BoolLiter(true)))
+        ));
+
+        // bracketed
+        let expr_bracketed = expr_atom_literal("(1)");
+        assert!(matches!(expr_bracketed, Ok(("", Expr::IntLiter(1)))));
+    }
+
+    #[test]
+    fn parse_binary_application() {
+        // basic operations
+        let expr_basic_plus = expr("1 + 1");
+        assert!(matches!(
+            expr_basic_plus,
+            Ok((
+                "",
+                plus_ast
+            )) if plus_ast == Expr::BinaryApp(
+                    Box::new(Expr::IntLiter(1)),
+                    BinaryOperator::Add,
+                    Box::new(Expr::IntLiter(1))
+                )
+        ));
+
+        // chain operation
+        let expr_consecutive_plus = expr("1 + 2 - 3");
+        assert!(matches!(
+            expr_consecutive_plus,
+            Ok((
+                "",
+                plus_ast
+            )) if plus_ast == Expr::BinaryApp(
+                    Box::new(Expr::BinaryApp(
+                    Box::new(Expr::IntLiter(1)),
+                    BinaryOperator::Add,
+                    Box::new(Expr::IntLiter(2))
+                )),
+                    BinaryOperator::Sub,
+                    Box::new(Expr::IntLiter(3))
+                )
         ));
     }
 }

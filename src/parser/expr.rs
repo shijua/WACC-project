@@ -1,4 +1,4 @@
-use crate::ast::Expr;
+use crate::ast::{BinaryOperator, Expr, UnaryOperator};
 use crate::parser::util::{consume_meaningless, ident, token};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -8,6 +8,8 @@ use nom::multi::many0;
 use nom::sequence::{delimited, pair, preceded};
 use nom::IResult;
 use nom_supreme::error::{BaseErrorKind, ErrorTree, Expectation};
+
+const HIGHEST_BINARY_PRECEDENCE: i32 = 6;
 
 fn is_valid_single_ascii(chr: u8) -> bool {
     (chr >= 0x20 && chr < 0x80) && (chr != b'\'') && (chr != b'\"') && (chr != b'\\')
@@ -102,8 +104,91 @@ pub fn expr_atom_literal(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
     let ident_atom = map(ident, Expr::Ident);
 
     let (mut input, mut e) = alt((
-        int_liter, bool_liter, char_liter, str_liter, pair_liter, ident_atom,
+        int_liter,
+        bool_liter,
+        char_liter,
+        str_liter,
+        pair_liter,
+        ident_atom,
+        delimited(token("("), expr, token(")")),
     ))(input)?;
 
     Ok((input, e))
+}
+
+// <unary-oper> ::= ‘!’ | ‘-’ | ‘len’ | ‘ord’ | ‘chr’
+fn unary_oper(input: &str) -> IResult<&str, UnaryOperator, ErrorTree<&str>> {
+    alt((
+        value(UnaryOperator::Bang, token("!")),
+        value(UnaryOperator::Negative, token("-")),
+        value(UnaryOperator::Len, token("len")),
+        value(UnaryOperator::Ord, token("ord")),
+        value(UnaryOperator::Chr, token("chr")),
+    ))(input)
+}
+
+// <binary-oper> ::= ‘*’|‘/’|‘%’|‘+’|‘-’|‘>’|‘>=’|‘<’|‘<=’|‘==’|‘!=’|‘&&’|‘||’
+fn binary_operator_precedence<'a>(
+    precedence: i32,
+) -> impl FnMut(&'a str) -> IResult<&str, BinaryOperator, ErrorTree<&str>> {
+    // The precedence table:
+    // 1: infix left, ‘*’, ‘%’, ‘/’
+    // 2: infix left, ‘+’, ‘-’
+    // 3: infix non, ‘>’, ‘>=’, ‘<’, ‘<=’
+    // 4: infix non, ‘==’, ‘!=’
+    // 5: infix right, ‘&&’
+    // 6: infix right, ‘||’
+    move |input| match precedence {
+        1 => alt((
+            value(BinaryOperator::Mul, token("*")),
+            value(BinaryOperator::Modulo, token("%")),
+            value(BinaryOperator::Div, token("/")),
+        ))(input),
+        2 => alt((
+            value(BinaryOperator::Add, token("+")),
+            value(BinaryOperator::Sub, token("-")),
+        ))(input),
+        3 => alt((
+            value(BinaryOperator::Gt, token(">")),
+            value(BinaryOperator::Gte, token(">=")),
+            value(BinaryOperator::Lt, token("<")),
+            value(BinaryOperator::Lte, token("<=")),
+        ))(input),
+        4 => alt((
+            value(BinaryOperator::Eq, token("==")),
+            value(BinaryOperator::Neq, token("!=")),
+        ))(input),
+        5 => value(BinaryOperator::And, token("&&"))(input),
+        6 => value(BinaryOperator::Or, token("||"))(input),
+        // Just for debugging purposes
+        _ => unreachable!("No valid binary operator detected"),
+    }
+}
+
+fn expr_binary_app(input: &str, precedence: i32) -> IResult<&str, Expr, ErrorTree<&str>> {
+    if precedence == 0 {
+        // no binary application association related
+        return expr_atom_literal(input);
+    }
+
+    // which level of parsing we are currently in, and parse its sub expressions
+    let parse_sub_expr = |s| expr_binary_app(s, precedence - 1);
+
+    // fetch lhs
+    let (mut input, mut lhs) = parse_sub_expr(input)?;
+
+    // fetch operator and rhs
+    while let Ok((i, (op, rhs))) =
+        pair(binary_operator_precedence(precedence), parse_sub_expr)(input)
+    {
+        input = i;
+        lhs = Expr::BinaryApp(Box::new(lhs), op, Box::new(rhs));
+    }
+
+    Ok((input, lhs))
+}
+
+pub fn expr(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
+    // Either be captured by a binary application, or be captured by other detections within.
+    expr_binary_app(input, HIGHEST_BINARY_PRECEDENCE)
 }
