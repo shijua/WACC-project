@@ -9,7 +9,7 @@ use nom::sequence::{delimited, pair, preceded};
 use nom::IResult;
 use nom_supreme::error::{BaseErrorKind, ErrorTree, Expectation};
 
-const HIGHEST_BINARY_PRECEDENCE: i32 = 6;
+const HIGHEST_BINARY_PRECEDENCE: i32 = 0;
 
 fn is_valid_single_ascii(chr: u8) -> bool {
     (chr >= 0x20 && chr < 0x80) && (chr != b'\'') && (chr != b'\"') && (chr != b'\\')
@@ -165,7 +165,57 @@ fn binary_operator_precedence<'a>(
     }
 }
 
-fn expr_binary_app(input: &str, precedence: i32) -> IResult<&str, Expr, ErrorTree<&str>> {
+fn binary_operator_parser(input: &str) -> IResult<&str, BinaryOperator, ErrorTree<&str>> {
+    alt((
+        value(BinaryOperator::Mul, token("*")),
+        value(BinaryOperator::Modulo, token("%")),
+        value(BinaryOperator::Div, token("/")),
+        value(BinaryOperator::Add, token("+")),
+        value(BinaryOperator::Sub, token("-")),
+        value(BinaryOperator::Gte, token(">=")),
+        value(BinaryOperator::Gt, token(">")),
+        value(BinaryOperator::Lte, token("<=")),
+        value(BinaryOperator::Lt, token("<")),
+        value(BinaryOperator::Eq, token("==")),
+        value(BinaryOperator::Neq, token("!=")),
+        value(BinaryOperator::And, token("&&")),
+        value(BinaryOperator::Or, token("||")),
+    ))(input)
+}
+fn infix_binding_power(binop: &BinaryOperator) -> (i32, i32) {
+    use BinaryOperator::*;
+    match binop {
+        Or => (2, 1),
+        And => (4, 3),
+        Eq | Neq => (5, 6),
+        Gt | Gte | Lt | Lte => (7, 8),
+        Add | Sub => (9, 10),
+        Mul | Modulo | Div => (11, 12),
+    }
+}
+
+fn expr_binary_app(input: &str, min_binding_power: i32) -> IResult<&str, Expr, ErrorTree<&str>> {
+    let (mut input, mut lhs) = expr_atom_literal(input)?;
+
+    while let Ok((i, op)) = binary_operator_parser(input) {
+        let (l_bp, r_bp) = infix_binding_power(&op);
+        if l_bp < min_binding_power {
+            break;
+        }
+
+        input = i;
+
+        let (i, rhs) = expr_binary_app(input, r_bp)?;
+
+        input = i;
+
+        lhs = Expr::BinaryApp(Box::new(lhs), op, Box::new(rhs));
+    }
+
+    Ok((input, lhs))
+}
+
+fn expr_binary(input: &str, precedence: i32) -> IResult<&str, Expr, ErrorTree<&str>> {
     if precedence == 0 {
         // no binary application association related
         return expr_atom_literal(input);

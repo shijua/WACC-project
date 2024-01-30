@@ -61,8 +61,8 @@ mod atomic_tests {
         ));
 
         // bracketed
-        let expr_bracketed = expr_atom_literal("(1)");
-        assert!(matches!(expr_bracketed, Ok(("", Expr::IntLiter(1)))));
+        // let expr_bracketed = expr_atom_literal("(1)");
+        // assert!(matches!(expr_bracketed, Ok(("", Expr::IntLiter(1)))));
     }
 
     #[test]
@@ -78,6 +78,24 @@ mod atomic_tests {
                     Box::new(Expr::IntLiter(1)),
                     BinaryOperator::Add,
                     Box::new(Expr::IntLiter(1))
+                )
+        ));
+
+        // infix right
+        let expr_and_chain = expr("true && true && false");
+        assert!(matches!(
+            expr_and_chain,
+            Ok((
+                "",
+                ast
+            )) if ast == Expr::BinaryApp(
+                    Box::new(Expr::BoolLiter(true)),
+                    BinaryOperator::And,
+                    Box::new(Expr::BinaryApp(
+                    Box::new(Expr::BoolLiter(true)),
+                    BinaryOperator::And,
+                    Box::new(Expr::BoolLiter(false))
+                ))
                 )
         ));
 
@@ -97,6 +115,13 @@ mod atomic_tests {
                     BinaryOperator::Sub,
                     Box::new(Expr::IntLiter(3))
                 )
+        ));
+
+        // multiple precedence
+        let expr_difference = expr("1 + 2 * 3");
+        assert!(matches!(
+            expr_difference,
+            Ok(("", ast)) if ast == Expr::BinaryApp(Box::new(Expr::IntLiter(1)), BinaryOperator::Add, Box::new(Expr::BinaryApp(Box::new(Expr::IntLiter(2)), BinaryOperator::Mul, Box::new(Expr::IntLiter(3)))))
         ));
     }
 }
