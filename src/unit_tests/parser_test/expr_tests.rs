@@ -296,6 +296,20 @@ mod atomic_tests {
         let expr_parentheses = expr("((1 + 2) * 3");
         assert!(expr_parentheses.is_err());
 
+        // test chain logical comparison: would not consume all stream.
+        let expr_chain_eq = expr("1 == 2 == 3");
+        assert!(matches!(
+            expr_chain_eq,
+            Ok((
+                "== 3",
+                ast
+            )) if ast == Expr::BinaryApp(
+                    Box::new(Expr::IntLiter(1)),
+                    BinaryOperator::Eq,
+                    Box::new(Expr::IntLiter(2))
+                )
+        ));
+
         // TODO
         // let expr_parentheses1 = expr("(1 + 2 * 3))");
         // assert!(expr_parentheses1.is_err());
