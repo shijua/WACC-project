@@ -328,21 +328,25 @@ mod atomic_tests {
                 )
         ));
 
-        // test with triple negate operator TODO
-        // let expr_triple_negate = expr("1---3");
-        // assert!(matches!(
-        //     expr_triple_negate,
-        //     Ok((
-        //         "",
-        //         ast
-        //     )) if ast == Expr::BinaryApp(
-        //             Box::new(Expr::IntLiter(1)),
-        //             BinaryOperator::Sub,
-        //             Box::new(Expr::UnaryApp(
-        //                 UnaryOperator::Negative,
-        //                 Box::new(Expr::IntLiter(-3))
-        //             ))
-        //         )
-        // ));
+        // test with triple negate operator
+        let expr_triple_negate = expr("1---3");
+        assert!(matches!(
+            expr_triple_negate,
+            Ok((
+                "",
+                ast
+            )) if ast == Expr::BinaryApp(
+                    Box::new(Expr::IntLiter(1)),
+                    BinaryOperator::Sub,
+                    Box::new(Expr::UnaryApp(
+                        UnaryOperator::Negative,
+                        Box::new(Expr::IntLiter(-3))
+                    ))
+                )
+        ));
+
+        // test with array elem
+        let expr_array = expr("ident[487][6 + 12]");
+        assert!(expr_array.is_ok());
     }
 }

@@ -1,11 +1,11 @@
-use crate::ast::{BinaryOperator, Expr, UnaryOperator};
+use crate::ast::{ArrayElem, BinaryOperator, Expr, UnaryOperator};
 use crate::parser::expr::Associativity::{Left, NotApplicable, Right};
 use crate::parser::util::{consume_meaningless, ident, token};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{char as char_nom, digit1, satisfy};
 use nom::combinator::{map, opt, value};
-use nom::multi::many0;
+use nom::multi::{many0, many1};
 use nom::sequence::{delimited, pair, preceded};
 use nom::IResult;
 use nom_supreme::error::{BaseErrorKind, ErrorTree, Expectation};
@@ -74,6 +74,18 @@ fn int_parser(input: &str) -> IResult<&str, i32, ErrorTree<&str>> {
     Ok((input, actual_value))
 }
 
+pub fn array_elem_parser(input: &str) -> IResult<&str, ArrayElem, ErrorTree<&str>> {
+    let (input, array_name) = ident(input)?;
+    let (input, array_indices) = many1(delimited(token("["), expr, token("]")))(input)?;
+    Ok((
+        input,
+        ArrayElem {
+            ident: array_name,
+            indices: array_indices,
+        },
+    ))
+}
+
 pub fn expr_atom_literal(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
     // <int-liter>
     let int_liter = map(int_parser, Expr::IntLiter);
@@ -106,12 +118,21 @@ pub fn expr_atom_literal(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
     // <ident>
     let ident_atom = map(ident, Expr::Ident);
 
+    // <unary-oper> <expr>
+    let unary_app = map(pair(unary_oper, expr), |(op, exp)| {
+        Expr::UnaryApp(op, Box::new(exp))
+    });
+
+    let array_elem = map(array_elem_parser, Expr::ArrayElem);
+
     let (mut input, mut e) = alt((
         int_liter,
         bool_liter,
         char_liter,
         str_liter,
         pair_liter,
+        array_elem,
+        unary_app,
         ident_atom,
         delimited(token("("), expr, token(")")),
     ))(input)?;
