@@ -52,7 +52,7 @@ where
     terminated(inner, unused_comment_or_whitespace)
 }
 
-pub fn lex<'a, E: 'a + ParseError<&'a str>>(
+pub fn token<'a, E: 'a + ParseError<&'a str>>(
     input: &'a str,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, E> {
     consume_meaningless(tag(input))

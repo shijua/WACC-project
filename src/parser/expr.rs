@@ -1,5 +1,5 @@
 use crate::ast::Expr;
-use crate::parser::util::{consume_meaningless, ident, lex};
+use crate::parser::util::{consume_meaningless, ident, token};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{char as char_nom, digit1, satisfy};
@@ -75,8 +75,8 @@ pub fn expr_atom_literal(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
 
     // <bool-liter> ::= ‘true’ | ‘false’
     let bool_liter = alt((
-        value(Expr::BoolLiter(true), lex("true")),
-        value(Expr::BoolLiter(false), lex("false")),
+        value(Expr::BoolLiter(true), token("true")),
+        value(Expr::BoolLiter(false), token("false")),
     ));
 
     // <char-liter> ::= ::= ‘'’ ⟨character⟩ ‘'’
@@ -96,7 +96,7 @@ pub fn expr_atom_literal(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
     ));
 
     // <pair-liter> ::= ‘null’
-    let pair_liter = value(Expr::PairLiter, lex("null"));
+    let pair_liter = value(Expr::PairLiter, token("null"));
 
     // <ident>
     let ident_atom = map(ident, Expr::Ident);
