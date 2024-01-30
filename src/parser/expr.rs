@@ -1,15 +1,19 @@
 use crate::ast::{BinaryOperator, Expr, UnaryOperator};
+use crate::parser::expr::Associativity::{Left, NotApplicable, Right};
 use crate::parser::util::{consume_meaningless, ident, token};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{char as char_nom, digit1, satisfy};
 use nom::combinator::{map, opt, value};
+use nom::error::ErrorKind::Not;
 use nom::multi::many0;
 use nom::sequence::{delimited, pair, preceded};
 use nom::IResult;
 use nom_supreme::error::{BaseErrorKind, ErrorTree, Expectation};
 
 const HIGHEST_BINARY_PRECEDENCE: i32 = 0;
+
+const NORMALIZE_FACTOR: i32 = 10;
 
 fn is_valid_single_ascii(chr: u8) -> bool {
     (chr >= 0x20 && chr < 0x80) && (chr != b'\'') && (chr != b'\"') && (chr != b'\\')
@@ -165,6 +169,25 @@ fn binary_operator_precedence<'a>(
     }
 }
 
+enum Associativity {
+    Left,
+    Right,
+    NotApplicable,
+}
+
+fn normalize_binding_power(bp: i32) -> i32 {
+    bp * NORMALIZE_FACTOR
+}
+
+fn fetch_binding_power(assoc: Associativity, bp: i32) -> (i32, i32, i32) {
+    let n = normalize_binding_power(bp);
+    match assoc {
+        Left => (n, n + 1, n),
+        Right => (n, n, n),
+        NotApplicable => (n, n + 1, n - 1),
+    }
+}
+
 fn binary_operator_parser(input: &str) -> IResult<&str, BinaryOperator, ErrorTree<&str>> {
     alt((
         value(BinaryOperator::Mul, token("*")),
@@ -187,52 +210,48 @@ fn infix_binding_power(binop: &BinaryOperator) -> (i32, i32) {
     match binop {
         Or => (2, 1),
         And => (4, 3),
-        Eq | Neq => (5, 6),
-        Gt | Gte | Lt | Lte => (7, 8),
+        Eq | Neq => (5, 5),
+        Gt | Gte | Lt | Lte => (7, 7),
         Add | Sub => (9, 10),
         Mul | Modulo | Div => (11, 12),
     }
 }
 
-fn expr_binary_app(input: &str, min_binding_power: i32) -> IResult<&str, Expr, ErrorTree<&str>> {
+fn binding_power(binop: &BinaryOperator) -> (i32, i32, i32) {
+    use BinaryOperator::*;
+    match binop {
+        Or => fetch_binding_power(Right, 1),
+        And => fetch_binding_power(Right, 2),
+        Eq | Neq => fetch_binding_power(NotApplicable, 3),
+        Gt | Gte | Lt | Lte => fetch_binding_power(NotApplicable, 4),
+        Add | Sub => fetch_binding_power(Left, 5),
+        Mul | Modulo | Div => fetch_binding_power(Left, 6),
+    }
+}
+
+fn expr_binary_app(
+    input: &str,
+    min_binding_power: i32,
+    // r_bound: i32,
+) -> IResult<&str, Expr, ErrorTree<&str>> {
     let (mut input, mut lhs) = expr_atom_literal(input)?;
 
+    let mut actual_bound = i32::MAX;
+
     while let Ok((i, op)) = binary_operator_parser(input) {
-        let (l_bp, r_bp) = infix_binding_power(&op);
-        if l_bp < min_binding_power {
+        // let (l_bp, r_bp) = infix_binding_power(&op);
+        let (l_bp, r_bp, n_bp) = binding_power(&op);
+        if !((min_binding_power <= l_bp) && (l_bp <= actual_bound)) {
             break;
         }
 
         input = i;
 
         let (i, rhs) = expr_binary_app(input, r_bp)?;
-
         input = i;
 
         lhs = Expr::BinaryApp(Box::new(lhs), op, Box::new(rhs));
-    }
-
-    Ok((input, lhs))
-}
-
-fn expr_binary(input: &str, precedence: i32) -> IResult<&str, Expr, ErrorTree<&str>> {
-    if precedence == 0 {
-        // no binary application association related
-        return expr_atom_literal(input);
-    }
-
-    // which level of parsing we are currently in, and parse its sub expressions
-    let parse_sub_expr = |s| expr_binary_app(s, precedence - 1);
-
-    // fetch lhs
-    let (mut input, mut lhs) = parse_sub_expr(input)?;
-
-    // fetch operator and rhs
-    while let Ok((i, (op, rhs))) =
-        pair(binary_operator_precedence(precedence), parse_sub_expr)(input)
-    {
-        input = i;
-        lhs = Expr::BinaryApp(Box::new(lhs), op, Box::new(rhs));
+        actual_bound = n_bp;
     }
 
     Ok((input, lhs))
@@ -240,5 +259,5 @@ fn expr_binary(input: &str, precedence: i32) -> IResult<&str, Expr, ErrorTree<&s
 
 pub fn expr(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
     // Either be captured by a binary application, or be captured by other detections within.
-    expr_binary_app(input, HIGHEST_BINARY_PRECEDENCE)
+    expr_binary_app(input, 0)
 }
