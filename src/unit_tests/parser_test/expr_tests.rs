@@ -5,6 +5,22 @@ mod atomic_tests {
 
     #[test]
     fn parse_expr_atomic_literals() {
+        // int literals
+        let expr_int = expr_atom_literal("233");
+        assert!(matches!(expr_int, Ok(("", Expr::IntLiter(233)))));
+        let expr_int_negative = expr_atom_literal("-114514");
+        assert!(matches!(
+            expr_int_negative,
+            Ok(("", Expr::IntLiter(-114514)))
+        ));
+        let expr_int_oversize = expr_atom_literal("1000000000000");
+        assert!(expr_int_oversize.is_err());
+        let expr_int_edge_case = expr_atom_literal("-2147483648");
+        assert!(matches!(
+            expr_int_edge_case,
+            Ok(("", Expr::IntLiter(-2147483648)))
+        ));
+
         // bool literals
         let expr_true = expr_atom_literal("true");
         assert!(matches!(expr_true, Ok(("", Expr::BoolLiter(true)))));
