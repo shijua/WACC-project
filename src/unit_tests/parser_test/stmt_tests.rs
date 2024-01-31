@@ -270,7 +270,27 @@ mod stmt_tests {
             Ok(("", Stmt::Scope(stmt))) if stmt == Box::new(Stmt::Skip)
         ));
 
+        // serial
+        assert!(matches!(
+            stmt("skip; skip"),
+            Ok(("", Stmt::Serial(stmt1, stmt2))) if stmt1 == Box::new(Stmt::Skip) && stmt2 == Box::new(Stmt::Skip)
+        ));
 
+        // serial with different stmts
+        assert!(matches!(
+            stmt("skip; a = 1 + 1"),
+            Ok(("", Stmt::Serial(stmt1, stmt2))) if stmt1 == Box::new(Stmt::Skip) && stmt2 == Box::new(Stmt::Assign(Lvalue::LIdent("a".to_string()), Rvalue::RExpr(Expr::BinaryApp(
+                Box::new(Expr::IntLiter(1)),
+                BinaryOperator::Add,
+                Box::new(Expr::IntLiter(1))
+            ))))
+        ));
+
+        // serial with three statements
+        assert!(matches!(
+            stmt("skip; skip; skip"),
+            Ok(("", Stmt::Serial(stmt1, stmt2))) if stmt1 == Box::new(Stmt::Skip) && stmt2 == Box::new(Stmt::Serial(Box::new(Stmt::Skip), Box::new(Stmt::Skip)))
+        ));
 
     }
 

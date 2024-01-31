@@ -175,5 +175,5 @@ pub fn stmt_serial(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
 }
 
 pub fn stmt(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
-    alt((stmt_unary, stmt_serial))(input)
+    alt((stmt_serial, stmt_unary))(input)
 }
