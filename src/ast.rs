@@ -102,7 +102,7 @@ pub enum Rvalue {
     RArrLit(ArrayLiter),
     RNewPair(Expr, Expr),
     RPairElem(PairElem),
-    RCall(Expr, ArgList),
+    RCall(String, ArgList),
 }
 
 #[derive(PartialEq, Clone, Debug)]

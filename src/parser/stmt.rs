@@ -54,13 +54,14 @@ fn rvalue(input: &str) -> IResult<&str, Rvalue, ErrorTree<&str>> {
             expr,
             token(")"),
         )),
-        |(_, _, expr1, _, expr2, _)| Type::newpair(expr1, expr2),
+        |(_, _, expr1, _, expr2, _)| Rvalue::RNewPair(expr1, expr2),
     );
 
     let call = map(
         tuple((token("call"), ident, token("("), arg_mod_list, token(")"))),
-        |_, ident, _, arg_list, _| Rvalue::RCall(ident, arg_list),
+        |(_, ident, _, arg_list, _)| Rvalue::RCall(ident, arg_list),
     );
+
     alt((
         map(expr, Rvalue::RExpr),
         map(array_liter, Rvalue::RArrLit),
@@ -72,7 +73,7 @@ fn rvalue(input: &str) -> IResult<&str, Rvalue, ErrorTree<&str>> {
 
 // this version of arg_list can enable empty arguments
 fn arg_mod_list(input: &str) -> IResult<&str, ArgList, ErrorTree<&str>> {
-    many0_separated(expr, token(","))
+    map(many0_separated(expr, token(",")), ArgList::Arg)(input)
 }
 
 // other cases for statements
@@ -133,7 +134,7 @@ fn stmt_unary(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
             stmt,
             token("fi"),
         )),
-        |_if, cond, _then, then_statement, _else, else_statement, _fi| {
+        |(_if, cond, _then, then_statement, _else, else_statement, _fi)| {
             Stmt::If(cond, Box::new(then_statement), Box::new(else_statement))
         },
     );
@@ -174,5 +175,5 @@ fn stmt_serial(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
 }
 
 fn stmt(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
-    alt((stmt_unary, stmt_serial))
+    alt((stmt_unary, stmt_serial))(input)
 }
