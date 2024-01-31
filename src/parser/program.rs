@@ -57,6 +57,6 @@ fn program(input: &str) -> IResult<&str, Program, ErrorTree<&str>> {
     })(input)
 }
 
-fn program_parser_to_output(input: &str) -> Result<Program, ErrorTree<&str>> {
+pub fn program_parser_to_output(input: &str) -> Result<Program, ErrorTree<&str>> {
     final_parser(program)(input)
 }
