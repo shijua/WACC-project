@@ -10,19 +10,20 @@ use nom_supreme::error::ErrorTree;
 use nom_supreme::final_parser::final_parser;
 
 // <param> ::= ⟨type⟩ ⟨ident⟩
-fn param(input: &str) -> IResult<&str, Param, ErrorTree<&str>> {
+pub fn param(input: &str) -> IResult<&str, Param, ErrorTree<&str>> {
     map(pair(type_parse, ident), |(type_, ident_)| {
         Param::Parameter(type_, ident_)
     })(input)
 }
 
+// modified version to accept empty param-list
 // <param-list> ::= ⟨param⟩ ( ‘,’ ⟨param⟩ )*
-fn param_list(input: &str) -> IResult<&str, Vec<Param>, ErrorTree<&str>> {
+pub fn param_list(input: &str) -> IResult<&str, Vec<Param>, ErrorTree<&str>> {
     many0_separated(param, token(","))(input)
 }
 
 // <func> ::= ⟨type⟩ ⟨ident⟩ ‘(’ ⟨param-list⟩? ‘)’ ‘is’ ⟨stmt⟩ ‘end’
-fn func(input: &str) -> IResult<&str, Function, ErrorTree<&str>> {
+pub fn func(input: &str) -> IResult<&str, Function, ErrorTree<&str>> {
     let func_parser = tuple((
         type_parse,
         ident,
@@ -45,7 +46,7 @@ fn func(input: &str) -> IResult<&str, Function, ErrorTree<&str>> {
 }
 
 // <program> ::= ‘begin’ ⟨func⟩* ⟨stmt⟩ ‘end’
-fn program(input: &str) -> IResult<&str, Program, ErrorTree<&str>> {
+pub fn program(input: &str) -> IResult<&str, Program, ErrorTree<&str>> {
     let program_parser = delimited(
         preceded(unused_comment_or_whitespace, token("begin")),
         pair(many0(func), stmt),
@@ -57,6 +58,6 @@ fn program(input: &str) -> IResult<&str, Program, ErrorTree<&str>> {
     })(input)
 }
 
-fn program_parser_to_output(input: &str) -> Result<Program, ErrorTree<&str>> {
+pub fn program_parser_to_output(input: &str) -> Result<Program, ErrorTree<&str>> {
     final_parser(program)(input)
 }
