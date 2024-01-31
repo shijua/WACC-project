@@ -1,42 +1,63 @@
-use crate::ast::PairElemType::PairSimple;
-use crate::ast::{BaseType, PairType, Type};
+use crate::ast::Type;
 use crate::parser::util::{keyword, token};
 use nom::branch::alt;
-use nom::combinator::value;
+use nom::combinator::{map, value};
+use nom::multi::many0;
+use nom::sequence::{pair, tuple};
 use nom::IResult;
-use nom_supreme::error::ErrorTree;
+use nom_supreme::error::{BaseErrorKind, ErrorTree, Expectation};
 use nom_supreme::ParserExt;
 
 pub fn base_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     alt((
-        value(Type::BaseType(BaseType::IntType), keyword("int")).context("expecting \"int\""),
-        value(Type::BaseType(BaseType::BoolType), keyword("bool")).context("expecting \"bool\""),
-        value(Type::BaseType(BaseType::CharType), keyword("char")).context("expecting \"char\""),
-        value(Type::BaseType(BaseType::StringType), keyword("string"))
-            .context("expecting \"string\""),
+        value(Type::IntType, keyword("int")).context("expecting \"int\""),
+        value(Type::BoolType, keyword("bool")).context("expecting \"bool\""),
+        value(Type::CharType, keyword("char")).context("expecting \"char\""),
+        value(Type::StringType, keyword("string")).context("expecting \"string\""),
     ))(input)
 }
 
 pub fn pair_elem(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
-    // base elements shall pass
-    if let Ok(base_trial) = base_type(input) {
-        return Ok(base_trial);
+    match type_parse(input) {
+        // We would not accept direct "pair(x, y)" construction inside pair elements
+        Ok((input, Type::Pair(_, _))) => Err(nom::Err::Error(ErrorTree::Base {
+            location: input,
+            kind: BaseErrorKind::Expected(Expectation::Tag(
+                "not accepting explicit pair layout as pair-elem.",
+            )),
+        })),
+        // Any other element that belongs to <type> would be accepted as legal pair-elem
+        Ok((result)) => Ok(result),
+        // Another possibility: "pair" could be recognized as an abstracted pair-elem type.
+        _ => value(
+            Type::Pair(Box::new(Type::Any), Box::new(Type::Any)),
+            token("pair"),
+        )(input),
     }
-    // TODO: array elements shall pass
-    value(
-        Type::PairType(PairType::Pair(Box::new(PairSimple), Box::new(PairSimple))),
-        token("pair"),
-    )(input)
-}
-
-fn array_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
-    todo!()
 }
 
 fn pair_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
-    todo!()
+    map(
+        tuple((
+            token("pair"),
+            token("("),
+            pair_elem,
+            token(","),
+            pair_elem,
+            token(")"),
+        )),
+        |(_, _, l_elem, _, r_elem, _)| Type::Pair(Box::new(l_elem), Box::new(r_elem)),
+    )(input)
 }
 
-fn type_parse(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
-    todo!()
+pub fn type_parse(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
+    let base_parser = base_type;
+    let pair_parser = pair_type;
+    let (input, mut t) = alt((base_parser, pair_parser))(input)?;
+    // parsing array type: only trailing "[]"es.
+    let (input, arr_chain) = many0(pair(token("["), token("]")))(input)?;
+    for _layer in arr_chain.iter() {
+        t = Type::Array(Box::new(t));
+    }
+    Ok((input, t))
 }

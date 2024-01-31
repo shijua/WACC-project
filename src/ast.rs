@@ -50,41 +50,20 @@ pub enum BinaryOperator {
 }
 
 #[derive(PartialEq, Clone, Debug)]
-pub enum BaseType {
+pub enum Type {
     IntType,
     BoolType,
     CharType,
     StringType,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum ArrayType {
     Array(Box<Type>),
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum PairElemType {
-    PairElemBase(BaseType),
-    PairElemArr(ArrayType),
-    PairSimple, // simple pair type "pair"
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum PairType {
-    Pair(Box<PairElemType>, Box<PairElemType>),
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum Type {
-    BaseType(BaseType),
-    ArrayType(ArrayType),
-    PairType(PairType),
-    Misc, // Type for the unrecognized.
+    Pair(Box<Type>, Box<Type>),
+    NullLiter,
+    Any,
 }
 
 impl Default for Type {
     fn default() -> Self {
-        Type::Misc
+        Type::Any
     }
 }
 
