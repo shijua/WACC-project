@@ -108,7 +108,7 @@ pub enum Lvalue {
 pub enum Rvalue {
     RExpr(Expr),
     RArrLit(ArrLit),
-    RNewPair(Box<Expr>, Box<Expr>),
+    RNewPair(Expr, Expr),
     RPairElem(PairElem),
     RCall(Expr, ArgList),
 }
@@ -126,12 +126,13 @@ pub enum PairElem {
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum ArrLit {
-    Lit(Vec<Expr>),
+    ArrLit(Vec<Expr>),
 }
 
 #[derive(PartialEq, Clone, Debug)]
-pub enum Program {
-    Prog(Box<Function>, Box<Stmt>),
+pub struct Program {
+    pub functions: Vec<Function>,
+    pub body: Stmt,
 }
 
 #[derive(PartialEq, Clone, Debug)]
