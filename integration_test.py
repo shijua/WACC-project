@@ -26,7 +26,7 @@ class incorrect_test():
       return "UNKNOWN ERROR"
 
 # variable defined for result output
-runned_test_cases: int = 0
+run_test_cases: int = 0
 actual_syntax_error_test_cases: int = 0
 actual_semantic_error_test_cases: int = 0
 expected_syntax_error_test_cases: int = 0
@@ -44,10 +44,10 @@ def get_total_test_cases(path: str = TEST_PATH) -> int:
   return total_test_cases
 
 def running_our_single_test_cases(path: str) -> int:
-  global runned_test_cases, actual_syntax_error_test_cases, actual_semantic_error_test_cases
+  global run_test_cases, actual_syntax_error_test_cases, actual_semantic_error_test_cases
   result: int = subprocess.run([WACC_PATH, path], stdout=subprocess.PIPE).returncode
   print(f"running {path} in our compiler: ", end="")
-  runned_test_cases += 1
+  run_test_cases += 1
   if result == 0:
     print("PASS")
   elif result == 100:
@@ -114,20 +114,31 @@ if __name__ == "__main__":
   running_test_cases(path)
 
   # print the error test cases
+  print("======================== RESULTS ===========================")
   print("====================== error tests =========================")
   for test in incorrect_list:
     print(f"in {test.path}: out result: {test.our_message}, ref result: {test.ref_message}")
 
   # print the result
   print("============================================================")
-  print(f"runned test cases: {runned_test_cases}")
-  print(f"actual passed test cases: {runned_test_cases - actual_syntax_error_test_cases - actual_semantic_error_test_cases}")
-  print(f"expected passed test cases: {runned_test_cases - expected_syntax_error_test_cases - expected_semantic_error_test_cases}")
+  print(f"test cases have run: {run_test_cases}")
+  print(f"actual passed test cases: {run_test_cases - actual_syntax_error_test_cases - actual_semantic_error_test_cases}")
+  print(f"expected passed test cases: {run_test_cases - expected_syntax_error_test_cases - expected_semantic_error_test_cases}")
   print(f"actual syntax error test cases: {actual_syntax_error_test_cases}")
   print(f"expected syntax error test cases: {expected_syntax_error_test_cases}")
   print(f"actual semantic error test cases: {actual_semantic_error_test_cases}")
   print(f"expected semantic error test cases: {expected_semantic_error_test_cases}")
-  print(f"remaining test cases: {get_total_test_cases() - runned_test_cases}")
+  print(f"remaining test cases: {get_total_test_cases() - run_test_cases}")
+  print("============================================================")
+  incorrect_number = len(incorrect_list)
+  print(f"incorrect tests: {incorrect_number} OUT OF {run_test_cases}")
+  print(f"local correctness percentage: {round((run_test_cases - incorrect_number) / run_test_cases * 100, 4)}%")
+
+  if actual_syntax_error_test_cases != expected_syntax_error_test_cases:
+    print("Syntax error test cases not match!")
+
+  if actual_semantic_error_test_cases != expected_semantic_error_test_cases:
+    print("Semantic error test cases not match!")
   
   assert actual_syntax_error_test_cases == expected_syntax_error_test_cases, "syntax error test cases not match"
   assert actual_semantic_error_test_cases == expected_semantic_error_test_cases, "semantic error test cases not match"
