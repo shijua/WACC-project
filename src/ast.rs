@@ -136,16 +136,26 @@ pub struct Program {
 }
 
 #[derive(PartialEq, Clone, Debug)]
-pub enum Function {
-    Func(Type, Expr, ParamList, Box<Stmt>),
+pub struct Function {
+    // ident
+    pub ident: String,
+
+    // type
+    pub return_type: Type,
+
+    // param-list
+    pub parameters: ParamList,
+
+    // body statement
+    pub body: Stmt,
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum ParamList {
-    ParamL(Param, Box<Param>),
+    ParamList(Vec<Param>),
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Param {
-    Par(Type, Expr),
+    Parameter(Type, String),
 }
