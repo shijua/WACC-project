@@ -82,6 +82,14 @@ pub enum Stmt {
     While(Expr, Box<Stmt>),
     Scope(Box<Stmt>),
     Serial(Box<Stmt>, Box<Stmt>),
+    // // "virtual" Statement Type for enforced function returning condition.
+    // Returning(Box<Stmt>),
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum ReturningStmt {
+    Returning(Box<Stmt>),
+    NonReturning(Box<Stmt>),
 }
 
 #[derive(PartialEq, Clone, Debug)]
