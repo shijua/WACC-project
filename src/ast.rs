@@ -94,7 +94,7 @@ pub enum Lvalue {
 #[derive(PartialEq, Clone, Debug)]
 pub enum Rvalue {
     RExpr(Expr),
-    RArrLit(ArrLit),
+    RArrLit(Vec<Expr>),
     RNewPair(Expr, Expr),
     RPairElem(PairElem),
     RCall(Expr, ArgList),
@@ -112,11 +112,6 @@ pub enum PairElem {
 }
 
 #[derive(PartialEq, Clone, Debug)]
-pub enum ArrLit {
-    ArrLit(Vec<Expr>),
-}
-
-#[derive(PartialEq, Clone, Debug)]
 pub struct Program {
     pub functions: Vec<Function>,
     pub body: Stmt,
@@ -131,15 +126,10 @@ pub struct Function {
     pub return_type: Type,
 
     // param-list
-    pub parameters: ParamList,
+    pub parameters: Vec<Param>,
 
     // body statement
     pub body: Stmt,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum ParamList {
-    ParamList(Vec<Param>),
 }
 
 #[derive(PartialEq, Clone, Debug)]

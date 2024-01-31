@@ -17,7 +17,7 @@ pub fn base_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     ))(input)
 }
 
-pub fn pair_elem(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
+pub fn pair_elem_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     match type_parse(input) {
         // We would not accept direct "pair(x, y)" construction inside pair elements
         Ok((input, Type::Pair(_, _))) => Err(nom::Err::Error(ErrorTree::Base {
@@ -41,9 +41,9 @@ fn pair_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
         tuple((
             token("pair"),
             token("("),
-            pair_elem,
+            pair_elem_type,
             token(","),
-            pair_elem,
+            pair_elem_type,
             token(")"),
         )),
         |(_, _, l_elem, _, r_elem, _)| Type::Pair(Box::new(l_elem), Box::new(r_elem)),

@@ -1,12 +1,4 @@
-use crate::ast::{BinaryOperator, Expr, Lvalue, PairElem, UnaryOperator};
-use crate::parser::expr::expr;
-use crate::parser::util::{consume_meaningless, ident, token};
-use nom::branch::alt;
-use nom::bytes::complete::tag;
-use nom::character::complete::{char as char_nom, digit1, satisfy};
-use nom::combinator::{map, opt, value};
-use nom::multi::many0;
-use nom::sequence::{delimited, pair, preceded};
+use crate::ast::{BinaryOperator, Expr, Lvalue, PairElem, Rvalue, UnaryOperator};
 use nom::IResult;
 use nom_supreme::error::{BaseErrorKind, ErrorTree, Expectation};
 
@@ -30,5 +22,9 @@ fn lvalue_parser(input: &str) -> IResult<&str, Lvalue, ErrorTree<&str>> {
     // ))(input)?;
     //
     // Ok((input, lvalue))
+    todo!()
+}
+
+fn rvalue_parser(input: &str) -> IResult<&str, Rvalue, ErrorTree<&str>> {
     todo!()
 }

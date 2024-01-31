@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod type_tests {
     use crate::ast::Type;
-    use crate::parser::type_parser::{base_type, pair_elem, type_parse};
+    use crate::parser::type_parser::{base_type, pair_elem_type, type_parse};
 
     #[test]
     fn basic_type() {
@@ -18,16 +18,16 @@ mod type_tests {
     }
 
     #[test]
-    fn pair_elem_type() {
-        assert!(matches!(pair_elem("int"), Ok(("", Type::IntType))));
+    fn pair_elem_type_test() {
+        assert!(matches!(pair_elem_type("int"), Ok(("", Type::IntType))));
 
         assert!(matches!(
-            pair_elem("pair ##"),
+            pair_elem_type("pair ##"),
             Ok(("", Type::Pair(e1, e2))) if e1 == Box::new(Type::Any) && e2 == Box::new(Type::Any)
         ));
 
         assert!(matches!(
-            pair_elem("int []"),
+            pair_elem_type("int []"),
             Ok(("", Type::Array(e1))) if e1 == Box::new(Type::IntType)
         ));
     }
