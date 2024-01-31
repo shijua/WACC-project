@@ -70,7 +70,7 @@ impl Default for Type {
 #[derive(PartialEq, Clone, Debug)]
 pub enum Stmt {
     Skip,
-    Declare(Type, Expr, Rvalue),
+    Declare(Type, String, Rvalue),
     Assign(Lvalue, Rvalue),
     Read(Lvalue),
     Free(Expr),
@@ -80,21 +80,26 @@ pub enum Stmt {
     Println(Expr),
     If(Expr, Box<Stmt>, Box<Stmt>),
     While(Expr, Box<Stmt>),
-    Begin(Box<Stmt>),
+    Scope(Box<Stmt>),
     Serial(Box<Stmt>, Box<Stmt>),
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Lvalue {
-    LIdent(Expr),
-    LArrElem(Expr),
+    LIdent(String),
+    LArrElem(ArrayElem),
     LPairElem(PairElem),
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub struct ArrayLiter {
+    pub val: Vec<Expr>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Rvalue {
     RExpr(Expr),
-    RArrLit(Vec<Expr>),
+    RArrLit(ArrayLiter),
     RNewPair(Expr, Expr),
     RPairElem(PairElem),
     RCall(Expr, ArgList),

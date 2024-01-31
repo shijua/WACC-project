@@ -130,7 +130,7 @@ pub fn keyword<'a, E: 'a + ParseError<&'a str>>(
     many0, but each of the elements are seperated by another parser, and delimited,
     the result of which is thrown away.
 */
-pub fn many0_delimited<'a, Oe, Od, Ep: 'a, Dp: 'a, E>(
+pub fn many0_separated<'a, Oe, Od, Ep: 'a, Dp: 'a, E>(
     element: Ep,
     delimiter: Dp,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<Oe>, E>

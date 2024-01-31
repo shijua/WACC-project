@@ -74,7 +74,7 @@ fn int_parser(input: &str) -> IResult<&str, i32, ErrorTree<&str>> {
     Ok((input, actual_value))
 }
 
-pub fn array_elem_parser(input: &str) -> IResult<&str, ArrayElem, ErrorTree<&str>> {
+pub fn array_elem(input: &str) -> IResult<&str, ArrayElem, ErrorTree<&str>> {
     let (input, array_name) = ident(input)?;
     let (input, array_indices) = many1(delimited(token("["), expr, token("]")))(input)?;
     Ok((
@@ -123,7 +123,7 @@ pub fn expr_atom_literal(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
         Expr::UnaryApp(op, Box::new(exp))
     });
 
-    let array_elem = map(array_elem_parser, Expr::ArrayElem);
+    let array_elem_ = map(array_elem, Expr::ArrayElem);
 
     let (mut input, mut e) = alt((
         int_liter,
@@ -131,7 +131,7 @@ pub fn expr_atom_literal(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
         char_liter,
         str_liter,
         pair_liter,
-        array_elem,
+        array_elem_,
         unary_app,
         ident_atom,
         delimited(token("("), expr, token(")")),
