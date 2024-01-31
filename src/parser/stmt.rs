@@ -12,7 +12,7 @@ use nom_supreme::error::{BaseErrorKind, ErrorTree, Expectation};
 
 use super::expr;
 
-fn pair_elem(input: &str) -> IResult<&str, PairElem, ErrorTree<&str>> {
+pub fn pair_elem(input: &str) -> IResult<&str, PairElem, ErrorTree<&str>> {
     // <pair-elem> ::= ‘fst’ <expr> | ‘snd’ <expr>
     consume_meaningless(alt((
         map(preceded(token("fst"), lvalue), |lv| {
@@ -24,7 +24,7 @@ fn pair_elem(input: &str) -> IResult<&str, PairElem, ErrorTree<&str>> {
     )))(input)
 }
 
-fn lvalue(input: &str) -> IResult<&str, Lvalue, ErrorTree<&str>> {
+pub fn lvalue(input: &str) -> IResult<&str, Lvalue, ErrorTree<&str>> {
     // lvalue ::= ⟨ident⟩ | ⟨array-elem⟩ | ⟨pair-elem⟩
     alt((
         map(pair_elem, Lvalue::LPairElem),
@@ -33,7 +33,7 @@ fn lvalue(input: &str) -> IResult<&str, Lvalue, ErrorTree<&str>> {
     ))(input)
 }
 
-fn array_liter(input: &str) -> IResult<&str, ArrayLiter, ErrorTree<&str>> {
+pub fn array_liter(input: &str) -> IResult<&str, ArrayLiter, ErrorTree<&str>> {
     // <array-liter> ::= '[' (<expr>(','<expr>)*)?']'
     consume_meaningless(delimited(
         token("["),
@@ -42,13 +42,13 @@ fn array_liter(input: &str) -> IResult<&str, ArrayLiter, ErrorTree<&str>> {
     ))(input)
 }
 
-fn rvalue(input: &str) -> IResult<&str, Rvalue, ErrorTree<&str>> {
+pub fn rvalue(input: &str) -> IResult<&str, Rvalue, ErrorTree<&str>> {
     // <rvalue> ::= <expr> | <array-liter> | 'newpair' '(' <expr> ',' <expr> ')'
     // | <pair-elem> | 'call' <ident> '(' <arg-list>? ')'
     let new_pair = map(
         tuple((
             token("newpair"),
-            token("'"),
+            token("("),
             expr,
             token(","),
             expr,
@@ -72,12 +72,12 @@ fn rvalue(input: &str) -> IResult<&str, Rvalue, ErrorTree<&str>> {
 }
 
 // this version of arg_list can enable empty arguments
-fn arg_mod_list(input: &str) -> IResult<&str, ArgList, ErrorTree<&str>> {
+pub fn arg_mod_list(input: &str) -> IResult<&str, ArgList, ErrorTree<&str>> {
     map(many0_separated(expr, token(",")), ArgList::Arg)(input)
 }
 
 // other cases for statements
-fn stmt_unary(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
+pub fn stmt_unary(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
     // 'skip'
     let skip = value(Stmt::Skip, token("skip"));
 
@@ -158,8 +158,8 @@ fn stmt_unary(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
         free,
         return_,
         exit,
-        print,
         println,
+        print,
         if_parser,
         while_parser,
         scope,
@@ -167,13 +167,13 @@ fn stmt_unary(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
 }
 
 // Only for <stmt>;<stmt> cases
-fn stmt_serial(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
+pub fn stmt_serial(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
     map(
         tuple((stmt_unary, token(";"), stmt)),
         |(stmt1, _semi_colon, stmt2)| Stmt::Serial(Box::new(stmt1), Box::new(stmt2)),
     )(input)
 }
 
-fn stmt(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
+pub fn stmt(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
     alt((stmt_unary, stmt_serial))(input)
 }
