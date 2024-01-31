@@ -87,9 +87,9 @@ pub enum Stmt {
 }
 
 #[derive(PartialEq, Clone, Debug)]
-pub enum ReturningStmt {
-    Returning(Box<Stmt>),
-    NonReturning(Box<Stmt>),
+pub struct ReturningStmt {
+    pub statement: Stmt,
+    pub returning: bool,
 }
 
 #[derive(PartialEq, Clone, Debug)]

@@ -1,6 +1,4 @@
-use crate::ast::{
-    ArgList, ArrayLiter, BinaryOperator, Expr, Lvalue, PairElem, Rvalue, Stmt, Type, UnaryOperator,
-};
+use crate::ast::{ArgList, ArrayLiter, Lvalue, PairElem, Rvalue, Stmt};
 use crate::parser::expr::{array_elem, expr};
 use crate::parser::type_parser::type_parse;
 use crate::parser::util::{consume_meaningless, ident, many0_separated, token};
@@ -8,9 +6,7 @@ use nom::branch::alt;
 use nom::combinator::{map, value};
 use nom::sequence::{delimited, preceded, tuple};
 use nom::IResult;
-use nom_supreme::error::{BaseErrorKind, ErrorTree, Expectation};
-
-use super::expr;
+use nom_supreme::error::ErrorTree;
 
 pub fn pair_elem(input: &str) -> IResult<&str, PairElem, ErrorTree<&str>> {
     // <pair-elem> ::= ‘fst’ <expr> | ‘snd’ <expr>
