@@ -1,15 +1,18 @@
-use crate::ast::{BinaryOperator, Expr, UnaryOperator};
+use crate::ast::{ArrayElem, BinaryOperator, Expr, UnaryOperator};
+use crate::parser::expr::Associativity::{Left, NotApplicable, Right};
 use crate::parser::util::{consume_meaningless, ident, token};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{char as char_nom, digit1, satisfy};
 use nom::combinator::{map, opt, value};
-use nom::multi::many0;
+use nom::multi::{many0, many1};
 use nom::sequence::{delimited, pair, preceded};
 use nom::IResult;
 use nom_supreme::error::{BaseErrorKind, ErrorTree, Expectation};
 
-const HIGHEST_BINARY_PRECEDENCE: i32 = 6;
+const BASELINE_BINDING_POWER: u32 = 0;
+
+const NORMALIZE_FACTOR: u32 = 10;
 
 fn is_valid_single_ascii(chr: u8) -> bool {
     (chr >= 0x20 && chr < 0x80) && (chr != b'\'') && (chr != b'\"') && (chr != b'\\')
@@ -71,6 +74,18 @@ fn int_parser(input: &str) -> IResult<&str, i32, ErrorTree<&str>> {
     Ok((input, actual_value))
 }
 
+pub fn array_elem_parser(input: &str) -> IResult<&str, ArrayElem, ErrorTree<&str>> {
+    let (input, array_name) = ident(input)?;
+    let (input, array_indices) = many1(delimited(token("["), expr, token("]")))(input)?;
+    Ok((
+        input,
+        ArrayElem {
+            ident: array_name,
+            indices: array_indices,
+        },
+    ))
+}
+
 pub fn expr_atom_literal(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
     // <int-liter>
     let int_liter = map(int_parser, Expr::IntLiter);
@@ -103,12 +118,21 @@ pub fn expr_atom_literal(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
     // <ident>
     let ident_atom = map(ident, Expr::Ident);
 
+    // <unary-oper> <expr>
+    let unary_app = map(pair(unary_oper, expr), |(op, exp)| {
+        Expr::UnaryApp(op, Box::new(exp))
+    });
+
+    let array_elem = map(array_elem_parser, Expr::ArrayElem);
+
     let (mut input, mut e) = alt((
         int_liter,
         bool_liter,
         char_liter,
         str_liter,
         pair_liter,
+        array_elem,
+        unary_app,
         ident_atom,
         delimited(token("("), expr, token(")")),
     ))(input)?;
@@ -165,24 +189,79 @@ fn binary_operator_precedence<'a>(
     }
 }
 
-fn expr_binary_app(input: &str, precedence: i32) -> IResult<&str, Expr, ErrorTree<&str>> {
-    if precedence == 0 {
-        // no binary application association related
-        return expr_atom_literal(input);
+// Implemented Pratt Parsing
+enum Associativity {
+    Left,
+    Right,
+    NotApplicable,
+}
+
+fn normalize_binding_power(bp: u32) -> u32 {
+    bp * NORMALIZE_FACTOR
+}
+
+fn fetch_binding_power(assoc: Associativity, bp: u32) -> (u32, u32, u32) {
+    let n = normalize_binding_power(bp);
+    match assoc {
+        Left => (n, n + 1, n),
+        Right => (n, n, n),
+        NotApplicable => (n, n + 1, n - 1),
     }
+}
 
-    // which level of parsing we are currently in, and parse its sub expressions
-    let parse_sub_expr = |s| expr_binary_app(s, precedence - 1);
+fn binary_operator_parser(input: &str) -> IResult<&str, BinaryOperator, ErrorTree<&str>> {
+    alt((
+        value(BinaryOperator::Mul, token("*")),
+        value(BinaryOperator::Modulo, token("%")),
+        value(BinaryOperator::Div, token("/")),
+        value(BinaryOperator::Add, token("+")),
+        value(BinaryOperator::Sub, token("-")),
+        value(BinaryOperator::Gte, token(">=")),
+        value(BinaryOperator::Gt, token(">")),
+        value(BinaryOperator::Lte, token("<=")),
+        value(BinaryOperator::Lt, token("<")),
+        value(BinaryOperator::Eq, token("==")),
+        value(BinaryOperator::Neq, token("!=")),
+        value(BinaryOperator::And, token("&&")),
+        value(BinaryOperator::Or, token("||")),
+    ))(input)
+}
 
-    // fetch lhs
-    let (mut input, mut lhs) = parse_sub_expr(input)?;
+fn binding_power(binop: &BinaryOperator) -> (u32, u32, u32) {
+    use BinaryOperator::*;
+    match binop {
+        Or => fetch_binding_power(Right, 1),
+        And => fetch_binding_power(Right, 2),
+        Eq | Neq => fetch_binding_power(NotApplicable, 3),
+        Gt | Gte | Lt | Lte => fetch_binding_power(NotApplicable, 4),
+        Add | Sub => fetch_binding_power(Left, 5),
+        Mul | Modulo | Div => fetch_binding_power(Left, 6),
+    }
+}
 
-    // fetch operator and rhs
-    while let Ok((i, (op, rhs))) =
-        pair(binary_operator_precedence(precedence), parse_sub_expr)(input)
-    {
+fn expr_binary_app(
+    input: &str,
+    min_binding_power: u32,
+    // r_bound: i32,
+) -> IResult<&str, Expr, ErrorTree<&str>> {
+    let (mut input, mut lhs) = expr_atom_literal(input)?;
+
+    let mut actual_bound = u32::MAX;
+
+    while let Ok((i, op)) = binary_operator_parser(input) {
+        // let (l_bp, r_bp) = infix_binding_power(&op);
+        let (l_bp, r_bp, n_bp) = binding_power(&op);
+        if !((min_binding_power <= l_bp) && (l_bp <= actual_bound)) {
+            break;
+        }
+
         input = i;
+
+        let (i, rhs) = expr_binary_app(input, r_bp)?;
+        input = i;
+
         lhs = Expr::BinaryApp(Box::new(lhs), op, Box::new(rhs));
+        actual_bound = n_bp;
     }
 
     Ok((input, lhs))
@@ -190,5 +269,5 @@ fn expr_binary_app(input: &str, precedence: i32) -> IResult<&str, Expr, ErrorTre
 
 pub fn expr(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
     // Either be captured by a binary application, or be captured by other detections within.
-    expr_binary_app(input, HIGHEST_BINARY_PRECEDENCE)
+    expr_binary_app(input, BASELINE_BINDING_POWER)
 }

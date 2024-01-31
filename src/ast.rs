@@ -8,9 +8,17 @@ pub enum Expr {
     PairLiter, // which is just (null)
     // Identifiers
     Ident(String),
+    // Array Elements,
+    ArrayElem(ArrayElem),
     // Operator-Applied Expressions
     UnaryApp(UnaryOperator, Box<Expr>),
     BinaryApp(Box<Expr>, BinaryOperator, Box<Expr>),
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub struct ArrayElem {
+    pub ident: String,
+    pub indices: Vec<Expr>,
 }
 
 // <unary-oper> ::= ‘!’ | ‘-’ | ‘len’ | ‘ord’ | ‘chr’
