@@ -1,7 +1,8 @@
 #[cfg(test)]
 mod type_tests {
-    use crate::ast::{BaseType, Type};
-    use crate::parser::type_parser::base_type;
+    use crate::ast::PairType::Pair;
+    use crate::ast::{BaseType, PairElemType, PairType, Type};
+    use crate::parser::type_parser::{base_type, pair_elem};
 
     #[test]
     fn basic_type() {
@@ -20,6 +21,19 @@ mod type_tests {
         assert!(matches!(
             base_type("  string #"),
             Ok(("#", Type::BaseType(BaseType::StringType)))
+        ));
+    }
+
+    #[test]
+    fn pair_elem_type() {
+        assert!(matches!(
+            pair_elem("int"),
+            Ok(("", Type::BaseType(BaseType::IntType)))
+        ));
+
+        assert!(matches!(
+            pair_elem("pair ##"),
+            Ok(("", Type::PairType(pair))) if pair == Pair(Box::new(PairElemType::PairSimple), Box::new(PairElemType::PairSimple))
         ));
     }
 }

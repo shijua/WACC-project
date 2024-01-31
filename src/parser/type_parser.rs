@@ -1,5 +1,6 @@
-use crate::ast::{BaseType, Type};
-use crate::parser::util::keyword;
+use crate::ast::PairElemType::PairSimple;
+use crate::ast::{BaseType, PairType, Type};
+use crate::parser::util::{keyword, token};
 use nom::branch::alt;
 use nom::combinator::value;
 use nom::IResult;
@@ -16,8 +17,16 @@ pub fn base_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     ))(input)
 }
 
-fn pair_elem(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
-    todo!()
+pub fn pair_elem(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
+    // base elements shall pass
+    if let Ok(base_trial) = base_type(input) {
+        return Ok(base_trial);
+    }
+    // TODO: array elements shall pass
+    value(
+        Type::PairType(PairType::Pair(Box::new(PairSimple), Box::new(PairSimple))),
+        token("pair"),
+    )(input)
 }
 
 fn array_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
