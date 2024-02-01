@@ -1,4 +1,4 @@
 pub mod symbol_table;
 pub mod type_checker;
-mod stmt_checker;
-mod util;
+pub mod stmt_checker;
+pub mod util;

@@ -15,10 +15,26 @@ pub fn get_type_from_table(ident: &str, symbol_table: &SymbolTable) -> Result<Ty
 pub fn pair_elem_to_type(pair_elem: &PairElem, symbol_table: &SymbolTable) -> Result<Type, String> {
     match pair_elem {
         PairElem::PairElemFst(lvalue) => {
-            lvalue_to_type(lvalue, symbol_table)
+            let type_result = lvalue_to_type(lvalue, symbol_table);
+            if type_result.is_err() {
+                return type_result;
+            }
+            let type_result = type_result.unwrap();
+            match type_result {
+                Type::Pair(inner1, _) => Ok(*inner1),
+                _ => Err(format!("elem is not a pair"))
+            }
         }
         PairElem::PairElemSnd(lvalue) => {
-            lvalue_to_type(lvalue, symbol_table)
+            let type_result = lvalue_to_type(lvalue, symbol_table);
+            if type_result.is_err() {
+                return type_result;
+            }
+            let type_result = type_result.unwrap();
+            match type_result {
+                Type::Pair(_, inner2) => Ok(*inner2),
+                _ => Err(format!("elem is not a pair"))
+            }
         }
     }
 }
