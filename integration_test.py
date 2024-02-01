@@ -11,7 +11,7 @@ REF_PATH: str = "wacc-examples-36/refCompile"
 
 # type definition
 class incorrect_test():
-    def __init__(self, path: str, our_message: str, ref_message: str) -> None:
+    def __init__(self, path: str, our_message: int, ref_message: int) -> None:
         self.path: str = path
         self.our_message: str = self.translate_message(our_message)
         self.ref_message: str = self.translate_message(ref_message)
