@@ -92,7 +92,7 @@ pub fn expr_to_type(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, Str
         Expr::CharLiter(_) => Ok(Type::CharType),
         Expr::StrLiter(_) => Ok(Type::StringType),
         Expr::PairLiter => Ok(Type::Any),
-        Expr::Ident(_) => Ok(Type::StringType),
+        Expr::Ident(ident) => get_type_from_table(ident, symbol_table),
         Expr::ArrayElem(Array) => {
             array_elem_to_type(Array, symbol_table)
         }

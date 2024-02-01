@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod type_tests {
     use crate::ast::{BinaryOperator, Expr, Type, UnaryOperator};
-    use crate::parser::type_parser::{base_type, pair_elem_type, type_parse};
     use crate::semantic_checker::symbol_table::SymbolTable;
     use crate::semantic_checker::type_checker::{binary_operator_check, unary_operator_check};
 

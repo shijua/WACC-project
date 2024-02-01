@@ -3,7 +3,7 @@ use crate::semantic_checker::symbol_table::SymbolTable;
 use crate::semantic_checker::util::{expr_to_type, lvalue_to_type, rvalue_to_type};
 
 // variable declaration
-fn declaration_check(type_given: &Type, ident: &str, rvalue: &Rvalue,
+pub fn declaration_check(type_given: &Type, ident: &str, rvalue: &Rvalue,
                symbol_table: &mut SymbolTable) -> Result<Type, String> {
     let rvalue_result = rvalue_to_type(rvalue, symbol_table);
     if rvalue_result.is_err() {
@@ -21,7 +21,7 @@ fn declaration_check(type_given: &Type, ident: &str, rvalue: &Rvalue,
 }
 
 // variable assignment
-fn assignment_check(lvalue: &Lvalue, rvalue: &Rvalue, symbol_table: &SymbolTable) -> Result<Type, String> {
+pub fn assignment_check(lvalue: &Lvalue, rvalue: &Rvalue, symbol_table: &SymbolTable) -> Result<Type, String> {
     let lvalue_result = lvalue_to_type(lvalue, symbol_table);
     if lvalue_result.is_err() {
         return lvalue_result;
@@ -40,7 +40,7 @@ fn assignment_check(lvalue: &Lvalue, rvalue: &Rvalue, symbol_table: &SymbolTable
 }
 
 // read
-fn read_check(lvalue: &Lvalue, symbol_table: &SymbolTable) -> Result<Type, String> {
+pub fn read_check(lvalue: &Lvalue, symbol_table: &SymbolTable) -> Result<Type, String> {
     let lvalue_result = lvalue_to_type(lvalue, symbol_table);
     if lvalue_result.is_err() {
         return lvalue_result;
@@ -53,37 +53,38 @@ fn read_check(lvalue: &Lvalue, symbol_table: &SymbolTable) -> Result<Type, Strin
 }
 
 // free
-fn free_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
+pub fn free_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
     let expr_result = expr_to_type(expr, symbol_table);
     if expr_result.is_err() {
         return expr_result;
     }
     let expr_type = expr_result.unwrap();
+    println!("{:?}", expr_type);
     match expr_type {
-        Type::Array(_) => Ok(expr_type),
+        Type::Array(..) => Ok(expr_type),
         Type::Pair(..) => Ok(expr_type),
         _ => Err(format!("type need to be array or pair"))
     }
 }
 
 // return
-fn return_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
+pub fn return_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
     expr_to_type(expr, symbol_table)
     // todo!("further checking needed for multiple return etc?")
 }
 
 // exit
-fn exit_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
+pub fn exit_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
     expr_to_type(expr, symbol_table)
 }
 
 // print and println
-fn print_println_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
+pub fn print_println_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
     expr_to_type(expr, symbol_table)
 }
 
 // if
-fn if_check(expr: &Expr, stmt1: &Stmt, stmt2: &Stmt, symbol_table: &mut SymbolTable) -> Result<Type, String> {
+pub fn if_check(expr: &Expr, stmt1: &Stmt, stmt2: &Stmt, symbol_table: &mut SymbolTable) -> Result<Type, String> {
     let expr_result = expr_to_type(expr, symbol_table);
     if expr_result.is_err() {
         return expr_result;
@@ -102,7 +103,7 @@ fn if_check(expr: &Expr, stmt1: &Stmt, stmt2: &Stmt, symbol_table: &mut SymbolTa
 }
 
 // while
-fn while_check(expr: &Expr, stmt: &Stmt, symbol_table: &mut SymbolTable) -> Result<Type, String> {
+pub fn while_check(expr: &Expr, stmt: &Stmt, symbol_table: &mut SymbolTable) -> Result<Type, String> {
     let expr_result = expr_to_type(expr, symbol_table);
     if expr_result.is_err() {
         return expr_result;
@@ -116,11 +117,11 @@ fn while_check(expr: &Expr, stmt: &Stmt, symbol_table: &mut SymbolTable) -> Resu
 }
 
 // scope
-fn scope_check(stmt: &Stmt, symbol_table: &mut SymbolTable) -> Result<Type, String> {
+pub fn scope_check(stmt: &Stmt, symbol_table: &mut SymbolTable) -> Result<Type, String> {
     stmt_check(stmt, symbol_table)
 }
 
-fn stmt_check(stmt: &Stmt, symbol_table: &mut SymbolTable) -> Result<Type, String> {
+pub fn stmt_check(stmt: &Stmt, symbol_table: &mut SymbolTable) -> Result<Type, String> {
     match stmt {
         Stmt::Skip => Ok(Type::Any),
         Stmt::Declare(type_given, ident, rvalue) => {
