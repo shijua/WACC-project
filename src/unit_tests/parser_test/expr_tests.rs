@@ -252,7 +252,6 @@ mod atomic_tests {
                 )
         ));
 
-        // test with two infix non operators TODO
         // let expr_non_non = expr("1 < 2 < 3");
         // assert!(expr_non_non.is_err());
 
@@ -310,7 +309,6 @@ mod atomic_tests {
                 )
         ));
 
-        // TODO
         // let expr_parentheses1 = expr("(1 + 2 * 3))");
         // assert!(expr_parentheses1.is_err());
 
