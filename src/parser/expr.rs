@@ -125,7 +125,7 @@ pub fn expr_atom_literal(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
 
     let array_elem_ = map(array_elem, Expr::ArrayElem);
 
-    let (mut input, mut e) = alt((
+    let (input, e) = alt((
         int_liter,
         bool_liter,
         char_liter,
@@ -149,44 +149,6 @@ fn unary_oper(input: &str) -> IResult<&str, UnaryOperator, ErrorTree<&str>> {
         value(UnaryOperator::Ord, token("ord")),
         value(UnaryOperator::Chr, token("chr")),
     ))(input)
-}
-
-// <binary-oper> ::= ‘*’|‘/’|‘%’|‘+’|‘-’|‘>’|‘>=’|‘<’|‘<=’|‘==’|‘!=’|‘&&’|‘||’
-fn binary_operator_precedence<'a>(
-    precedence: i32,
-) -> impl FnMut(&'a str) -> IResult<&str, BinaryOperator, ErrorTree<&str>> {
-    // The precedence table:
-    // 1: infix left, ‘*’, ‘%’, ‘/’
-    // 2: infix left, ‘+’, ‘-’
-    // 3: infix non, ‘>’, ‘>=’, ‘<’, ‘<=’
-    // 4: infix non, ‘==’, ‘!=’
-    // 5: infix right, ‘&&’
-    // 6: infix right, ‘||’
-    move |input| match precedence {
-        1 => alt((
-            value(BinaryOperator::Mul, token("*")),
-            value(BinaryOperator::Modulo, token("%")),
-            value(BinaryOperator::Div, token("/")),
-        ))(input),
-        2 => alt((
-            value(BinaryOperator::Add, token("+")),
-            value(BinaryOperator::Sub, token("-")),
-        ))(input),
-        3 => alt((
-            value(BinaryOperator::Gt, token(">")),
-            value(BinaryOperator::Gte, token(">=")),
-            value(BinaryOperator::Lt, token("<")),
-            value(BinaryOperator::Lte, token("<=")),
-        ))(input),
-        4 => alt((
-            value(BinaryOperator::Eq, token("==")),
-            value(BinaryOperator::Neq, token("!=")),
-        ))(input),
-        5 => value(BinaryOperator::And, token("&&"))(input),
-        6 => value(BinaryOperator::Or, token("||"))(input),
-        // Just for debugging purposes
-        _ => unreachable!("No valid binary operator detected"),
-    }
 }
 
 // Implemented Pratt Parsing
