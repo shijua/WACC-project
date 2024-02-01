@@ -23,12 +23,12 @@ mod type_tests {
 
         assert!(matches!(
             pair_elem_type("pair ##"),
-            Ok(("", Type::Pair(e1, e2))) if e1 == Box::new(Type::Any) && e2 == Box::new(Type::Any)
+            Ok(("", Type::Pair(e1, e2))) if e1 == Box::from(Type::Any) && e2 == Box::from(Type::Any)
         ));
 
         assert!(matches!(
             pair_elem_type("int []"),
-            Ok(("", Type::Array(e1))) if e1 == Box::new(Type::IntType)
+            Ok(("", Type::Array(e1))) if e1 == Box::from(Type::IntType)
         ));
     }
 
@@ -54,17 +54,17 @@ mod type_tests {
     fn array_type_test() {
         assert!(matches!(
             type_parse("int []"),
-            Ok(("", Type::Array(type_given))) if type_given == Box::new(Type::IntType)
+            Ok(("", Type::Array(type_given))) if type_given == Box::from(Type::IntType)
         ));
 
         assert!(matches!(
             type_parse("string []"),
-            Ok(("", Type::Array(type_given))) if type_given == Box::new(Type::StringType)
+            Ok(("", Type::Array(type_given))) if type_given == Box::from(Type::StringType)
         ));
 
         assert!(matches!(
             type_parse("char [][]"),
-            Ok(("", Type::Array(type_given))) if type_given == Box::new(Type::Array(Box::new(Type::CharType)))
+            Ok(("", Type::Array(type_given))) if type_given == Box::from(Type::Array(Box::new(Type::CharType)))
         ));
     }
 }

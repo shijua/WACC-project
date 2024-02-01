@@ -26,6 +26,6 @@ fn test_debug_expr() {
             BinaryOperator::Add,
             Box::new(Expr::IntLiter(1))
         )),
-        ((Expr::IntLiter(1), Expr::IntLiter(1)))
+        (Expr::IntLiter(1), Expr::IntLiter(1))
     ));
 }
