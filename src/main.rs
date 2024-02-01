@@ -9,6 +9,8 @@ mod parser;
 mod unit_tests;
 
 mod debug_util;
+mod semantic_checker;
+
 
 fn main() {
     // collect environment arguments

@@ -68,16 +68,10 @@ pub fn binary_operator_check(lhs: &Expr, operator: &BinaryOperator, rhs: &Expr, 
     }
     let rhs_type = rhs_result.unwrap();
     match operator {
-        BinaryOperator::Mul | BinaryOperator::Div | BinaryOperator::Modulo | BinaryOperator::Add | BinaryOperator::Sub => {
+        BinaryOperator::Mul | BinaryOperator::Div | BinaryOperator::Modulo | BinaryOperator::Add | BinaryOperator::Sub
+        | BinaryOperator::Gt | BinaryOperator::Gte | BinaryOperator::Lt | BinaryOperator::Lte => {
             if lhs_type == Type::IntType && rhs_type == Type::IntType {
                 Ok(Type::IntType)
-            } else {
-                Err(format!("Expected int type, found {:?} and {:?}", lhs_type, rhs_type))
-            }
-        }
-        BinaryOperator::Gt | BinaryOperator::Gte | BinaryOperator::Lt | BinaryOperator::Lte => {
-            if lhs_type == Type::IntType && rhs_type == Type::IntType {
-                Ok(Type::BoolType)
             } else {
                 Err(format!("Expected int type, found {:?} and {:?}", lhs_type, rhs_type))
             }
