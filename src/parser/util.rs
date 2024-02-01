@@ -22,7 +22,7 @@ pub fn process_comment<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a st
 }
 
 /*
-   Drop and eat comments and whitespaces as they have no actual meaning (only as delimeters)
+   Drop and eat comments and whitespaces as they have no actual meaning (only as delimiters)
    in parsing.
 */
 pub fn unused_comment_or_whitespace<'a, E: ParseError<&'a str>>(
