@@ -22,12 +22,10 @@ pub fn pair_elem_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
         // We would not accept direct "pair(x, y)" construction inside pair elements
         Ok((input, Type::Pair(_, _))) => Err(nom::Err::Error(ErrorTree::Base {
             location: input,
-            kind: BaseErrorKind::Expected(Expectation::Tag(
-                "not accepting explicit pair layout as pair-elem.",
-            )),
+            kind: BaseErrorKind::Expected(Expectation::Tag("function has no returning statement.")),
         })),
         // Any other element that belongs to <type> would be accepted as legal pair-elem
-        Ok((result)) => Ok(result),
+        Ok(result) => Ok(result),
         // Another possibility: "pair" could be recognized as an abstracted pair-elem type.
         _ => value(
             Type::Pair(Box::new(Type::Any), Box::new(Type::Any)),

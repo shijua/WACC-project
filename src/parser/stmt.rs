@@ -1,4 +1,4 @@
-use crate::ast::{ArgList, ArrayLiter, Lvalue, PairElem, Rvalue, Stmt};
+use crate::ast::{ArgList, ArrayLiter, Lvalue, PairElem, ReturningStmt, Rvalue, Stmt};
 use crate::parser::expr::{array_elem, expr};
 use crate::parser::type_parser::type_parse;
 use crate::parser::util::{consume_meaningless, ident, many0_separated, token};
@@ -73,50 +73,92 @@ pub fn arg_mod_list(input: &str) -> IResult<&str, ArgList, ErrorTree<&str>> {
 }
 
 // other cases for statements
-pub fn stmt_unary(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
-    // 'skip'
-    let skip = value(Stmt::Skip, token("skip"));
+
+// A block of statements is called "returning" if the last statement in the block is either
+// * a return statement
+// * an exit statement
+// * an if-statement with two returning blocks
+// Function bodies must be returning blocks.
+pub fn stmt_unary(input: &str) -> IResult<&str, ReturningStmt, ErrorTree<&str>> {
+    // 'skip': not a returning statement.
+    let skip_stmt = value(Stmt::Skip, token("skip"));
+    let skip = map(skip_stmt, |st| ReturningStmt {
+        statement: st,
+        returning: false,
+    });
 
     // <type> <ident> '=' <rvalue>
-    let declare = map(
+    let declare_stmt = map(
         tuple((type_parse, ident, token("="), rvalue)),
         |(t, id, _eq, rv)| Stmt::Declare(t, id, rv),
     );
+    let declare = map(declare_stmt, |st| ReturningStmt {
+        statement: st,
+        returning: false,
+    });
 
     // ⟨lvalue⟩ ‘=’ ⟨rvalue⟩
-    let assign = map(
+    let assign_stmt = map(
         tuple((lvalue, token("="), rvalue)),
         |(l_val, _eq, r_val)| Stmt::Assign(l_val, r_val),
     );
+    let assign = map(assign_stmt, |st| ReturningStmt {
+        statement: st,
+        returning: false,
+    });
 
     // ‘read’ ⟨lvalue⟩
-    let read = map(tuple((token("read"), lvalue)), |(_read, l_val)| {
+    let read_stmt = map(tuple((token("read"), lvalue)), |(_read, l_val)| {
         Stmt::Read(l_val)
+    });
+    let read = map(read_stmt, |st| ReturningStmt {
+        statement: st,
+        returning: false,
     });
 
     // ‘free’ ⟨expr⟩
-    let free = map(tuple((token("free"), expr)), |(_read, expression)| {
+    let free_stmt = map(tuple((token("free"), expr)), |(_read, expression)| {
         Stmt::Free(expression)
+    });
+    let free = map(free_stmt, |st| ReturningStmt {
+        statement: st,
+        returning: false,
     });
 
     // ‘return’ ⟨expr⟩
-    let return_ = map(tuple((token("return"), expr)), |(_return, expression)| {
+    let return_stmt = map(tuple((token("return"), expr)), |(_return, expression)| {
         Stmt::Return(expression)
+    });
+    let return_ = map(return_stmt, |st| ReturningStmt {
+        statement: st,
+        returning: true,
     });
 
     // ‘exit’ ⟨expr⟩
-    let exit = map(tuple((token("exit"), expr)), |(_exit, expression)| {
+    let exit_stmt = map(tuple((token("exit"), expr)), |(_exit, expression)| {
         Stmt::Exit(expression)
+    });
+    let exit = map(exit_stmt, |st| ReturningStmt {
+        statement: st,
+        returning: true,
     });
 
     // ‘print’ ⟨expr⟩
-    let print = map(tuple((token("print"), expr)), |(_print, expression)| {
+    let print_stmt = map(tuple((token("print"), expr)), |(_print, expression)| {
         Stmt::Print(expression)
+    });
+    let print = map(print_stmt, |st| ReturningStmt {
+        statement: st,
+        returning: false,
     });
 
     // ‘println’ ⟨expr⟩
-    let println = map(tuple((token("println"), expr)), |(_println, expression)| {
+    let println_stmt = map(tuple((token("println"), expr)), |(_println, expression)| {
         Stmt::Println(expression)
+    });
+    let println = map(println_stmt, |st| ReturningStmt {
+        statement: st,
+        returning: false,
     });
 
     // ‘if’ ⟨expr⟩ ‘then’ ⟨stmt⟩ ‘else’ ⟨stmt⟩ ‘fi’
@@ -131,19 +173,30 @@ pub fn stmt_unary(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
             token("fi"),
         )),
         |(_if, cond, _then, then_statement, _else, else_statement, _fi)| {
-            Stmt::If(cond, Box::new(then_statement), Box::new(else_statement))
+            let returning_status = (then_statement.returning) && (else_statement.returning);
+            let st = Stmt::If(cond, Box::new(then_statement), Box::new(else_statement));
+            ReturningStmt {
+                statement: st,
+                returning: returning_status,
+            }
         },
     );
 
     // ‘while’ ⟨expr⟩ ‘do’ ⟨stmt⟩ ‘done’
     let while_parser = map(
         tuple((token("while"), expr, token("do"), stmt, token("done"))),
-        |(_while, expr1, _do, stmt1, _done)| Stmt::While(expr1, Box::new(stmt1)),
+        |(_while, expr1, _do, stmt1, _done)| ReturningStmt {
+            statement: Stmt::While(expr1, Box::new(stmt1)),
+            returning: false,
+        },
     );
     // ‘begin’ ⟨stmt⟩ ‘end’
     let scope = map(
         tuple((token("begin"), stmt, token("end"))),
-        |(_begin, statement, _end)| Stmt::Scope(Box::new(statement)),
+        |(_begin, statement, _end)| ReturningStmt {
+            returning: statement.returning,
+            statement: Stmt::Scope(Box::new(statement)),
+        },
     );
 
     alt((
@@ -163,13 +216,16 @@ pub fn stmt_unary(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
 }
 
 // Only for <stmt>;<stmt> cases
-pub fn stmt_serial(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
+pub fn stmt_serial(input: &str) -> IResult<&str, ReturningStmt, ErrorTree<&str>> {
     map(
         tuple((stmt_unary, token(";"), stmt)),
-        |(stmt1, _semi_colon, stmt2)| Stmt::Serial(Box::new(stmt1), Box::new(stmt2)),
+        |(stmt1, _semi_colon, stmt2)| ReturningStmt {
+            returning: stmt2.returning,
+            statement: Stmt::Serial(Box::new(stmt1), Box::new(stmt2)),
+        },
     )(input)
 }
 
-pub fn stmt(input: &str) -> IResult<&str, Stmt, ErrorTree<&str>> {
+pub fn stmt(input: &str) -> IResult<&str, ReturningStmt, ErrorTree<&str>> {
     alt((stmt_serial, stmt_unary))(input)
 }

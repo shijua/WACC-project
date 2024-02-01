@@ -1,4 +1,4 @@
-use crate::ast::{Function, Param, Program};
+use crate::ast::{Function, Param, Program, ReturningStmt};
 use crate::parser::stmt::stmt;
 use crate::parser::type_parser::type_parse;
 use crate::parser::util::{ident, many0_separated, token, unused_comment_or_whitespace};
@@ -6,7 +6,7 @@ use nom::combinator::map;
 use nom::multi::many0;
 use nom::sequence::{delimited, pair, preceded, tuple};
 use nom::IResult;
-use nom_supreme::error::ErrorTree;
+use nom_supreme::error::{BaseErrorKind, ErrorTree, Expectation};
 use nom_supreme::final_parser::final_parser;
 
 // <param> ::= ⟨type⟩ ⟨ident⟩
@@ -34,7 +34,7 @@ pub fn func(input: &str) -> IResult<&str, Function, ErrorTree<&str>> {
         stmt,
         token("end"),
     ));
-    map(
+    let func_structure = map(
         func_parser,
         |(type_, ident_, _l_bracket, parameters_list, _r_bracket, _is, statement, _end)| Function {
             ident: ident_,
@@ -42,7 +42,28 @@ pub fn func(input: &str) -> IResult<&str, Function, ErrorTree<&str>> {
             parameters: parameters_list,
             body: statement,
         },
-    )(input)
+    )(input);
+    match func_structure {
+        Ok((
+            _,
+            Function {
+                ident: _,
+                return_type: _,
+                parameters: _,
+                body:
+                    ReturningStmt {
+                        statement: _,
+                        returning: false,
+                    },
+            },
+        )) => Err(nom::Err::Error(ErrorTree::Base {
+            location: input,
+            kind: BaseErrorKind::Expected(Expectation::Tag(
+                "not accepting explicit pair layout as pair-elem.",
+            )),
+        })),
+        _ => func_structure,
+    }
 }
 
 // <program> ::= ‘begin’ ⟨func⟩* ⟨stmt⟩ ‘end’
@@ -52,9 +73,11 @@ pub fn program(input: &str) -> IResult<&str, Program, ErrorTree<&str>> {
         pair(many0(func), stmt),
         token("end"),
     );
-    map(program_parser, |(functions_parsed, statement)| Program {
-        functions: functions_parsed,
-        body: statement,
+    map(program_parser, |(functions_parsed, return_statement)| {
+        Program {
+            functions: functions_parsed,
+            body: return_statement,
+        }
     })(input)
 }
 

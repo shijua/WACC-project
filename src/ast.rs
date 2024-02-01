@@ -78,10 +78,10 @@ pub enum Stmt {
     Exit(Expr),
     Print(Expr),
     Println(Expr),
-    If(Expr, Box<Stmt>, Box<Stmt>),
-    While(Expr, Box<Stmt>),
-    Scope(Box<Stmt>),
-    Serial(Box<Stmt>, Box<Stmt>),
+    If(Expr, Box<ReturningStmt>, Box<ReturningStmt>),
+    While(Expr, Box<ReturningStmt>),
+    Scope(Box<ReturningStmt>),
+    Serial(Box<ReturningStmt>, Box<ReturningStmt>),
     // // "virtual" Statement Type for enforced function returning condition.
     // Returning(Box<Stmt>),
 }
@@ -127,7 +127,7 @@ pub enum PairElem {
 #[derive(PartialEq, Clone, Debug)]
 pub struct Program {
     pub functions: Vec<Function>,
-    pub body: Stmt,
+    pub body: ReturningStmt,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -142,7 +142,7 @@ pub struct Function {
     pub parameters: Vec<Param>,
 
     // body statement
-    pub body: Stmt,
+    pub body: ReturningStmt,
 }
 
 #[derive(PartialEq, Clone, Debug)]
