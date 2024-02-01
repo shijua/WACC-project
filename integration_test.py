@@ -121,6 +121,8 @@ if __name__ == "__main__":
         path = f"{sys.argv[i]}"
         running_test_cases(path)
 
+    total_test = get_total_test_cases()
+
     # print the error test cases
     print("======================== RESULTS ===========================")
     print("====================== error tests =========================")
@@ -143,6 +145,7 @@ if __name__ == "__main__":
     incorrect_number = len(incorrect_list)
     print(f"incorrect tests: {incorrect_number} OUT OF {run_test_cases}")
     print(f"local correctness percentage: {round((run_test_cases - incorrect_number) / run_test_cases * 100, 4)}%")
+    print(f"test coverage: {run_test_cases}/{total_test}, which is {round((run_test_cases / total_test) * 100, 4)}%")
 
     if actual_syntax_error_test_cases != expected_syntax_error_test_cases:
         print("Syntax error test cases not match!")
