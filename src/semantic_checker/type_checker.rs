@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use crate::ast::{BinaryOperator, Expr, Type, UnaryOperator};
+use crate::semantic_checker::symbol_table::SymbolTable;
 use crate::semantic_checker::util::expr_to_type;
 
 // binary operator check
 // unary operator check
-// array check
 // function check
     // return amount
     // return type
@@ -14,8 +14,8 @@ use crate::semantic_checker::util::expr_to_type;
 
 
 // unary operator check
-pub fn unary_operator_check(operator: &UnaryOperator, operand: &Expr) -> Result<Type, String> {
-    let operand_result = expr_to_type(operand);
+pub fn unary_operator_check(operator: &UnaryOperator, operand: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
+    let operand_result = expr_to_type(operand, symbol_table);
     if operand_result.is_err() {
         return operand_result;
     }
@@ -56,13 +56,13 @@ pub fn unary_operator_check(operator: &UnaryOperator, operand: &Expr) -> Result<
 }
 
 // binary operator check
-pub fn binary_operator_check(lhs: &Expr, operator: &BinaryOperator, rhs: &Expr) -> Result<Type, String> {
-    let lhs_result = expr_to_type(lhs);
+pub fn binary_operator_check(lhs: &Expr, operator: &BinaryOperator, rhs: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
+    let lhs_result = expr_to_type(lhs, symbol_table);
     if lhs_result.is_err() {
         return lhs_result;
     }
     let lhs_type = lhs_result.unwrap();
-    let rhs_result = expr_to_type(rhs);
+    let rhs_result = expr_to_type(rhs, symbol_table);
     if rhs_result.is_err() {
         return rhs_result;
     }
@@ -99,8 +99,4 @@ pub fn binary_operator_check(lhs: &Expr, operator: &BinaryOperator, rhs: &Expr) 
     }
 }
 
-// array check
-pub fn array_check(array_type: &Type, expr_type: &Type) -> Result<Type, String> {
-    todo!()
-}
 
