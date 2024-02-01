@@ -20,7 +20,7 @@ mod stmt_checker_tests {
     fn declaration_check_test() {
         let mut symbol_table = create_symbol_table();
         assert!(matches!(
-            declaration_check(&Type::IntType, "e", &Rvalue::RExpr(IntLiter(1)), &mut symbol_table),
+            declaration_check(&Type::IntType, "f", &Rvalue::RExpr(IntLiter(1)), &mut symbol_table),
             Ok(Type::IntType)
         ));
         assert!(matches!(
