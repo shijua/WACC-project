@@ -37,8 +37,11 @@ fn main() {
         exit(100);
     }
 
-    let semantic_result = semantic_check_start(&parse_result.unwrap());
-    if (semantic_result.is_err()) {
+    let parse_result = parse_result.unwrap();
+    println!("{:?}", parse_result);
+
+    let semantic_result = semantic_check_start(&parse_result);
+    if semantic_result.is_err() {
         println!("Semantic Error!");
         println!("{}", semantic_result.unwrap_err());
         exit(200);

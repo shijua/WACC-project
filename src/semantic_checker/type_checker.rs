@@ -1,18 +1,6 @@
-use std::collections::HashMap;
 use crate::ast::{BinaryOperator, Expr, Type, UnaryOperator};
 use crate::semantic_checker::symbol_table::SymbolTable;
-use crate::semantic_checker::util::expr_to_type;
-
-// binary operator check
-// unary operator check
-// function check
-    // return amount
-    // return type
-    // param check
-// pair check
-// overflow check
-
-
+use crate::semantic_checker::util::{expr_to_type, type_check_special};
 // unary operator check
 pub fn unary_operator_check(operator: &UnaryOperator, operand: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
     let operand_result = expr_to_type(operand, symbol_table);
@@ -68,16 +56,24 @@ pub fn binary_operator_check(lhs: &Expr, operator: &BinaryOperator, rhs: &Expr, 
     }
     let rhs_type = rhs_result.unwrap();
     match operator {
-        BinaryOperator::Mul | BinaryOperator::Div | BinaryOperator::Modulo | BinaryOperator::Add | BinaryOperator::Sub
-        | BinaryOperator::Gt | BinaryOperator::Gte | BinaryOperator::Lt | BinaryOperator::Lte => {
+        BinaryOperator::Mul | BinaryOperator::Div | BinaryOperator::Modulo | BinaryOperator::Add | BinaryOperator::Sub => {
             if lhs_type == Type::IntType && rhs_type == Type::IntType {
                 Ok(Type::IntType)
             } else {
                 Err(format!("Expected int type, found {:?} and {:?}", lhs_type, rhs_type))
             }
         }
+        BinaryOperator::Gt | BinaryOperator::Gte | BinaryOperator::Lt | BinaryOperator::Lte => {
+            if (lhs_type == Type::IntType && rhs_type == Type::IntType) ||
+                (lhs_type == Type::CharType && rhs_type == Type::CharType) {
+                Ok(Type::BoolType)
+            } else {
+                Err(format!("Expected int type, found {:?} and {:?}", lhs_type, rhs_type))
+            }
+        }
+
         BinaryOperator::Eq | BinaryOperator::Neq => {
-            if lhs_type == rhs_type {
+            if lhs_type == rhs_type || type_check_special(&lhs_type, &rhs_type).is_ok() {
                 Ok(Type::BoolType)
             } else {
                 Err(format!("Expected same type, found {:?} and {:?}", lhs_type, rhs_type))

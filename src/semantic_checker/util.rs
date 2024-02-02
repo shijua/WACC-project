@@ -1,9 +1,54 @@
 use std::collections::HashMap;
-use nom::combinator::map;
 use crate::ast::{ArgList, ArrayElem, ArrayLiter, Expr, Function, Lvalue, PairElem, Param, Rvalue, Type};
-use crate::parser::expr::expr;
 use crate::semantic_checker::symbol_table::SymbolTable;
 use crate::semantic_checker::type_checker::{binary_operator_check, unary_operator_check};
+
+pub fn type_check_special (type1: &Type, type2: &Type) -> Result<Type, String> {
+    let result = type_check_special_help(type1, type2);
+    if result.is_ok() {
+        result
+    } else {
+        type_check_special_help(type2, type1)
+    }
+}
+
+pub fn type_check_special_help(type1: &Type, type2: &Type) -> Result<Type, String> {
+    match type2 {
+        Type::Pair(p1, p2) => {
+            match type1 {
+                Type::Pair(p3, p4) => {
+                    let p1_result = type_check_special(p1, p3);
+                    if p1_result.is_err() && p1 != p3 {
+                        return p1_result;
+                    }
+                    let p2_result = type_check_special(p2, p4);
+                    if p2_result.is_err() && p2 != p4 {
+                        return p2_result;
+                    }
+                    Ok(Type::Any)
+                }
+                _ => Err(format!("type mismatch"))
+            }
+        }
+        Type::Array(chartype) if chartype == &Box::from(Type::CharType) => {
+            match type1 {
+                Type::StringType => Ok(Type::StringType),
+                _ => Err(format!("type mismatch"))
+            }
+        }
+        Type::Array(inner) => {
+            match type1 {
+                Type::Array(inner1) => type_check_special_help(inner1, inner),
+                _ => Err(format!("type mismatch"))
+            }
+        }
+        Type::Any => {
+            Ok(Type::Any)
+        }
+        _ => Err(format!("Do not a special type case")),
+    }
+
+}
 
 pub fn get_type_from_table(ident: &str, symbol_table: &SymbolTable) -> Result<Type, String> {
     let symbol = symbol_table.find_all(ident);
@@ -77,8 +122,8 @@ pub fn array_elem_to_type(array_elem: &ArrayElem, symbol_table: &SymbolTable) ->
 pub fn lvalue_to_type(lvalue: &Lvalue, symbol_table: &SymbolTable) -> Result<Type, String> {
     match lvalue {
         Lvalue::LIdent(ident) => get_type_from_table(ident, symbol_table),
-        Lvalue::LArrElem(Array) => {
-            array_elem_to_type(Array, symbol_table)
+        Lvalue::LArrElem(array) => {
+            array_elem_to_type(array, symbol_table)
         }
         Lvalue::LPairElem(pair) => {
             pair_elem_to_type(pair, symbol_table)
@@ -94,8 +139,8 @@ pub fn expr_to_type(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, Str
         Expr::StrLiter(_) => Ok(Type::StringType),
         Expr::PairLiter => Ok(Type::Any),
         Expr::Ident(ident) => get_type_from_table(ident, symbol_table),
-        Expr::ArrayElem(Array) => {
-            array_elem_to_type(Array, symbol_table)
+        Expr::ArrayElem(array) => {
+            array_elem_to_type(array, symbol_table)
         }
         Expr::UnaryApp(operator, operand) => {
             unary_operator_check(operator, operand, symbol_table)
@@ -118,10 +163,13 @@ pub fn arr_lit_to_type (array: &ArrayLiter, symbol_table: &SymbolTable) -> Resul
         if expr_type.is_err() {
             return expr_type;
         }
+        let expr_type = expr_type.unwrap();
         if array_type == Type::Any { // for first element
-            array_type = expr_type.unwrap();
-        } else if array_type != expr_type.unwrap() {
-            return Err(format!("array elements are not the same type"));
+            array_type = expr_type;
+        } else if array_type != expr_type {
+            if type_check_special(&array_type, &expr_type).is_err() {
+                return Err(format!("array elements are not the same type"));
+            }
         }
     }
     Ok(Type::Array(Box::new(array_type)))

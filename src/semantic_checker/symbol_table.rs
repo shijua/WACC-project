@@ -28,7 +28,7 @@ impl SymbolTable {
 
     // insert a symbol into the symbol table
     pub fn add(&mut self, ident: &str, symbol_type: Type) {
-        if (self.find(ident).is_some()) {
+        if self.find(ident).is_some() {
             panic!("ident already exists");
         }
         self.table.insert(ident.to_string(), Symbol { symbol_type });
@@ -41,10 +41,10 @@ impl SymbolTable {
 
     // find a symbol in their own symbol table and their parent symbol table
     pub fn find_all(&self, ident: &str) -> Option<&Symbol> {
-        if (self.find(ident).is_some()) {
+        if self.find(ident).is_some() {
             return self.find(ident);
         }
-        if (self.parent.is_none() || self.is_func) {
+        if self.parent.is_none() || self.is_func {
             return None;
         }
 

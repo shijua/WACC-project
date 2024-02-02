@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use crate::ast::{Function, Program, ReturningStmt, Type};
-use crate::semantic_checker::stmt_checker::stmt_check;
+use crate::ast::Param::Parameter;
+use crate::semantic_checker::stmt_checker::{scope_check, stmt_check};
 use crate::semantic_checker::symbol_table::{SymbolTable};
 
 pub fn program_check(functions: &Vec<Function>, body: &ReturningStmt) -> Result<Type, String> {
@@ -18,9 +19,13 @@ pub fn program_check(functions: &Vec<Function>, body: &ReturningStmt) -> Result<
 }
 
 pub fn function_check(function: &Function, function_table: &mut HashMap<String, Function>) -> Result<Type, String> {
-    let mut new_symbol_table = SymbolTable::create(None, true);
+    let mut para_symbol_table = SymbolTable::create(None, true);
     function_table.insert(function.ident.clone(), function.clone());
-    stmt_check(&function.body, &mut new_symbol_table, function_table)
+    for param in &function.parameters {
+        let Parameter(param_type, param_ident) = param;
+        para_symbol_table.add(param_ident, param_type.clone());
+    }
+    scope_check(&function.body, &mut para_symbol_table, function_table)
 }
 
 pub fn semantic_check_start(program: &Program) -> Result<Type, String>  {

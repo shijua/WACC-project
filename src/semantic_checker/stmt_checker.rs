@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::ast::{Expr, Function, Lvalue, ReturningStmt, Rvalue, Stmt, Type};
 use crate::semantic_checker::symbol_table::SymbolTable;
-use crate::semantic_checker::util::{expr_to_type, lvalue_to_type, rvalue_to_type};
+use crate::semantic_checker::util::{expr_to_type, lvalue_to_type, rvalue_to_type, type_check_special};
 
 // variable declaration
 pub fn declaration_check(type_given: &Type, ident: &str, rvalue: &Rvalue, symbol_table: &mut SymbolTable,
@@ -10,14 +10,15 @@ pub fn declaration_check(type_given: &Type, ident: &str, rvalue: &Rvalue, symbol
     if rvalue_result.is_err() {
         return rvalue_result;
     }
+
     let rvalue_type = rvalue_result.unwrap();
-    if (type_given != &rvalue_type) {
+    if type_given != &rvalue_type && type_check_special(type_given, &rvalue_type).is_err() {
         return Err(format!("type mismatch"));
     }
-    if (symbol_table.find(ident).is_some()) {
+    if symbol_table.find(ident).is_some() {
         return Err(format!("ident already exists"));
     }
-    symbol_table.add(ident.clone(), type_given.clone());
+    symbol_table.add(ident, type_given.clone());
     Ok(type_given.clone())
 }
 
@@ -35,7 +36,7 @@ pub fn assignment_check(lvalue: &Lvalue, rvalue: &Rvalue, symbol_table: &SymbolT
         return rvalue_result;
     }
     let rvalue_type = rvalue_result.unwrap();
-    if (lvalue_type != rvalue_type) { // todo!("assignment check on array and pair")
+    if lvalue_type != rvalue_type && type_check_special(&lvalue_type, &rvalue_type).is_err() {
         return Err(format!("type mismatch"));
     }
     return Ok(lvalue_type);
@@ -48,7 +49,7 @@ pub fn read_check(lvalue: &Lvalue, symbol_table: &SymbolTable) -> Result<Type, S
         return lvalue_result;
     }
     let lvalue_type = lvalue_result.unwrap();
-    if (lvalue_type != Type::IntType && lvalue_type != Type::CharType) {
+    if lvalue_type != Type::IntType && lvalue_type != Type::CharType {
         return Err(format!("type need to be int or char"));
     }
     return Ok(lvalue_type);
@@ -93,16 +94,16 @@ pub fn if_check(expr: &Expr, stmt1: &ReturningStmt, stmt2: &ReturningStmt,
         return expr_result;
     }
     let expr_type = expr_result.unwrap();
-    if (expr_type != Type::BoolType) {
+    if expr_type != Type::BoolType {
         return Err(format!("type need to be bool"));
     }
 
-    let stmt1_result = stmt_check(stmt1, symbol_table, function_table);
+    let stmt1_result = scope_check(stmt1, symbol_table, function_table);
     if stmt1_result.is_err() {
         return stmt1_result;
     }
 
-    stmt_check(stmt2, symbol_table, function_table)
+    scope_check(stmt2, symbol_table, function_table)
 }
 
 // while
@@ -113,17 +114,17 @@ pub fn while_check(expr: &Expr, stmt: &ReturningStmt,
         return expr_result;
     }
     let expr_type = expr_result.unwrap();
-    if (expr_type != Type::BoolType) {
+    if expr_type != Type::BoolType {
         return Err(format!("type need to be bool"));
     }
-
-    stmt_check(stmt, symbol_table, function_table)
+    scope_check(stmt, &symbol_table, function_table)
 }
 
 // scope
-pub fn scope_check(stmt: &ReturningStmt, symbol_table: &mut SymbolTable,
+pub fn scope_check(stmt: &ReturningStmt, symbol_table: &SymbolTable,
                    function_table: &HashMap<String, Function>) -> Result<Type, String> {
-    stmt_check(stmt, symbol_table, function_table)
+    let mut new_symbol_table = SymbolTable::create(Some(Box::from(symbol_table.clone())), symbol_table.is_func);
+    stmt_check(stmt, &mut new_symbol_table, function_table)
 }
 
 pub fn stmt_check(ret_stmt: &ReturningStmt, symbol_table: &mut SymbolTable,
