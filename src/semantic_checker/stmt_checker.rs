@@ -1,11 +1,12 @@
-use crate::ast::{Expr, Lvalue, Rvalue, Stmt, Type};
+use std::collections::HashMap;
+use crate::ast::{Expr, Function, Lvalue, ReturningStmt, Rvalue, Stmt, Type};
 use crate::semantic_checker::symbol_table::SymbolTable;
 use crate::semantic_checker::util::{expr_to_type, lvalue_to_type, rvalue_to_type};
 
 // variable declaration
-pub fn declaration_check(type_given: &Type, ident: &str, rvalue: &Rvalue,
-               symbol_table: &mut SymbolTable) -> Result<Type, String> {
-    let rvalue_result = rvalue_to_type(rvalue, symbol_table);
+pub fn declaration_check(type_given: &Type, ident: &str, rvalue: &Rvalue, symbol_table: &mut SymbolTable,
+                         function_table: &HashMap<String, Function>) -> Result<Type, String> {
+    let rvalue_result = rvalue_to_type(rvalue, symbol_table, function_table);
     if rvalue_result.is_err() {
         return rvalue_result;
     }
@@ -21,14 +22,15 @@ pub fn declaration_check(type_given: &Type, ident: &str, rvalue: &Rvalue,
 }
 
 // variable assignment
-pub fn assignment_check(lvalue: &Lvalue, rvalue: &Rvalue, symbol_table: &SymbolTable) -> Result<Type, String> {
+pub fn assignment_check(lvalue: &Lvalue, rvalue: &Rvalue, symbol_table: &SymbolTable,
+                        function_table: &HashMap<String, Function>) -> Result<Type, String> {
     let lvalue_result = lvalue_to_type(lvalue, symbol_table);
     if lvalue_result.is_err() {
         return lvalue_result;
     }
     let lvalue_type = lvalue_result.unwrap();
 
-    let rvalue_result = rvalue_to_type(rvalue, symbol_table);
+    let rvalue_result = rvalue_to_type(rvalue, symbol_table, function_table);
     if rvalue_result.is_err() {
         return rvalue_result;
     }
@@ -84,7 +86,8 @@ pub fn print_println_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Ty
 }
 
 // if
-pub fn if_check(expr: &Expr, stmt1: &Stmt, stmt2: &Stmt, symbol_table: &mut SymbolTable) -> Result<Type, String> {
+pub fn if_check(expr: &Expr, stmt1: &ReturningStmt, stmt2: &ReturningStmt,
+                symbol_table: &mut SymbolTable, function_table: &HashMap<String, Function>) -> Result<Type, String> {
     let expr_result = expr_to_type(expr, symbol_table);
     if expr_result.is_err() {
         return expr_result;
@@ -94,16 +97,17 @@ pub fn if_check(expr: &Expr, stmt1: &Stmt, stmt2: &Stmt, symbol_table: &mut Symb
         return Err(format!("type need to be bool"));
     }
 
-    let stmt1_result = stmt_check(stmt1, symbol_table);
+    let stmt1_result = stmt_check(stmt1, symbol_table, function_table);
     if stmt1_result.is_err() {
         return stmt1_result;
     }
 
-    stmt_check(stmt2, symbol_table)
+    stmt_check(stmt2, symbol_table, function_table)
 }
 
 // while
-pub fn while_check(expr: &Expr, stmt: &Stmt, symbol_table: &mut SymbolTable) -> Result<Type, String> {
+pub fn while_check(expr: &Expr, stmt: &ReturningStmt,
+                   symbol_table: &mut SymbolTable, function_table: &HashMap<String, Function>) -> Result<Type, String> {
     let expr_result = expr_to_type(expr, symbol_table);
     if expr_result.is_err() {
         return expr_result;
@@ -113,22 +117,25 @@ pub fn while_check(expr: &Expr, stmt: &Stmt, symbol_table: &mut SymbolTable) -> 
         return Err(format!("type need to be bool"));
     }
 
-    stmt_check(stmt, symbol_table)
+    stmt_check(stmt, symbol_table, function_table)
 }
 
 // scope
-pub fn scope_check(stmt: &Stmt, symbol_table: &mut SymbolTable) -> Result<Type, String> {
-    stmt_check(stmt, symbol_table)
+pub fn scope_check(stmt: &ReturningStmt, symbol_table: &mut SymbolTable,
+                   function_table: &HashMap<String, Function>) -> Result<Type, String> {
+    stmt_check(stmt, symbol_table, function_table)
 }
 
-pub fn stmt_check(stmt: &Stmt, symbol_table: &mut SymbolTable) -> Result<Type, String> {
+pub fn stmt_check(ret_stmt: &ReturningStmt, symbol_table: &mut SymbolTable,
+                  function_table: &HashMap<String, Function>) -> Result<Type, String> {
+    let stmt = &ret_stmt.statement;
     match stmt {
         Stmt::Skip => Ok(Type::Any),
         Stmt::Declare(type_given, ident, rvalue) => {
-            declaration_check(&type_given, &ident, &rvalue, symbol_table)
+            declaration_check(&type_given, &ident, &rvalue, symbol_table, function_table)
         }
         Stmt::Assign(lvalue, rvalue) => {
-            assignment_check(lvalue, rvalue, symbol_table)
+            assignment_check(lvalue, rvalue, symbol_table, function_table)
         }
         Stmt::Read(lvalue) => {
             read_check(lvalue, symbol_table)
@@ -146,20 +153,20 @@ pub fn stmt_check(stmt: &Stmt, symbol_table: &mut SymbolTable) -> Result<Type, S
             print_println_check(expr, symbol_table)
         }
         Stmt::If(expr, stmt1, stmt2) => {
-            if_check(expr, &stmt1.statement, &stmt2.statement, symbol_table)
+            if_check(expr, &stmt1, &stmt2, symbol_table, function_table)
         }
         Stmt::While(expr, stmt) => {
-            while_check(expr, &stmt.statement, symbol_table)
+            while_check(expr, &stmt, symbol_table, function_table)
         }
         Stmt::Scope(stmt) => {
-            scope_check(&stmt.statement, symbol_table)
+            scope_check(&stmt, symbol_table, function_table)
         }
         Stmt::Serial(stmt1, stmt2) => {
-            let stmt1_result = stmt_check(&stmt1.statement, symbol_table);
+            let stmt1_result = stmt_check(&stmt1, symbol_table, function_table);
             if stmt1_result.is_err() {
                 return stmt1_result;
             }
-            stmt_check(&stmt2.statement, symbol_table)
+            stmt_check(&stmt2, symbol_table, function_table)
         }
     }
 }
