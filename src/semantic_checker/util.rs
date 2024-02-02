@@ -3,16 +3,31 @@ use crate::ast::{ArgList, ArrayElem, ArrayLiter, Expr, Function, Lvalue, PairEle
 use crate::semantic_checker::symbol_table::SymbolTable;
 use crate::semantic_checker::type_checker::{binary_operator_check, unary_operator_check};
 
-pub fn type_check_special (type1: &Type, type2: &Type) -> Result<Type, String> {
-    let result = type_check_special_help(type1, type2);
-    if result.is_ok() {
-        result
-    } else {
-        type_check_special_help(type2, type1)
+pub fn type_check_array_elem(type1: &Type, type2: &Type) -> Result<Type, String> {
+    match type1 {
+        Type::Array(char_type) if char_type == &Box::from(Type::CharType) => {
+            match type2 {
+                Type::StringType => Ok(Type::StringType),
+                _ => Err("type mismatch in check array elem".to_string())
+            }
+        }
+        _ => Err("not this special case".to_string())
     }
 }
 
-pub fn type_check_special_help(type1: &Type, type2: &Type) -> Result<Type, String> {
+pub fn char_to_string_conversion(type1: &Type) -> Type {
+    match type1 {
+        Type::Array(char_type) if char_type == &Box::from(Type::CharType) => {
+            Type::StringType
+        }
+        Type::Array(inner) => {
+            Type::Array(Box::from(char_to_string_conversion(inner)))
+        }
+        _ => type1.clone()
+    }
+}
+
+pub fn type_check_special(type1: &Type, type2: &Type) -> Result<Type, String> {
     match type2 {
         Type::Pair(p1, p2) => {
             match type1 {
@@ -27,33 +42,26 @@ pub fn type_check_special_help(type1: &Type, type2: &Type) -> Result<Type, Strin
                     }
                     Ok(Type::Any)
                 }
-                _ => Err(format!("type mismatch"))
-            }
-        }
-        Type::Array(chartype) if chartype == &Box::from(Type::CharType) => {
-            match type1 {
-                Type::StringType => Ok(Type::StringType),
-                _ => Err(format!("type mismatch"))
+                _ => Err("type mismatch in special check pair".to_string())
             }
         }
         Type::Array(inner) => {
             match type1 {
-                Type::Array(inner1) => type_check_special_help(inner1, inner),
-                _ => Err(format!("type mismatch"))
+                Type::Array(inner1) => type_check_special(inner1, inner),
+                _ => Err("type mismatch in special check array".to_string())
             }
         }
         Type::Any => {
             Ok(Type::Any)
         }
-        _ => Err(format!("Do not a special type case")),
+        _ => Err("Do not a special type case".to_string()),
     }
-
 }
 
 pub fn get_type_from_table(ident: &str, symbol_table: &SymbolTable) -> Result<Type, String> {
     let symbol = symbol_table.find_all(ident);
     if symbol.is_none() {
-        return Err(format!("ident not found"));
+        return Err("ident not found".to_string());
     }
     Ok(symbol.unwrap().symbol_type.clone())
 }
@@ -68,7 +76,7 @@ pub fn pair_elem_to_type(pair_elem: &PairElem, symbol_table: &SymbolTable) -> Re
             let type_result = type_result.unwrap();
             match type_result {
                 Type::Pair(inner1, _) => Ok(*inner1),
-                _ => Err(format!("elem is not a pair"))
+                _ => Err("elem is not a pair".to_string())
             }
         }
         PairElem::PairElemSnd(lvalue) => {
@@ -79,7 +87,7 @@ pub fn pair_elem_to_type(pair_elem: &PairElem, symbol_table: &SymbolTable) -> Re
             let type_result = type_result.unwrap();
             match type_result {
                 Type::Pair(_, inner2) => Ok(*inner2),
-                _ => Err(format!("elem is not a pair"))
+                _ => Err("elem is not a pair".to_string())
             }
         }
     }
@@ -102,7 +110,7 @@ pub fn array_elem_to_type(array_elem: &ArrayElem, symbol_table: &SymbolTable) ->
         }
         let expr_type = expr_result.unwrap();
         if expr_type != Type::IntType {
-            return Err(format!("array index is not int type"));
+            return Err("array index is not int type".to_string());
         }
 
         // unwrap one box each time
@@ -111,7 +119,7 @@ pub fn array_elem_to_type(array_elem: &ArrayElem, symbol_table: &SymbolTable) ->
                 array_elem_type = *inner;
             }
             _ => {
-                return Err(format!("ident is more than the dimension of the array"));
+                return Err("ident is more than the dimension of the array".to_string());
             }
         }
     }
@@ -144,14 +152,14 @@ pub fn expr_to_type(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, Str
         }
         Expr::UnaryApp(operator, operand) => {
             unary_operator_check(operator, operand, symbol_table)
-        },
+        }
         Expr::BinaryApp(lhs, operator, rhs) => {
             binary_operator_check(lhs, operator, rhs, symbol_table)
-        },
+        }
     }
 }
 
-pub fn arr_lit_to_type (array: &ArrayLiter, symbol_table: &SymbolTable) -> Result<Type, String> {
+pub fn arr_lit_to_type(array: &ArrayLiter, symbol_table: &SymbolTable) -> Result<Type, String> {
     // check if array is null
     if array.val.is_empty() {
         return Ok(Type::Array(Box::new(Type::Any)));
@@ -167,12 +175,15 @@ pub fn arr_lit_to_type (array: &ArrayLiter, symbol_table: &SymbolTable) -> Resul
         if array_type == Type::Any { // for first element
             array_type = expr_type;
         } else if array_type != expr_type {
-            if type_check_special(&array_type, &expr_type).is_err() {
-                return Err(format!("array elements are not the same type"));
+            // need to check double side here
+            if type_check_special(&array_type, &expr_type).is_err() && type_check_array_elem(&array_type, &expr_type).is_err()
+                && type_check_array_elem(&expr_type, &array_type).is_err() {
+                return Err("array elements are not the same type".to_string());
             }
         }
     }
-    Ok(Type::Array(Box::new(array_type)))
+    Ok(char_to_string_conversion(&Type::Array(Box::from(array_type))))
+    // Ok(Type::Array(Box::new(char_to_string_conversion(&array_type))))
 }
 
 pub fn new_pair_to_type(expr1: &Expr, expr2: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
@@ -189,16 +200,16 @@ pub fn new_pair_to_type(expr1: &Expr, expr2: &Expr, symbol_table: &SymbolTable) 
 
 pub fn call_check(ident: &str, arg_list: &ArgList, symbol_table: &SymbolTable,
                   function_table: &HashMap<String, Function>) -> Result<Type, String> {
-    let function =  function_table.get(ident);
+    let function = function_table.get(ident);
     if function.is_none() {
-        return Err(format!("function not found"));
+        return Err("function not found".to_string());
     }
     let function = function.unwrap();
     // get Vec from arg_list
     let ArgList::Arg(args) = arg_list;
 
     if function.parameters.len() != args.len() {
-        return Err(format!("function call parameter length mismatch"));
+        return Err("function call parameter length mismatch".to_string());
     }
 
     for ind in 0..args.len() {
@@ -208,7 +219,7 @@ pub fn call_check(ident: &str, arg_list: &ArgList, symbol_table: &SymbolTable,
         }
         let Param::Parameter(param_type, _) = &function.parameters[ind];
         if &arg_type.unwrap() != param_type {
-            return Err(format!("function call parameter type mismatch"));
+            return Err("function call parameter type mismatch".to_string());
         }
     }
     Ok(function.return_type.clone())
