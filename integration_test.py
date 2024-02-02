@@ -60,7 +60,7 @@ def running_our_single_test_cases(path: str) -> int:
     print("UNKNOWN ERROR")
     exit(1)
   return result
-  
+
 def running_ref_single_test_cases(path: str) -> int:
   global expected_syntax_error_test_cases, expected_semantic_error_test_cases
   output: str = subprocess.run([REF_PATH, "-s", path], stdout=subprocess.PIPE).stdout.decode("utf-8")
@@ -79,21 +79,21 @@ def running_ref_single_test_cases(path: str) -> int:
   return result
 
 def running_test_cases(path: str) -> None:
-    if path.endswith("wacc"):
-      running_our_single_test_cases(path)
-      running_ref_single_test_cases(path)
-      return
-    for test_case in listdir(path):
-      new_path = f"{path}/{test_case}"
-      if isdir(new_path):
-        running_test_cases(new_path)
-      elif new_path.endswith(".wacc"):
-        print("============================================================")
-        our_result = running_our_single_test_cases(new_path)
-        ref_result = running_ref_single_test_cases(new_path)
-        if our_result != ref_result:
-          incorrect_list.append(incorrect_test(new_path, our_result, ref_result))
-          print("result not match")
+  if path.endswith("wacc"):
+    running_our_single_test_cases(path)
+    running_ref_single_test_cases(path)
+    return
+  for test_case in listdir(path):
+    new_path = f"{path}/{test_case}"
+    if isdir(new_path):
+      running_test_cases(new_path)
+    elif new_path.endswith(".wacc"):
+      print("============================================================")
+      our_result = running_our_single_test_cases(new_path)
+      ref_result = running_ref_single_test_cases(new_path)
+      if our_result != ref_result:
+        incorrect_list.append(incorrect_test(new_path, our_result, ref_result))
+        print("result not match")
 
 # accepting one arguments as the path of the test directory (can be single file)
 if __name__ == "__main__":
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     path = f"{sys.argv[1]}"
   else:
     exit(0)
-    
+
   # ensure that the wacc_36 executable exists
   if not exists(WACC_PATH):
     print("running cargo build")
@@ -128,6 +128,6 @@ if __name__ == "__main__":
   print(f"actual semantic error test cases: {actual_semantic_error_test_cases}")
   print(f"expected semantic error test cases: {expected_semantic_error_test_cases}")
   print(f"remaining test cases: {get_total_test_cases() - runned_test_cases}")
-  
+
   assert actual_syntax_error_test_cases == expected_syntax_error_test_cases, "syntax error test cases not match"
   assert actual_semantic_error_test_cases == expected_semantic_error_test_cases, "semantic error test cases not match"

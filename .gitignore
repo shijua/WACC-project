@@ -5,6 +5,9 @@
 .idea/
 wacc-compiler
 
+# ignore all drafts
+**/draft.wacc
+
 
 # Added by cargo
 
