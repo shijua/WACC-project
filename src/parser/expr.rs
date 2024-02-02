@@ -118,11 +118,6 @@ pub fn expr_atom_literal(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
     // <ident>
     let ident_atom = map(ident, Expr::Ident);
 
-    // <unary-oper> <expr>
-    let unary_app = map(pair(unary_oper, expr), |(op, exp)| {
-        Expr::UnaryApp(op, Box::new(exp))
-    });
-
     let array_elem_ = map(array_elem, Expr::ArrayElem);
 
     let (input, e) = alt((
@@ -132,7 +127,6 @@ pub fn expr_atom_literal(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
         str_liter,
         pair_liter,
         array_elem_,
-        unary_app,
         ident_atom,
         delimited(token("("), expr, token(")")),
     ))(input)?;
@@ -149,6 +143,12 @@ fn unary_oper(input: &str) -> IResult<&str, UnaryOperator, ErrorTree<&str>> {
         value(UnaryOperator::Ord, token("ord")),
         value(UnaryOperator::Chr, token("chr")),
     ))(input)
+}
+
+fn expr_unary_app(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
+    map(pair(unary_oper, expr), |(op, exp)| {
+        Expr::UnaryApp(op, Box::new(exp))
+    })(input)
 }
 
 // Implemented Pratt Parsing
@@ -206,7 +206,7 @@ fn expr_binary_app(
     min_binding_power: u32,
     // r_bound: i32,
 ) -> IResult<&str, Expr, ErrorTree<&str>> {
-    let (mut input, mut lhs) = expr_atom_literal(input)?;
+    let (mut input, mut lhs) = expr_non_binary(input)?;
 
     let mut actual_bound = u32::MAX;
 
@@ -229,7 +229,15 @@ fn expr_binary_app(
     Ok((input, lhs))
 }
 
+fn expr_non_binary(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
+    alt((expr_unary_app, expr_atom_literal))(input)
+}
+
 pub fn expr(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
     // Either be captured by a binary application, or be captured by other detections within.
-    expr_binary_app(input, BASELINE_BINDING_POWER)
+    alt((
+        expr_unary_app,
+        |i| expr_binary_app(i, BASELINE_BINDING_POWER),
+        expr_atom_literal,
+    ))(input)
 }

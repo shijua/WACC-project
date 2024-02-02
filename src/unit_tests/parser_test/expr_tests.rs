@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod atomic_tests {
+    use crate::ast::Expr::IntLiter;
     use crate::ast::{BinaryOperator, Expr, UnaryOperator};
     use crate::parser::expr::{expr, expr_atom_literal};
 
@@ -322,12 +323,20 @@ mod atomic_tests {
             )) if ast == Expr::BinaryApp(
                     Box::new(Expr::IntLiter(1)),
                     BinaryOperator::Sub,
-                    Box::new(Expr::IntLiter(-3))
+                    Box::new(Expr::UnaryApp(UnaryOperator::Negative, Box::new(IntLiter(3))))
                 )
         ));
 
+        // test with array elem
+        let expr_array = expr("ident[487][6 + 12]");
+        assert!(expr_array.is_ok());
+    }
+
+    #[test]
+    fn debug_triple_negate() {
         // test with triple negate operator
         let expr_triple_negate = expr("1---3");
+        println!("{:?}", expr_triple_negate);
         assert!(matches!(
             expr_triple_negate,
             Ok((
@@ -338,13 +347,9 @@ mod atomic_tests {
                     BinaryOperator::Sub,
                     Box::new(Expr::UnaryApp(
                         UnaryOperator::Negative,
-                        Box::new(Expr::IntLiter(-3))
+                        Box::new(Expr::UnaryApp(UnaryOperator::Negative, Box::new(Expr::IntLiter(3))))
                     ))
                 )
         ));
-
-        // test with array elem
-        let expr_array = expr("ident[487][6 + 12]");
-        assert!(expr_array.is_ok());
     }
 }
