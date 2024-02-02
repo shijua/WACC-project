@@ -96,16 +96,23 @@ fn is_wacc_keyword(ident: &str) -> bool {
     )
 }
 
+fn is_not_keyword(ident: &str) -> bool {
+    !is_wacc_keyword(ident)
+}
+
 /*
    Identifier Recognition ( ‘_’ | ‘a’-‘z’ | ‘A’-‘Z’ ) ( ‘_’ | ‘a’-‘z’ | ‘A’-‘Z’ | ‘0’-‘9’ )*
    However,
 */
 pub fn ident(input: &str) -> IResult<&str, String, ErrorTree<&str>> {
     let ident_parser = map(
-        recognize(pair(
-            alt((alpha1, tag("_"))),
-            many0_count(alt((alphanumeric1, tag("_")))),
-        )),
+        verify(
+            recognize(pair(
+                alt((alpha1, tag("_"))),
+                many0_count(alt((alphanumeric1, tag("_")))),
+            )),
+            is_not_keyword,
+        ),
         |x: &str| x.to_string(),
     );
 
