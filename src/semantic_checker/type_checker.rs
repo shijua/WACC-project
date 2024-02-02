@@ -79,6 +79,7 @@ pub fn binary_operator_check(lhs: &Expr, operator: &BinaryOperator, rhs: &Expr, 
                 Err(format!("Expected same type, found {:?} and {:?}", lhs_type, rhs_type))
             }
         }
+
         BinaryOperator::And | BinaryOperator::Or => {
             if lhs_type == Type::BoolType && rhs_type == Type::BoolType {
                 Ok(Type::BoolType)

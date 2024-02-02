@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::ast::{Expr, Function, Lvalue, ReturningStmt, Rvalue, Stmt, Type};
 use crate::semantic_checker::symbol_table::SymbolTable;
-use crate::semantic_checker::util::{expr_to_type, lvalue_to_type, rvalue_to_type, type_check_special};
+use crate::semantic_checker::util::{expr_to_type, lvalue_to_type, rvalue_to_type, type_check_array_elem, type_check_special};
 
 // variable declaration
 pub fn declaration_check(type_given: &Type, ident: &str, rvalue: &Rvalue, symbol_table: &mut SymbolTable,
@@ -12,11 +12,12 @@ pub fn declaration_check(type_given: &Type, ident: &str, rvalue: &Rvalue, symbol
     }
 
     let rvalue_type = rvalue_result.unwrap();
-    if type_given != &rvalue_type && type_check_special(type_given, &rvalue_type).is_err() {
-        return Err(format!("type mismatch"));
+    if type_given != &rvalue_type && type_check_special(type_given, &rvalue_type).is_err()
+        && type_check_array_elem(type_given, &rvalue_type).is_err() {
+        return Err("type mismatch in declaration check".to_string());
     }
     if symbol_table.find(ident).is_some() {
-        return Err(format!("ident already exists"));
+        return Err("ident already exists".to_string());
     }
     symbol_table.add(ident, type_given.clone())
 }
@@ -35,10 +36,15 @@ pub fn assignment_check(lvalue: &Lvalue, rvalue: &Rvalue, symbol_table: &SymbolT
         return rvalue_result;
     }
     let rvalue_type = rvalue_result.unwrap();
-    if (lvalue_type == rvalue_type) || type_check_special(&lvalue_type, &rvalue_type).is_ok() {
+    // Assert that not both sides can be any at the same time.
+    if lvalue_type == Type::Any && rvalue_type == Type::Any {
+        return Err("type mismatch in assignment check(both side is any)".to_string());
+    }
+    if lvalue_type == rvalue_type || type_check_array_elem(&lvalue_type, &rvalue_type).is_ok()
+        || type_check_special(&lvalue_type, &rvalue_type).is_ok() || lvalue_type == Type::Any {
         return Ok(lvalue_type);
     }
-    Err(format!("type mismatch"))
+    Err("type mismatch in assignment check".to_string())
 }
 
 // read
@@ -49,7 +55,7 @@ pub fn read_check(lvalue: &Lvalue, symbol_table: &SymbolTable) -> Result<Type, S
     }
     let lvalue_type = lvalue_result.unwrap();
     if lvalue_type != Type::IntType && lvalue_type != Type::CharType {
-        return Err(format!("type need to be int or char"));
+        return Err("type need to be int or char".to_string());
     }
     return Ok(lvalue_type);
 }
@@ -65,7 +71,7 @@ pub fn free_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, Strin
     match expr_type {
         Type::Array(..) => Ok(expr_type),
         Type::Pair(..) => Ok(expr_type),
-        _ => Err(format!("type need to be array or pair"))
+        _ => Err("type need to be array or pair".to_string())
     }
 }
 
@@ -82,10 +88,10 @@ pub fn return_check(expr: &Expr, symbol_table: &SymbolTable,
     let expr_type = expr_result.unwrap();
     assert!(symbol_table.func_name.as_ref().is_some(), "function name is not set");
     let func_type = function_table.get(symbol_table.func_name.as_ref().unwrap()).unwrap().return_type.clone();
-    if func_type == expr_type {
+    if func_type == expr_type || type_check_special(&func_type, &expr_type).is_ok() {
         return Ok(expr_type);
     }
-    return Err("type mismatch".to_string());
+    return Err("type mismatch in return check".to_string());
 
     // todo!("further checking needed for multiple return etc?")
 }
@@ -98,7 +104,7 @@ pub fn exit_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, Strin
     }
     let expr_type = expr_result.unwrap();
     if expr_type != Type::IntType {
-        return Err(format!("type need to be int"));
+        return Err("type need to be int".to_string());
     }
     Ok(expr_type)
 }
@@ -117,7 +123,7 @@ pub fn if_check(expr: &Expr, stmt1: &ReturningStmt, stmt2: &ReturningStmt,
     }
     let expr_type = expr_result.unwrap();
     if expr_type != Type::BoolType {
-        return Err(format!("type need to be bool"));
+        return Err("type need to be bool".to_string());
     }
 
     let stmt1_result = scope_check(stmt1, symbol_table, function_table);
@@ -137,7 +143,7 @@ pub fn while_check(expr: &Expr, stmt: &ReturningStmt,
     }
     let expr_type = expr_result.unwrap();
     if expr_type != Type::BoolType {
-        return Err(format!("type need to be bool"));
+        return Err("type need to be bool".to_string());
     }
     scope_check(stmt, &symbol_table, function_table)
 }

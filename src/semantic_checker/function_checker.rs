@@ -10,7 +10,7 @@ pub fn program_check(functions: &Vec<Function>, body: &ReturningStmt) -> Result<
 
     for function in functions {
         if function_table.contains_key(&function.ident) {
-            return Err(format!("function already exists"));
+            return Err("function already exists".to_string());
         }
         function_table.insert(function.ident.clone(), function.clone());
     }
@@ -29,7 +29,7 @@ pub fn function_check(function: &Function, function_table: &HashMap<String, Func
     for param in &function.parameters {
         let Parameter(param_type, param_ident) = param;
         if para_symbol_table.add(param_ident, param_type.clone()).is_err() {
-            return Err(format!("ident already exists"));
+            return Err("ident already exists".to_string());
         }
     }
     scope_check(&function.body, &para_symbol_table, function_table)
