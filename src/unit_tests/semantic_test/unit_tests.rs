@@ -2,24 +2,21 @@
 mod type_tests {
     use std::collections::HashMap;
     use crate::ast::{ArrayElem, ArrayLiter, BinaryOperator, Expr, Function, Lvalue, PairElem, Rvalue, Type, UnaryOperator};
-    use crate::parser::type_parser::{base_type, pair_elem_type, type_parse};
-    use crate::semantic_checker::symbol_table;
     use crate::semantic_checker::symbol_table::SymbolTable;
-    use crate::semantic_checker::type_checker::{binary_operator_check, unary_operator_check};
     use crate::semantic_checker::util::{array_elem_to_type, expr_to_type, get_type_from_table, pair_elem_to_type, rvalue_to_type};
 
     // create symbol table
     fn create_symbol_table() -> SymbolTable {
-        let mut symbol_table = SymbolTable::create(None, false);
-        symbol_table.add("a", Type::IntType);
-        symbol_table.add("b", Type::CharType);
-        symbol_table.add("c", Type::Array(Box::new(Type::IntType)));
-        symbol_table.add("d", Type::Pair(Box::new(Type::IntType), Box::new(Type::CharType)));
+        let mut symbol_table = SymbolTable::create(None, false, None);
+        let _test = symbol_table.add("a", Type::IntType);
+        let _test = symbol_table.add("b", Type::CharType);
+        let _test = symbol_table.add("c", Type::Array(Box::new(Type::IntType)));
+        let _test = symbol_table.add("d", Type::Pair(Box::new(Type::IntType), Box::new(Type::CharType)));
         symbol_table
     }
 
     fn create_function_table() -> HashMap<String, Function> {
-        let mut function_table: HashMap<String, Function> = HashMap::new();
+        let function_table: HashMap<String, Function> = HashMap::new();
         function_table
     }
 

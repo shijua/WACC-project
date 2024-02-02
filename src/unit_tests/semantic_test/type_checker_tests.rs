@@ -6,11 +6,11 @@ mod type_tests {
 
     // create empty symbol table
     fn create_empty_symbol_table() -> SymbolTable {
-        SymbolTable::create(None, false)
+        SymbolTable::create(None, false, None)
     }
     #[test]
     fn unary_operator_test() {
-        let mut symbol_table = create_empty_symbol_table();
+        let symbol_table = create_empty_symbol_table();
         assert!(matches!(
             unary_operator_check(&UnaryOperator::Bang, &Expr::BoolLiter(true), &symbol_table),
             Ok(Type::BoolType)
@@ -36,7 +36,7 @@ mod type_tests {
 
     #[test]
     fn binary_operator_test() {
-        let mut symbol_table = create_empty_symbol_table();
+        let symbol_table = create_empty_symbol_table();
         assert!(matches!(
             binary_operator_check(&Expr::IntLiter(1), &BinaryOperator::Add, &Expr::IntLiter(1), &symbol_table),
             Ok(Type::IntType)

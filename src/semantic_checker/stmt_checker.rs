@@ -18,8 +18,7 @@ pub fn declaration_check(type_given: &Type, ident: &str, rvalue: &Rvalue, symbol
     if symbol_table.find(ident).is_some() {
         return Err(format!("ident already exists"));
     }
-    symbol_table.add(ident, type_given.clone());
-    Ok(type_given.clone())
+    symbol_table.add(ident, type_given.clone())
 }
 
 // variable assignment
@@ -36,10 +35,10 @@ pub fn assignment_check(lvalue: &Lvalue, rvalue: &Rvalue, symbol_table: &SymbolT
         return rvalue_result;
     }
     let rvalue_type = rvalue_result.unwrap();
-    if lvalue_type != rvalue_type && type_check_special(&lvalue_type, &rvalue_type).is_err() {
-        return Err(format!("type mismatch"));
+    if (lvalue_type == rvalue_type) || type_check_special(&lvalue_type, &rvalue_type).is_ok() {
+        return Ok(lvalue_type);
     }
-    return Ok(lvalue_type);
+    Err(format!("type mismatch"))
 }
 
 // read
@@ -71,14 +70,37 @@ pub fn free_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, Strin
 }
 
 // return
-pub fn return_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
-    expr_to_type(expr, symbol_table)
+pub fn return_check(expr: &Expr, symbol_table: &SymbolTable,
+                    function_table: &HashMap<String, Function>) -> Result<Type, String> {
+    if symbol_table.is_func == false {
+        return Err("return in the main function!".to_string());
+    }
+    let expr_result = expr_to_type(expr, symbol_table);
+    if expr_result.is_err() {
+        return expr_result;
+    }
+    let expr_type = expr_result.unwrap();
+    assert!(symbol_table.func_name.as_ref().is_some(), "function name is not set");
+    let func_type = function_table.get(symbol_table.func_name.as_ref().unwrap()).unwrap().return_type.clone();
+    if func_type == expr_type {
+        return Ok(expr_type);
+    }
+    return Err("type mismatch".to_string());
+
     // todo!("further checking needed for multiple return etc?")
 }
 
 // exit
 pub fn exit_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
-    expr_to_type(expr, symbol_table)
+    let expr_result = expr_to_type(expr, symbol_table);
+    if expr_result.is_err() {
+        return expr_result;
+    }
+    let expr_type = expr_result.unwrap();
+    if expr_type != Type::IntType {
+        return Err(format!("type need to be int"));
+    }
+    Ok(expr_type)
 }
 
 // print and println
@@ -123,7 +145,8 @@ pub fn while_check(expr: &Expr, stmt: &ReturningStmt,
 // scope
 pub fn scope_check(stmt: &ReturningStmt, symbol_table: &SymbolTable,
                    function_table: &HashMap<String, Function>) -> Result<Type, String> {
-    let mut new_symbol_table = SymbolTable::create(Some(Box::from(symbol_table.clone())), symbol_table.is_func);
+    let mut new_symbol_table = SymbolTable::create(Some(Box::from(symbol_table.clone())),
+                                                   symbol_table.is_func, symbol_table.func_name.clone());
     stmt_check(stmt, &mut new_symbol_table, function_table)
 }
 
@@ -145,7 +168,7 @@ pub fn stmt_check(ret_stmt: &ReturningStmt, symbol_table: &mut SymbolTable,
             free_check(expr, symbol_table)
         }
         Stmt::Return(expr) => {
-            return_check(expr, symbol_table)
+            return_check(expr, symbol_table, function_table)
         }
         Stmt::Exit(expr) => {
             exit_check(expr, symbol_table)

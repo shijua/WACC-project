@@ -211,7 +211,7 @@ pub fn call_check(ident: &str, arg_list: &ArgList, symbol_table: &SymbolTable,
             return Err(format!("function call parameter type mismatch"));
         }
     }
-    Ok(Type::Any)
+    Ok(function.return_type.clone())
 }
 
 pub fn rvalue_to_type(rvalue: &Rvalue, symbol_table: &SymbolTable,
