@@ -1,5 +1,6 @@
+mod ast;
 mod parser;
 
 fn main() {
-    println!("{}",parser::lexer::work("42"));
+    println!("hello world");
 }
