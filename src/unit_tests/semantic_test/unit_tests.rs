@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod type_tests {
-    use crate::ast::{ArrayElem, ArrayLiter, BinaryOperator, Expr, Lvalue, PairElem, Rvalue, Type, UnaryOperator};
+    use std::collections::HashMap;
+    use crate::ast::{ArrayElem, ArrayLiter, BinaryOperator, Expr, Function, Lvalue, PairElem, Rvalue, Type, UnaryOperator};
     use crate::parser::type_parser::{base_type, pair_elem_type, type_parse};
     use crate::semantic_checker::symbol_table;
     use crate::semantic_checker::symbol_table::SymbolTable;
@@ -15,6 +16,11 @@ mod type_tests {
         symbol_table.add("c", Type::Array(Box::new(Type::IntType)));
         symbol_table.add("d", Type::Pair(Box::new(Type::IntType), Box::new(Type::CharType)));
         symbol_table
+    }
+
+    fn create_function_table() -> HashMap<String, Function> {
+        let mut function_table: HashMap<String, Function> = HashMap::new();
+        function_table
     }
 
     #[test]
@@ -116,25 +122,27 @@ mod type_tests {
 
     #[test]
     fn rvalue_to_type_test() {
+        let function_table = create_function_table();
+        let symbol_table = create_symbol_table();
         assert!(matches!(
-            rvalue_to_type(&Rvalue::RExpr(Expr::IntLiter(1)), &create_symbol_table()),
+            rvalue_to_type(&Rvalue::RExpr(Expr::IntLiter(1)), &symbol_table, &function_table),
             Ok(Type::IntType)
         ));
         assert!(matches!(
-            rvalue_to_type(&Rvalue::RArrLit(ArrayLiter {val: vec![Expr::IntLiter(1)]}), &create_symbol_table()),
+            rvalue_to_type(&Rvalue::RArrLit(ArrayLiter {val: vec![Expr::IntLiter(1)]}), &symbol_table, &function_table),
             Ok(Type::Array(types)) if types == Box::from(Type::IntType)
         ));
         // array with different types
         assert!(matches!(
-            rvalue_to_type(&Rvalue::RArrLit(ArrayLiter {val: vec![Expr::IntLiter(1), Expr::CharLiter('1')]}), &create_symbol_table()),
+            rvalue_to_type(&Rvalue::RArrLit(ArrayLiter {val: vec![Expr::IntLiter(1), Expr::CharLiter('1')]}), &symbol_table, &function_table),
             Err(_)
         ));
         assert!(matches!(
-            rvalue_to_type(&Rvalue::RNewPair(Expr::IntLiter(1), Expr::CharLiter('1')), &create_symbol_table()),
+            rvalue_to_type(&Rvalue::RNewPair(Expr::IntLiter(1), Expr::CharLiter('1')), &symbol_table, &function_table),
             Ok(Type::Pair(e1, e2)) if e1 == Box::from(Type::IntType) && e2 == Box::from(Type::CharType)
         ));
         assert!(matches!(
-            rvalue_to_type(&Rvalue::RPairElem(PairElem::PairElemFst(Box::from(Lvalue::LIdent("d".to_string())))), &create_symbol_table()),
+            rvalue_to_type(&Rvalue::RPairElem(PairElem::PairElemFst(Box::from(Lvalue::LIdent("d".to_string())))), &symbol_table, &function_table),
             Ok(Type::IntType)
         ));
         // todo!("missing RCall");

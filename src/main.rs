@@ -3,6 +3,7 @@ use nom_supreme::error::ErrorTree;
 use nom_supreme::final_parser::{Location, RecreateContext};
 use std::process::exit;
 use std::{env, fs};
+use crate::semantic_checker::function_checker::semantic_check_start;
 
 mod ast;
 mod parser;
@@ -35,6 +36,14 @@ fn main() {
         print_syntax_error(program_str, &parse_result.unwrap_err());
         exit(100);
     }
+
+    let semantic_result = semantic_check_start(&parse_result.unwrap());
+    if (semantic_result.is_err()) {
+        println!("Semantic Error!");
+        println!("{}", semantic_result.unwrap_err());
+        exit(200);
+    }
+
     println!("Parsing Successful");
     exit(0);
 }
