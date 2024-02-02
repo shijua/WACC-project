@@ -223,8 +223,9 @@ pub fn call_check(ident: &str, arg_list: &ArgList, symbol_table: &SymbolTable,
         if arg_type.is_err() {
             return arg_type;
         }
+        let arg_type = arg_type.unwrap();
         let Param::Parameter(param_type, _) = &function.parameters[ind];
-        if &arg_type.unwrap() != param_type {
+        if &arg_type != param_type && type_check_special(param_type, &arg_type).is_err() {
             return Err("function call parameter type mismatch".to_string());
         }
     }

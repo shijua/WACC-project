@@ -88,7 +88,7 @@ pub fn return_check(expr: &Expr, symbol_table: &SymbolTable,
     let expr_type = expr_result.unwrap();
     assert!(symbol_table.func_name.as_ref().is_some(), "function name is not set");
     let func_type = function_table.get(symbol_table.func_name.as_ref().unwrap()).unwrap().return_type.clone();
-    if func_type == expr_type {
+    if func_type == expr_type || type_check_special(&func_type, &expr_type).is_ok() {
         return Ok(expr_type);
     }
     return Err("type mismatch in return check".to_string());
