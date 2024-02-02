@@ -36,8 +36,12 @@ pub fn assignment_check(lvalue: &Lvalue, rvalue: &Rvalue, symbol_table: &SymbolT
         return rvalue_result;
     }
     let rvalue_type = rvalue_result.unwrap();
-    if lvalue_type != Type::Any && (lvalue_type == rvalue_type || type_check_array_elem(&lvalue_type, &rvalue_type).is_ok()
-        || type_check_special(&lvalue_type, &rvalue_type).is_ok()) {
+    // Assert that not both sides can be any at the same time.
+    if lvalue_type == Type::Any && rvalue_type == Type::Any {
+        return Err("type mismatch in assignment check(both side is any)".to_string());
+    }
+    if lvalue_type == rvalue_type || type_check_array_elem(&lvalue_type, &rvalue_type).is_ok()
+        || type_check_special(&lvalue_type, &rvalue_type).is_ok() || lvalue_type == Type::Any {
         return Ok(lvalue_type);
     }
     Err("type mismatch in assignment check".to_string())

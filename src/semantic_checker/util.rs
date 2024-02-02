@@ -34,11 +34,17 @@ pub fn type_check_special(type1: &Type, type2: &Type) -> Result<Type, String> {
                 Type::Pair(p3, p4) => {
                     let p1_result = type_check_special(p1, p3);
                     if p1_result.is_err() && p1 != p3 {
-                        return p1_result;
+                        let p1_result = type_check_special(p3, p1);
+                        if p1_result.is_err() {
+                            return p1_result;
+                        }
                     }
                     let p2_result = type_check_special(p2, p4);
                     if p2_result.is_err() && p2 != p4 {
-                        return p2_result;
+                        let p2_result = type_check_special(p4, p2);
+                        if p2_result.is_err() {
+                            return p2_result;
+                        }
                     }
                     Ok(Type::Any)
                 }
