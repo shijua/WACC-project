@@ -3,6 +3,7 @@ use crate::semantic_checker::symbol_table::SymbolTable;
 use crate::semantic_checker::util::{expr_to_type, type_check_special};
 // unary operator check
 pub fn unary_operator_check(operator: &UnaryOperator, operand: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
+    // check inside of the unary operator first
     let operand_result = expr_to_type(operand, symbol_table);
     if operand_result.is_err() {
         return operand_result;
@@ -45,6 +46,7 @@ pub fn unary_operator_check(operator: &UnaryOperator, operand: &Expr, symbol_tab
 
 // binary operator check
 pub fn binary_operator_check(lhs: &Expr, operator: &BinaryOperator, rhs: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
+    // check lhs and rhs first
     let lhs_result = expr_to_type(lhs, symbol_table);
     if lhs_result.is_err() {
         return lhs_result;

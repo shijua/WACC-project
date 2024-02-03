@@ -3,18 +3,18 @@ use crate::ast::{ArgList, ArrayElem, ArrayLiter, Expr, Function, Lvalue, PairEle
 use crate::semantic_checker::symbol_table::SymbolTable;
 use crate::semantic_checker::type_checker::{binary_operator_check, unary_operator_check};
 
+// check type2 (usually rvalue) is the same as type1 (usually lvalue) between char[] and string
+// we will convert type2 in to char of array in array_elem_to_type
+// so what we are doing now is to convert type1 to char of array and compare with type2
 pub fn type_check_array_elem(type1: &Type, type2: &Type) -> Result<Type, String> {
-    match type1 {
-        Type::Array(char_type) if char_type == &Box::from(Type::CharType) => {
-            match type2 {
-                Type::StringType => Ok(Type::StringType),
-                _ => Err("type mismatch in check array elem".to_string())
-            }
-        }
-        _ => Err("not this special case".to_string())
+    if &char_to_string_conversion(type1) == type2 {
+        Ok(type1.clone())
+    } else {
+        Err("type mismatch in check array elem".to_string())
     }
 }
 
+// convert char[] to string
 pub fn char_to_string_conversion(type1: &Type) -> Type {
     match type1 {
         Type::Array(char_type) if char_type == &Box::from(Type::CharType) => {
@@ -29,6 +29,7 @@ pub fn char_to_string_conversion(type1: &Type) -> Type {
 
 pub fn type_check_special(type1: &Type, type2: &Type) -> Result<Type, String> {
     match type2 {
+        // check inside of pair type
         Type::Pair(p1, p2) => {
             match type1 {
                 Type::Pair(p3, p4) => {
@@ -51,12 +52,14 @@ pub fn type_check_special(type1: &Type, type2: &Type) -> Result<Type, String> {
                 _ => Err("type mismatch in special check pair".to_string())
             }
         }
+        // check inside of array type
         Type::Array(inner) => {
             match type1 {
                 Type::Array(inner1) => type_check_special(inner1, inner),
                 _ => Err("type mismatch in special check array".to_string())
             }
         }
+        // if rhs is any, then it is ok
         Type::Any => {
             Ok(Type::Any)
         }
@@ -80,6 +83,7 @@ pub fn pair_elem_to_type(pair_elem: &PairElem, symbol_table: &SymbolTable) -> Re
                 return type_result;
             }
             let type_result = type_result.unwrap();
+
             match type_result {
                 Type::Pair(inner1, _) => Ok(*inner1),
                 _ => Err("elem is not a pair".to_string())
@@ -181,7 +185,7 @@ pub fn arr_lit_to_type(array: &ArrayLiter, symbol_table: &SymbolTable) -> Result
         if array_type == Type::Any { // for first element
             array_type = expr_type;
         } else if array_type != expr_type {
-            // need to check double side here
+            // need to check double side here for type_check_array_elem
             if type_check_special(&array_type, &expr_type).is_err() && type_check_array_elem(&array_type, &expr_type).is_err()
                 && type_check_array_elem(&expr_type, &array_type).is_err() {
                 return Err("array elements are not the same type".to_string());
@@ -189,7 +193,6 @@ pub fn arr_lit_to_type(array: &ArrayLiter, symbol_table: &SymbolTable) -> Result
         }
     }
     Ok(char_to_string_conversion(&Type::Array(Box::from(array_type))))
-    // Ok(Type::Array(Box::new(char_to_string_conversion(&array_type))))
 }
 
 pub fn new_pair_to_type(expr1: &Expr, expr2: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
@@ -206,6 +209,7 @@ pub fn new_pair_to_type(expr1: &Expr, expr2: &Expr, symbol_table: &SymbolTable) 
 
 pub fn call_check(ident: &str, arg_list: &ArgList, symbol_table: &SymbolTable,
                   function_table: &HashMap<String, Function>) -> Result<Type, String> {
+    // check if function is in the function table
     let function = function_table.get(ident);
     if function.is_none() {
         return Err("function not found".to_string());
@@ -218,6 +222,7 @@ pub fn call_check(ident: &str, arg_list: &ArgList, symbol_table: &SymbolTable,
         return Err("function call parameter length mismatch".to_string());
     }
 
+    // check if each parameter has the same type as the argument
     for ind in 0..args.len() {
         let arg_type = expr_to_type(&args[ind], symbol_table);
         if arg_type.is_err() {
@@ -236,17 +241,9 @@ pub fn rvalue_to_type(rvalue: &Rvalue, symbol_table: &SymbolTable,
                       function_table: &HashMap<String, Function>) -> Result<Type, String> {
     match rvalue {
         Rvalue::RExpr(expr) => expr_to_type(expr, symbol_table),
-        Rvalue::RArrLit(array) => {
-            arr_lit_to_type(array, symbol_table)
-        }
-        Rvalue::RNewPair(expr1, expr2) => {
-            new_pair_to_type(expr1, expr2, symbol_table)
-        }
-        Rvalue::RPairElem(pair) => {
-            pair_elem_to_type(pair, symbol_table)
-        }
-        Rvalue::RCall(ident, arg_list) => {
-            call_check(ident, arg_list, symbol_table, function_table)
-        }
+        Rvalue::RArrLit(array) => arr_lit_to_type(array, symbol_table),
+        Rvalue::RNewPair(expr1, expr2) => new_pair_to_type(expr1, expr2, symbol_table),
+        Rvalue::RPairElem(pair) => pair_elem_to_type(pair, symbol_table),
+        Rvalue::RCall(ident, arg_list) => call_check(ident, arg_list, symbol_table, function_table)
     }
 }
