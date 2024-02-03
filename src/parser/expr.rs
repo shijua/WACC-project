@@ -1,6 +1,6 @@
 use crate::ast::{ArrayElem, BinaryOperator, Expr, UnaryOperator};
 use crate::parser::expr::Associativity::{Left, NotApplicable, Right};
-use crate::parser::util::{consume_meaningless, ident, token};
+use crate::parser::util::{consume_meaningless, ident, keyword, token};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{char as char_nom, digit1, satisfy};
@@ -139,9 +139,9 @@ fn unary_oper(input: &str) -> IResult<&str, UnaryOperator, ErrorTree<&str>> {
     alt((
         value(UnaryOperator::Bang, token("!")),
         value(UnaryOperator::Negative, token("-")),
-        value(UnaryOperator::Len, token("len")),
-        value(UnaryOperator::Ord, token("ord")),
-        value(UnaryOperator::Chr, token("chr")),
+        value(UnaryOperator::Len, keyword("len")),
+        value(UnaryOperator::Ord, keyword("ord")),
+        value(UnaryOperator::Chr, keyword("chr")),
     ))(input)
 }
 
