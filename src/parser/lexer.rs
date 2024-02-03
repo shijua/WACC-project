@@ -12,9 +12,12 @@ pub enum Token<'src> {
     CharToken(char),
     Ident(&'src str),
     Op(&'src str),
-    Ctrl(&'src str),
+    Ctrl(char),
     Keyword(&'src str),
 }
+
+pub type ParserInput<'tokens, 'src> =
+    chumsky::input::SpannedInput<Token<'src>, Span, &'tokens [(Token<'src>, Span)]>;
 
 impl<'src> std::fmt::Display for Token<'src> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -137,7 +140,7 @@ fn lexer<'src>(
         .map(|s| Token::Op(s));
 
     // A parser for scope control brackets and separation symbols
-    let ctrl = one_of("()[],;").to_slice().map(Token::Ctrl);
+    let ctrl = one_of("()[],;").map(Token::Ctrl);
 
     // keywords
     let is_keyword = text::ascii::keyword("true")
