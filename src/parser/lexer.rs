@@ -38,7 +38,7 @@ impl<'src> std::fmt::Display for Token<'src> {
 //     just(input).padded_by(comments().repeated()).padded()
 // }
 
-fn lexer<'src>(
+pub fn lexer<'src>(
 ) -> impl Parser<'src, &'src str, Vec<(Token<'src>, Span)>, extra::Err<Rich<'src, char, Span>>> {
     let int_token = one_of("+-")
         .or_not()
@@ -272,3 +272,48 @@ fn can_lex_identifier() {
     let input = "length";
     assert_eq!(work(input), vec![Token::Ident("length")]);
 }
+
+// <unary_oper> ::= '!' | '-' | 'len' | 'ord' | 'chr'
+// let unary_oper = select! {
+//     Token::Op("!") => UnaryOperator::Bang,
+//     Token::Op("-") => UnaryOperator::Negative,
+//     Token::Keyword("len") => UnaryOperator::Len,
+//     Token::Keyword("chr") => UnaryOperator::Chr,
+// }
+// .labelled("unary operator");
+//
+// let binary_1 = select! {
+//     Token::Op("*") => BinaryOperator::Mul,
+//     Token::Op("%") => BinaryOperator::Modulo,
+//     Token::Op("/") => BinaryOperator::Div,
+// }
+// .labelled("binary operator");
+//
+// let binary_2 = select! {
+//     Token::Op("+") => BinaryOperator::Add,
+//     Token::Op("-") => BinaryOperator::Sub,
+// }
+// .labelled("binary operator");
+//
+// let binary_3 = select! {
+//     Token::Op(">=") => BinaryOperator::Gte,
+//     Token::Op(">") => BinaryOperator::Gt,
+//     Token::Op("<=") => BinaryOperator::Lte,
+//     Token::Op("<") => BinaryOperator::Lt,
+// }
+// .labelled("binary operator");
+//
+// let binary_4 = select! {
+//     Token::Op("!=") => BinaryOperator::Neq,
+//     Token::Op("==") => BinaryOperator::Eq,
+//
+// }
+// .labelled("binary operator");
+//
+// let binary_5 = just(Token::Op("&&"))
+//     .to(BinaryOperator::And)
+//     .labelled("binary operator");
+//
+// let binary_6 = just(Token::Op("||"))
+//     .to(BinaryOperator::Or)
+//     .labelled("binary operator");
