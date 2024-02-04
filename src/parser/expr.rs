@@ -1,10 +1,10 @@
-use crate::ast::BinaryOperator::{And, Eq, Or};
 use crate::ast::{BinaryOperator, Expr, UnaryOperator};
 use crate::parser::lexer::{ParserInput, Token};
 use crate::{Span, Spanned};
 use chumsky::error::Rich;
 use chumsky::input::MapExtra;
-use chumsky::prelude::{choice, just, todo, Recursive};
+use chumsky::pratt::{infix, left};
+use chumsky::prelude::{choice, just, recursive, todo, Recursive};
 use chumsky::IterParser;
 use chumsky::{extra, select, Parser};
 
@@ -131,14 +131,61 @@ fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
     }
     .labelled("unary operators");
 
-    let unary_app = unary_oper
+    let expr_unary = unary_oper
         .then(expr.clone())
         .map(|(op, target)| Expr::UnaryApp(op, Box::new(target)))
         .map_with(|exp, e| (exp, e.span()));
 
-    let expr_unary_atom = unary_app.or(atom).boxed();
+    let expr_unary_atom = expr_unary.or(atom);
 
-    // expr_binary.define({});
+    // we use a Vec to mimic the function call parameters.
+    // use parameter_stack.pop() to fetch the current.
 
-    expr_unary_atom
+    // <binary_oper> ::= * % /  + -   >= > <= <  == != && ||
+    let binary_oper = select! {
+      Token::Op("*") => BinaryOperator::Mul,
+        Token::Op("%") => BinaryOperator::Modulo,
+        Token::Op("/") => BinaryOperator::Div,
+        Token::Op("+") => BinaryOperator::Add,
+        Token::Op("-") => BinaryOperator::Sub,
+        Token::Op(">=") => BinaryOperator::Gte,
+        Token::Op(">") => BinaryOperator::Gt,
+        Token::Op("<=") => BinaryOperator::Lte,
+        Token::Op("<") => BinaryOperator::Lt,
+        Token::Op("==") => BinaryOperator::Eq,
+        Token::Op("!=") => BinaryOperator::Neq,
+        Token::Op("&&") => BinaryOperator::And,
+        Token::Op("||") => BinaryOperator::Or,
+    };
+
+    let mut powers: Vec<u32> = Vec::new();
+    powers.push(0);
+
+    let mut expr_binary = Recursive::declare();
+
+    expr_binary.define({
+        let mut bound: u32 = u32::MAX;
+        let power = powers.pop().unwrap();
+        expr_unary_atom.clone().foldl_with(
+            binary_oper
+                .filter(|binop| {
+                    let current_lbp = binop.lbp();
+                    let result = (power <= current_lbp) && (current_lbp <= bound);
+                    if result {
+                        powers.push(binop.rbp());
+                    }
+                    result
+                })
+                .then(expr_binary.clone())
+                .repeated(),
+            |a, (op, b), e| {
+                let result = Expr::BinaryApp(Box::new(a), op, Box::new(b));
+                bound = op.nbp();
+                (result, e.span())
+            },
+        );
+    });
+
+    //
+    choice((expr_unary, expr_binary, atom.clone()))
 }
