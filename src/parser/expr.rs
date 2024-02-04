@@ -146,7 +146,7 @@ fn unary_oper(input: &str) -> IResult<&str, UnaryOperator, ErrorTree<&str>> {
 }
 
 fn expr_unary_app(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
-    map(pair(unary_oper, expr), |(op, exp)| {
+    map(pair(unary_oper, expr_atom_literal), |(op, exp)| {
         Expr::UnaryApp(op, Box::new(exp))
     })(input)
 }
@@ -236,8 +236,8 @@ fn expr_non_binary(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
 pub fn expr(input: &str) -> IResult<&str, Expr, ErrorTree<&str>> {
     // Either be captured by a binary application, or be captured by other detections within.
     alt((
-        expr_unary_app,
         |i| expr_binary_app(i, BASELINE_BINDING_POWER),
+        expr_unary_app,
         expr_atom_literal,
     ))(input)
 }
