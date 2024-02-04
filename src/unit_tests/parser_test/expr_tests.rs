@@ -347,7 +347,7 @@ mod atomic_tests {
                     BinaryOperator::Sub,
                     Box::new(Expr::UnaryApp(
                         UnaryOperator::Negative,
-                        Box::new(Expr::UnaryApp(UnaryOperator::Negative, Box::new(Expr::IntLiter(3))))
+                        Box::new(Expr::IntLiter(-3))
                     ))
                 )
         ));
