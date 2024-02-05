@@ -10,6 +10,7 @@ use std::{env, fs};
 
 mod ast;
 mod parser;
+mod semantic_checker;
 
 pub type Span = SimpleSpan<usize>;
 
@@ -45,10 +46,11 @@ fn main() {
             .map_with(|ast, e| (ast, e.span()))
             .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
             .into_output_errors();
+        // println!("{:?}", ast);
         exit_code = 100;
         parse_errs
     } else {
-        Vec::new()
+        panic!("lexer failed")
     };
 
     errs.into_iter()
@@ -75,6 +77,5 @@ fn main() {
                 .print(sources([(input_file.clone(), src.clone())]))
                 .unwrap()
         });
-
     exit(exit_code);
 }

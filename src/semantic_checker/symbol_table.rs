@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use crate::ast::Type;
+use crate::semantic_checker::util::{create_span, from_span};
+use crate::Spanned;
 
 // symbol table type
 #[derive(Debug, Clone, PartialEq)]
 pub struct SymbolTable<'a> {
     pub parent: Option<Box<&'a SymbolTable<'a>>>,
-    pub table: HashMap<String, Symbol>,
+    pub table: HashMap<&'a String, Symbol>,
     pub is_func: bool,
     pub func_name: Option<&'a String>,
 }
@@ -14,7 +16,7 @@ pub struct SymbolTable<'a> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Symbol {
     // other type may be used later on
-    pub symbol_type: Type,
+    pub symbol_type: Spanned<Type>,
 }
 
 // symbol table constructor
@@ -29,21 +31,22 @@ impl<'a> SymbolTable<'a> {
     }
 
     // insert a symbol into the symbol table
-    pub fn add(&mut self, ident: &str, symbol_type: Type) -> Result<Type, String> {
+    pub fn add(&mut self, ident: &'a Spanned<String>, symbol_type: Spanned<Type>) -> Result<Spanned<Type>, String> {
+        // check if the ident already exists
         if self.find(ident).is_some() {
-            return Err(format!("ident already exists"));
+            return Err("ident already exists".to_string());
         }
-        self.table.insert(ident.to_string(), Symbol { symbol_type });
-        Ok(Type::Any)
+        self.table.insert(from_span(ident), Symbol { symbol_type });
+        Ok(create_span(Type::Any))
     }
 
     // find a symbol in their own symbol table
-    pub fn find(&self, ident: &str) -> Option<&Symbol> {
-        self.table.get(ident)
+    pub fn find(&self, ident: &Spanned<String>) -> Option<&Symbol> {
+        self.table.get(from_span(ident))
     }
 
     // find a symbol in their own symbol table and their parent symbol table
-    pub fn find_all(&self, ident: &str) -> Option<&Symbol> {
+    pub fn find_all(&self, ident: &Spanned<String>) -> Option<&Symbol> {
         if self.find(ident).is_some() {
             return self.find(ident);
         }

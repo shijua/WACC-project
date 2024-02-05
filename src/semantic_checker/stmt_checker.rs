@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use crate::ast::{Expr, Function, Lvalue, ReturningStmt, Rvalue, Stmt, Type};
 use crate::semantic_checker::symbol_table::SymbolTable;
-use crate::semantic_checker::util::{expr_to_type, lvalue_to_type, rvalue_to_type, type_check_array_elem, type_check_special};
+use crate::semantic_checker::util::{any_span, bool_span, char_span, create_span, expr_to_type, from_span, int_span, lvalue_to_type, rvalue_to_type, type_check_array_elem, type_check_special};
+use crate::Spanned;
 
 // variable declaration
-pub fn declaration_check(type_given: &Type, ident: &str, rvalue: &Rvalue, symbol_table: &mut SymbolTable,
-                         function_table: &HashMap<String, Function>) -> Result<Type, String> {
+pub fn declaration_check(type_given: &Spanned<Type>, ident: &Spanned<String>, rvalue: &Spanned<Rvalue>, symbol_table: &mut SymbolTable,
+                         function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
     // check if rvalue is valid and get its type
     let rvalue_result = rvalue_to_type(rvalue, symbol_table, function_table);
     if rvalue_result.is_err() {
@@ -24,8 +25,8 @@ pub fn declaration_check(type_given: &Type, ident: &str, rvalue: &Rvalue, symbol
 }
 
 // variable assignment
-pub fn assignment_check(lvalue: &Lvalue, rvalue: &Rvalue, symbol_table: &SymbolTable,
-                        function_table: &HashMap<String, Function>) -> Result<Type, String> {
+pub fn assignment_check(lvalue: &Spanned<Lvalue>, rvalue: &Spanned<Rvalue>, symbol_table: &SymbolTable,
+                        function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
     // check if lvalue is valid and get its type
     let lvalue_result = lvalue_to_type(lvalue, symbol_table);
     if lvalue_result.is_err() {
@@ -41,12 +42,12 @@ pub fn assignment_check(lvalue: &Lvalue, rvalue: &Rvalue, symbol_table: &SymbolT
     let rvalue_type = rvalue_result.unwrap();
 
     // Assert that not both sides can be any at the same time.
-    if lvalue_type == Type::Any && rvalue_type == Type::Any {
+    if lvalue_type == any_span() && rvalue_type == any_span() {
         return Err("type mismatch in assignment check(both side is any)".to_string());
     }
 
     // check if lvalue and rvalue have the same type
-    if lvalue_type == Type::Any || lvalue_type == rvalue_type || type_check_array_elem(&lvalue_type, &rvalue_type).is_ok()
+    if lvalue_type == any_span() || lvalue_type == rvalue_type || type_check_array_elem(&lvalue_type, &rvalue_type).is_ok()
         || type_check_special(&lvalue_type, &rvalue_type).is_ok() {
         return Ok(lvalue_type);
     }
@@ -54,7 +55,7 @@ pub fn assignment_check(lvalue: &Lvalue, rvalue: &Rvalue, symbol_table: &SymbolT
 }
 
 // read
-pub fn read_check(lvalue: &Lvalue, symbol_table: &SymbolTable) -> Result<Type, String> {
+pub fn read_check(lvalue: &Spanned<Lvalue>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, String> {
     // check if lvalue is valid and get its type
     let lvalue_result = lvalue_to_type(lvalue, symbol_table);
     if lvalue_result.is_err() {
@@ -62,14 +63,14 @@ pub fn read_check(lvalue: &Lvalue, symbol_table: &SymbolTable) -> Result<Type, S
     }
     let lvalue_type = lvalue_result.unwrap();
 
-    if lvalue_type != Type::IntType && lvalue_type != Type::CharType {
+    if from_span(&lvalue_type) != int_span() && from_span(&lvalue_type) != char_span() {
         return Err("type need to be int or char".to_string());
     }
     return Ok(lvalue_type);
 }
 
 // free
-pub fn free_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
+pub fn free_check(expr: &Spanned<Expr>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, String> {
     // check if expr is valid and get its type
     let expr_result = expr_to_type(expr, symbol_table);
     if expr_result.is_err() {
@@ -77,16 +78,16 @@ pub fn free_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, Strin
     }
     let expr_type = expr_result.unwrap();
 
-    match expr_type {
+    match from_span(expr_type) {
         Type::Array(..) => Ok(expr_type),
-        Type::Pair(..) => Ok(expr_type),
+        Type::Pair(..)=> Ok(expr_type),
         _ => Err("type need to be array or pair".to_string())
     }
 }
 
 // return
-pub fn return_check(expr: &Expr, symbol_table: &SymbolTable,
-                    function_table: &HashMap<String, Function>) -> Result<Type, String> {
+pub fn return_check(expr: &Spanned<Expr>, symbol_table: &SymbolTable,
+                    function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
     // cannot return in the main function
     if symbol_table.is_func == false {
         return Err("return in the main function!".to_string());
@@ -100,7 +101,11 @@ pub fn return_check(expr: &Expr, symbol_table: &SymbolTable,
     let expr_type = expr_result.unwrap();
 
     // check the return type of the function
-    let func_type = function_table.get(symbol_table.func_name.unwrap()).unwrap().return_type.clone();
+    let func_type = from_span(
+        function_table.get(
+            symbol_table.func_name.unwrap())
+            .unwrap())
+        .return_type.clone();
     if func_type == expr_type || type_check_special(&func_type, &expr_type).is_ok() ||
         type_check_array_elem(&func_type, &expr_type).is_ok() {
         return Ok(expr_type);
@@ -109,7 +114,7 @@ pub fn return_check(expr: &Expr, symbol_table: &SymbolTable,
 }
 
 // exit
-pub fn exit_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
+pub fn exit_check(expr: &Spanned<Expr>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, String> {
     // check if expr is valid and get its type
     let expr_result = expr_to_type(expr, symbol_table);
     if expr_result.is_err() {
@@ -117,27 +122,27 @@ pub fn exit_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, Strin
     }
     let expr_type = expr_result.unwrap();
 
-    if expr_type != Type::IntType {
+    if from_span(&expr_type) != Type::IntType {
         return Err("type need to be int".to_string());
     }
     Ok(expr_type)
 }
 
 // print and println
-pub fn print_println_check(expr: &Expr, symbol_table: &SymbolTable) -> Result<Type, String> {
+pub fn print_println_check(expr: &Spanned<Expr>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, String> {
     expr_to_type(expr, symbol_table)
 }
 
 // if
-pub fn if_check(expr: &Expr, stmt1: &ReturningStmt, stmt2: &ReturningStmt,
-                symbol_table: &mut SymbolTable, function_table: &HashMap<String, Function>) -> Result<Type, String> {
+pub fn if_check(expr: &Spanned<Expr>, stmt1: &Spanned<ReturningStmt>, stmt2: &Spanned<ReturningStmt>,
+                symbol_table: &mut SymbolTable, function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
     // check if expr is valid and get its type
     let expr_result = expr_to_type(expr, symbol_table);
     if expr_result.is_err() {
         return expr_result;
     }
     let expr_type = expr_result.unwrap();
-    if expr_type != Type::BoolType {
+    if from_span(&expr_type) != bool_span() {
         return Err("type need to be bool".to_string());
     }
 
@@ -150,34 +155,34 @@ pub fn if_check(expr: &Expr, stmt1: &ReturningStmt, stmt2: &ReturningStmt,
 }
 
 // while
-pub fn while_check(expr: &Expr, stmt: &ReturningStmt,
-                   symbol_table: &mut SymbolTable, function_table: &HashMap<String, Function>) -> Result<Type, String> {
+pub fn while_check(expr: &Spanned<Expr>, stmt: &Spanned<ReturningStmt>,
+                   symbol_table: &mut SymbolTable, function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
     // check if expr is valid and get its type
     let expr_result = expr_to_type(expr, symbol_table);
     if expr_result.is_err() {
         return expr_result;
     }
     let expr_type = expr_result.unwrap();
-    if expr_type != Type::BoolType {
+    if from_span(&expr_type) != Type::BoolType {
         return Err("type need to be bool".to_string());
     }
     scope_check(stmt, &symbol_table, function_table)
 }
 
 // scope
-pub fn scope_check(stmt: &ReturningStmt, symbol_table: &SymbolTable,
-                   function_table: &HashMap<String, Function>) -> Result<Type, String> {
+pub fn scope_check(stmt: &Spanned<ReturningStmt>, symbol_table: &SymbolTable,
+                   function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
     // create a new symbol table for the scope
     let mut new_symbol_table = SymbolTable::create(Some(Box::from(symbol_table)),
                                                    symbol_table.is_func, symbol_table.func_name.clone());
     stmt_check(stmt, &mut new_symbol_table, function_table)
 }
 
-pub fn stmt_check(ret_stmt: &ReturningStmt, symbol_table: &mut SymbolTable,
-                  function_table: &HashMap<String, Function>) -> Result<Type, String> {
-    let stmt = &ret_stmt.statement;
+pub fn stmt_check(ret_stmt: &Spanned<ReturningStmt>, symbol_table: &mut SymbolTable,
+                  function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
+    let stmt = from_span(&from_span(ret_stmt).statement);
     match stmt {
-        Stmt::Skip => Ok(Type::Any),
+        Stmt::Skip => Ok(create_span(Type::Any)),
         Stmt::Declare(type_given, ident, rvalue) => {
             declaration_check(&type_given, &ident, &rvalue, symbol_table, function_table)
         }

@@ -9,7 +9,7 @@ pub enum Expr {
     StrLiter(String),
     PairLiter,
     Ident(String),
-    ArrayElem(ArrayElem),
+    ArrayElem(Spanned<ArrayElem>),
     UnaryApp(UnaryOperator, Box<Spanned<Expr>>),
     BinaryApp(Box<Spanned<Expr>>, BinaryOperator, Box<Spanned<Expr>>),
 }
