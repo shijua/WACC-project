@@ -53,11 +53,68 @@ pub enum Type {
     CharType,
     StringType,
     Array(Box<Spanned<Type>>),
-    Pair,
+    Pair(Box<Spanned<Type>>, Box<Spanned<Type>>),
+    NestedPair,
     Any,
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct ArrayLiter {
     pub val: Vec<Spanned<Expr>>,
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum PairElem {
+    PairElemFst(Box<Spanned<Lvalue>>),
+    PairElemSnd(Box<Spanned<Lvalue>>),
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum Lvalue {
+    LIdent(Spanned<String>),
+    LArrElem(Spanned<ArrayElem>),
+    LPairElem(Spanned<PairElem>),
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum ArgList {
+    Arg(Vec<Expr>),
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum Rvalue {
+    RExpr(Box<Spanned<Expr>>),
+    RArrLit(Box<Spanned<ArrayLiter>>),
+    RNewPair(Box<Spanned<Expr>>, Box<Spanned<Expr>>),
+    RPairElem(Box<Spanned<PairElem>>),
+    RCall(Spanned<String>, Spanned<ArgList>),
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum Stmt {
+    Skip,
+    Declare(Spanned<Type>, Spanned<String>, Spanned<Rvalue>),
+    Assign(Spanned<Lvalue>, Spanned<Rvalue>),
+    Read(Spanned<Lvalue>),
+    Free(Spanned<Expr>),
+    Return(Spanned<Expr>),
+    Exit(Spanned<Expr>),
+    Print(Spanned<Expr>),
+    Println(Spanned<Expr>),
+    If(
+        Spanned<Expr>,
+        Box<Spanned<ReturningStmt>>,
+        Box<Spanned<ReturningStmt>>,
+    ),
+    While(Spanned<Expr>, Box<Spanned<ReturningStmt>>),
+    Scope(Box<Spanned<ReturningStmt>>),
+    Serial(Box<Spanned<ReturningStmt>>, Box<Spanned<ReturningStmt>>),
+    // // "virtual" Statement Type for enforced function returning condition.
+    // Returning(Box<Stmt>),
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub struct ReturningStmt {
+    pub statement: Spanned<Stmt>,
+    pub returning: bool,
 }

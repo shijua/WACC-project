@@ -31,8 +31,8 @@ pub fn type_parse<'tokens, 'src: 'tokens>() -> impl Parser<
 
             let pair_elem_type = type_parse
                 .clone()
-                .filter(|(x, _x_span)| !matches!(x, Type::Pair))
-                .or(just(Token::Keyword("pair")).map_with(|_, e| (Type::Pair, e.span()))); //.and_is(base_type.not());
+                .filter(|(x, _x_span)| !matches!(x, Type::Pair(_, _)))
+                .or(just(Token::Keyword("pair")).map_with(|_, e| (Type::NestedPair, e.span()))); //.and_is(base_type.not());
 
             just(Token::Keyword("pair"))
                 .ignore_then(just(Token::Ctrl('(')))
@@ -40,7 +40,9 @@ pub fn type_parse<'tokens, 'src: 'tokens>() -> impl Parser<
                 .then(just(Token::Ctrl(',')))
                 .then(pair_elem_type.clone())
                 .then(just(Token::Ctrl(')')))
-                .map_with(|_, e| (Type::Pair, e.span()))
+                .map_with(|(((p1, _), p2), _), e| {
+                    (Type::Pair(Box::new(p1), Box::new(p2)), e.span())
+                })
         });
 
         let array_base = base_type.or(pair_type);
