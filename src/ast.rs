@@ -15,6 +15,12 @@ pub enum Expr {
 }
 
 #[derive(PartialEq, Clone, Debug)]
+pub struct ArrayElem {
+    pub ident: String,
+    pub indices: Vec<Expr>,
+}
+
+#[derive(PartialEq, Clone, Debug)]
 pub enum UnaryOperator {
     Bang,
     Negative,
@@ -38,4 +44,15 @@ pub enum BinaryOperator {
     Neq,
     And,
     Or,
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum Type {
+    IntType,
+    BoolType,
+    CharType,
+    StringType,
+    Array(Box<Spanned<Type>>),
+    Pair(Box<Spanned<Type>>, Box<Spanned<Type>>),
+    Any,
 }
