@@ -1,4 +1,4 @@
-use crate::ast::{BinaryOperator, Expr, UnaryOperator};
+use crate::ast::{ArrayElem, BinaryOperator, Expr, UnaryOperator};
 use crate::parser::lexer::{lexer, ParserInput, Token};
 use crate::{Span, Spanned};
 use chumsky::error::Rich;
@@ -8,7 +8,7 @@ use chumsky::prelude::{choice, just, recursive};
 use chumsky::IterParser;
 use chumsky::{extra, select, Parser};
 
-fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
+pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
     'tokens,
     ParserInput<'tokens, 'src>,
     Spanned<Expr>,
@@ -41,7 +41,10 @@ fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
                     .collect::<Vec<_>>(),
             )
             .map(|(ident_name, indices_vec)| {
-                Expr::ArrayElem(ident_name.to_string(), indices_vec.clone())
+                Expr::ArrayElem(ArrayElem {
+                    ident: String::from(ident_name),
+                    indices: indices_vec,
+                })
             });
 
         // <ident>

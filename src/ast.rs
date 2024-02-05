@@ -9,7 +9,7 @@ pub enum Expr {
     StrLiter(String),
     PairLiter,
     Ident(String),
-    ArrayElem(String, Vec<Spanned<Expr>>),
+    ArrayElem(ArrayElem),
     UnaryApp(UnaryOperator, Box<Spanned<Expr>>),
     BinaryApp(Box<Spanned<Expr>>, BinaryOperator, Box<Spanned<Expr>>),
 }
@@ -17,7 +17,7 @@ pub enum Expr {
 #[derive(PartialEq, Clone, Debug)]
 pub struct ArrayElem {
     pub ident: String,
-    pub indices: Vec<Expr>,
+    pub indices: Vec<Spanned<Expr>>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -55,4 +55,9 @@ pub enum Type {
     Array(Box<Spanned<Type>>),
     Pair,
     Any,
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub struct ArrayLiter {
+    pub val: Vec<Spanned<Expr>>,
 }

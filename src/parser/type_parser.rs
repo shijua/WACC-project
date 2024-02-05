@@ -7,7 +7,7 @@ use chumsky::prelude::{just, none_of, todo, Recursive};
 use chumsky::recursive::recursive;
 use chumsky::{extra, select, Parser};
 
-fn type_parse<'tokens, 'src: 'tokens>() -> impl Parser<
+pub fn type_parse<'tokens, 'src: 'tokens>() -> impl Parser<
     'tokens,
     ParserInput<'tokens, 'src>,
     Spanned<Type>,
@@ -41,21 +41,6 @@ fn type_parse<'tokens, 'src: 'tokens>() -> impl Parser<
                 .then(pair_elem_type.clone())
                 .then(just(Token::Ctrl(')')))
                 .map_with(|_, e| (Type::Pair, e.span()))
-            // .try_map_with(|((((t1, s1), _), (t2, s2)), _), e| {
-            //     if matches!(t1, Type::Pair) {
-            //         Err(Rich::custom(
-            //             s1.span(),
-            //             "Pair Elem 1 Incompatible: cannot have pairs as pair elements.",
-            //         ))
-            //     }
-            //     if matches!(t2, Type::Pair) {
-            //         Err(Rich::custom(
-            //             s2.span(),
-            //             "Pair Elem 2 Incompatible: cannot have pairs as pair elements.",
-            //         ))
-            //     }
-            //     Ok((Type::Pair, e.span()))
-            // })
         });
 
         let array_base = base_type.or(pair_type);
