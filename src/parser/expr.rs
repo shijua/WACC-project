@@ -76,11 +76,14 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
                     .at_least(1)
                     .collect::<Vec<_>>(),
             )
-            .map(|(ident_name, indices_vec)| {
-                Expr::ArrayElem(ArrayElem {
-                    ident: String::from(ident_name),
-                    indices: indices_vec,
-                })
+            .map_with(|(ident_name, indices_vec), e| {
+                Expr::ArrayElem((
+                    ArrayElem {
+                        ident: String::from(ident_name),
+                        indices: indices_vec,
+                    },
+                    e.span(),
+                ))
             });
 
         // <ident>
