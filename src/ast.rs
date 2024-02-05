@@ -78,7 +78,7 @@ pub enum Lvalue {
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum ArgList {
-    Arg(Vec<Expr>),
+    Arg(Vec<Spanned<Expr>>),
 }
 
 #[derive(PartialEq, Clone, Debug)]

@@ -1,4 +1,6 @@
-use crate::ast::{ArrayLiter, Expr, ReturningStmt, Stmt, Type};
+use crate::ast::{
+    ArgList, ArrayElem, ArrayLiter, Expr, Lvalue, PairElem, ReturningStmt, Rvalue, Stmt, Type,
+};
 use crate::parser::expr::expr;
 use crate::parser::lexer::{lexer, ParserInput, Token};
 use crate::parser::type_parser::type_parse;
@@ -18,10 +20,23 @@ fn array_liter<'tokens, 'src: 'tokens>() -> impl Parser<
 > + Clone {
     expr()
         .separated_by(just(Token::Ctrl(',')))
-        .at_least(1)
         .collect::<Vec<Spanned<Expr>>>()
         .delimited_by(just(Token::Ctrl('[')), just(Token::Ctrl(']')))
         .map_with(|x, e| (ArrayLiter { val: x }, e.span()))
+}
+
+// <arg-list> ::=  <expr> (‘,’ <expr>)*
+fn arg_list<'tokens, 'src: 'tokens>() -> impl Parser<
+    'tokens,
+    ParserInput<'tokens, 'src>,
+    Spanned<ArgList>,
+    extra::Err<Rich<'tokens, Token<'src>, Span>>,
+> + Clone {
+    expr()
+        .separated_by(just(Token::Ctrl(',')))
+        .at_least(1)
+        .collect::<Vec<Spanned<Expr>>>()
+        .map_with(|x, e| (ArgList::Arg(x), e.span()))
 }
 
 fn ident<'tokens, 'src: 'tokens>() -> impl Parser<
@@ -34,6 +49,31 @@ fn ident<'tokens, 'src: 'tokens>() -> impl Parser<
         Token::Ident(id) => id
     };
     base.map_with(|x, e| (String::from(x), e.span()))
+}
+
+// <array-elem> ::= <ident> (‘[’ <expr> ‘]’)+
+fn array_elem<'tokens, 'src: 'tokens>() -> impl Parser<
+    'tokens,
+    ParserInput<'tokens, 'src>,
+    Spanned<ArrayElem>,
+    extra::Err<Rich<'tokens, Token<'src>, Span>>,
+> + Clone {
+    let base = select! {
+        Token::Ident(id) => id
+    };
+    let vec_indices = expr()
+        .delimited_by(just(Token::Ctrl('[')), just(Token::Ctrl(']')))
+        .repeated()
+        .collect::<Vec<Spanned<Expr>>>();
+    base.then(vec_indices).map_with(|(id, vec_indices), e| {
+        (
+            ArrayElem {
+                ident: String::from(id),
+                indices: vec_indices.clone(),
+            },
+            e.span(),
+        )
+    })
 }
 
 fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
@@ -50,11 +90,94 @@ fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
                 extra::Err<Rich<'tokens, Token<'src>, Span>>,
             >,
         >| {
+            let mut lvalue = Recursive::declare();
+            let mut pair_elem = Recursive::declare();
+
+            lvalue.define({
+                let l_ident = ident().map_with(|s, e| (Lvalue::LIdent(s), e.span()));
+                let l_arr_elem = array_elem().map_with(|arr, e| (Lvalue::LArrElem(arr), e.span()));
+                let l_pair_elem = pair_elem
+                    .clone()
+                    .map_with(|p, e| (Lvalue::LPairElem(p), e.span()));
+                l_ident.or(l_arr_elem).or(l_pair_elem)
+            });
+
+            pair_elem.define({
+                let pair_fst = just(Token::Keyword("fst"))
+                    .ignore_then(lvalue.clone())
+                    .map_with(|f, e| (PairElem::PairElemFst(Box::new(f)), e.span()));
+                let pair_snd = just(Token::Keyword("snd"))
+                    .ignore_then(lvalue.clone())
+                    .map_with(|f, e| (PairElem::PairElemSnd(Box::new(f)), e.span()));
+                pair_fst.or(pair_snd)
+            });
+
+            let rvalue = {
+                // <expr>,
+                let r_expr = expr().map_with(|exp, e| (Rvalue::RExpr(Box::new(exp)), e.span()));
+
+                // <array-liter>
+                let r_arr_liter = array_liter()
+                    .map_with(|arr_liter, e| (Rvalue::RArrLit(Box::new(arr_liter)), e.span()));
+
+                // 'newpair' '(' <expr> ',' <expr> ')'
+                let r_new_pair = just(Token::Keyword("newpair"))
+                    .ignore_then(just(Token::Ctrl('(')))
+                    .ignore_then(expr())
+                    .then(just(Token::Ctrl(',')))
+                    .then(expr())
+                    .then(just(Token::Ctrl(')')))
+                    .map_with(|((((ex1), _), ex2), _), e| {
+                        (Rvalue::RNewPair(Box::new(ex1), Box::new(ex2)), e.span())
+                    });
+
+                // RPairElem(Box<Spanned< crate::ast::PairElem >>),
+                // <pair-elem>
+                let r_pair_elem =
+                    pair_elem.map_with(|p, e| (Rvalue::RPairElem(Box::new(p)), e.span()));
+
+                // 'call' <ident> '(' <arg-list> ')'
+                let r_call = just(Token::Keyword("call"))
+                    .ignore_then(ident())
+                    .then(just(Token::Ctrl('(')))
+                    .then(arg_list())
+                    .then(just(Token::Ctrl('(')))
+                    .map_with(|(((id, _), args_list), _), e| {
+                        (Rvalue::RCall(id, args_list), e.span())
+                    });
+
+                r_expr
+                    .or(r_arr_liter)
+                    .or(r_new_pair)
+                    .or(r_pair_elem)
+                    .or(r_call)
+            };
+
             let stmt_unary = {
                 let skip = just(Token::Keyword("skip")).map_with(|_, e| ReturningStmt {
                     returning: false,
                     statement: (Stmt::Skip, e.span()),
                 });
+
+                // <type> <ident> '=' <rvalue>
+                let declare = type_parse()
+                    .then(ident())
+                    .then(just(Token::Op("=")))
+                    .then(rvalue.clone())
+                    .map_with(|(((t, id), _), rv), e| ReturningStmt {
+                        returning: false,
+                        statement: (Stmt::Declare(t, id, rv), e.span()),
+                    });
+
+                // ⟨lvalue⟩ ‘=’ ⟨rvalue⟩
+                let assign =
+                    lvalue
+                        .then(just(Token::Op("=")))
+                        .then(rvalue)
+                        .map_with(|((lv, _), rv), e| ReturningStmt {
+                            returning: false,
+                            statement: (Stmt::Assign(lv, rv), e.span()),
+                        });
 
                 let free = just(Token::Keyword("free"))
                     .ignore_then(expr())
@@ -122,6 +245,8 @@ fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
                     });
 
                 let unary_statement = skip
+                    .or(declare)
+                    .or(assign)
                     .or(free)
                     .or(return_)
                     .or(exit_)
@@ -169,6 +294,16 @@ fn can_parse_statement() {
 #[test]
 fn can_parse_serial() {
     let src = "skip; free (2 + 4)";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = stmt()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    assert!(expression.is_ok());
+}
+
+#[test]
+fn can_parse_declare() {
+    let src = "int x = 3; y = 89; z = newpair(3, 4)";
     let tokens = lexer().parse(src).into_result().unwrap();
     let expression = stmt()
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
