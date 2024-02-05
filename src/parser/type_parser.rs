@@ -25,56 +25,106 @@ fn type_parse<'tokens, 'src: 'tokens>() -> impl Parser<
         .map_with(|t, e| (t, e.span()))
         .labelled("base type");
 
-    let ambiguous_pair = just(Token::Keyword("pair"))
-        .then(none_of(Token::Ctrl('(')).rewind())
-        .map_with(|_, e| {
-            Type::Pair(
-                Box::new((Type::Any, e.span())),
-                Box::new((Type::Any, e.span())),
-            )
-        })
-        // .map_with(|t, e| (t, e.span()))
-        .labelled("general pairs");
-
     recursive(|type_parse| {
-        let array_type = type_parse
-            .clone()
-            .then(just(Token::Ctrl('[')).then(just(Token::Ctrl(']'))))
-            .map(|(x, _)| Type::Array(Box::new(x)))
-            //.map_with(|t, e| (t, e.span()))
-            .labelled("array type");
+        let pair_type = recursive(|pair_type| {
+            // let pair_elem_base = type_parse.clone().validate();
 
-        let baseline_parser = array_type.clone().or(basic_cases);
+            let pair_elem_type = type_parse
+                .clone()
+                .filter(|(x, _x_span)| !matches!(x, Type::Pair))
+                .or(just(Token::Keyword("pair")).map_with(|_, e| (Type::Pair, e.span()))); //.and_is(base_type.not());
 
-        let pair_elem_type = baseline_parser
-            .clone()
-            .or(ambiguous_pair)
-            .map_with(|t, e| (t, e.span()));
+            just(Token::Keyword("pair"))
+                .ignore_then(just(Token::Ctrl('(')))
+                .ignore_then(pair_elem_type.clone())
+                .then(just(Token::Ctrl(',')))
+                .then(pair_elem_type.clone())
+                .then(just(Token::Ctrl(')')))
+                .map_with(|_, e| (Type::Pair, e.span()))
+            // .try_map_with(|((((t1, s1), _), (t2, s2)), _), e| {
+            //     if matches!(t1, Type::Pair) {
+            //         Err(Rich::custom(
+            //             s1.span(),
+            //             "Pair Elem 1 Incompatible: cannot have pairs as pair elements.",
+            //         ))
+            //     }
+            //     if matches!(t2, Type::Pair) {
+            //         Err(Rich::custom(
+            //             s2.span(),
+            //             "Pair Elem 2 Incompatible: cannot have pairs as pair elements.",
+            //         ))
+            //     }
+            //     Ok((Type::Pair, e.span()))
+            // })
+        });
 
-        let pair_type = just(Token::Keyword("pair"))
-            .ignore_then(just(Token::Ctrl('(')))
-            .ignore_then(pair_elem_type.clone())
-            .then_ignore(just(Token::Ctrl(',')))
-            .then(pair_elem_type.clone())
-            .then_ignore(just(Token::Ctrl(')')))
-            .map_with(|(l_elem, r_elem), e| {
-                (Type::Pair(Box::new(l_elem), Box::new(r_elem)), e.span())
-            });
+        let array_base = base_type.or(pair_type);
 
-        basic_cases
-            .or(array_type)
-            .clone()
-            .map_with(|t, e| (t, e.span()))
-            .or(pair_type)
+        array_base.clone().foldl_with(
+            just(Token::Ctrl('['))
+                .then(just(Token::Ctrl(']')))
+                .repeated(),
+            |base, _, e| (Type::Array(Box::new(base)), e.span()),
+        )
     })
 }
 
 #[test]
-fn can_parse_type() {
+fn can_parse_basic_type() {
     let src = "int";
     let tokens = lexer().parse(src).into_result().unwrap();
     let expression = type_parse()
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
         .into_result();
     assert!(expression.is_ok());
+}
+
+#[test]
+fn can_parse_array_type() {
+    let src = "char[]";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = type_parse()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    assert!(expression.is_ok());
+}
+
+#[test]
+fn can_parse_pair_type() {
+    let src = "pair(pair(int, int)[], int)";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = type_parse()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    assert!(expression.is_ok());
+}
+
+#[test]
+fn can_parse_pair_with_literals() {
+    let src = "pair(int, pair)";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = type_parse()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    assert!(expression.is_ok());
+}
+
+#[test]
+fn cannot_parse_ambiguous_pair() {
+    let src = "pair(pair[], int)";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = type_parse()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    assert!(expression.is_err());
+}
+
+#[test]
+fn cannot_parse_nested_pair() {
+    let src = "pair(pair(int, int), int)";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = type_parse()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    assert!(expression.is_err());
 }

@@ -53,6 +53,6 @@ pub enum Type {
     CharType,
     StringType,
     Array(Box<Spanned<Type>>),
-    Pair(Box<Spanned<Type>>, Box<Spanned<Type>>),
+    Pair,
     Any,
 }
