@@ -55,7 +55,83 @@ fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
                     statement: (Stmt::Skip, e.span()),
                 });
 
-                skip.clone().map_with(|st, e| (st, e.span()))
+                let free = just(Token::Keyword("free"))
+                    .ignore_then(expr())
+                    .map_with(|x, e| ReturningStmt {
+                        returning: false,
+                        statement: (Stmt::Free(x), e.span()),
+                    });
+
+                let return_ = just(Token::Keyword("free"))
+                    .ignore_then(expr())
+                    .map_with(|x, e| ReturningStmt {
+                        returning: true,
+                        statement: (Stmt::Return(x), e.span()),
+                    });
+
+                let exit_ = just(Token::Keyword("free"))
+                    .ignore_then(expr())
+                    .map_with(|x, e| ReturningStmt {
+                        returning: true,
+                        statement: (Stmt::Exit(x), e.span()),
+                    });
+
+                let print = just(Token::Keyword("free"))
+                    .ignore_then(expr())
+                    .map_with(|x, e| ReturningStmt {
+                        returning: false,
+                        statement: (Stmt::Print(x), e.span()),
+                    });
+
+                let println = just(Token::Keyword("free"))
+                    .ignore_then(expr())
+                    .map_with(|x, e| ReturningStmt {
+                        returning: false,
+                        statement: (Stmt::Println(x), e.span()),
+                    });
+
+                let if_ = just(Token::Keyword("if"))
+                    .ignore_then(expr())
+                    .then(just(Token::Keyword("then")))
+                    .then(stmt.clone())
+                    .then(just(Token::Keyword("else")))
+                    .then(stmt.clone())
+                    .then(just(Token::Keyword("fi")))
+                    .map_with(|(((((cond, _), st1), _), st2), _), e| ReturningStmt {
+                        returning: st1.0.returning && st2.0.returning,
+                        statement: (Stmt::If(cond, Box::new(st1), Box::new(st2)), e.span()),
+                    });
+
+                let while_ = just(Token::Keyword("while"))
+                    .ignore_then(expr())
+                    .then(just(Token::Keyword("do")))
+                    .then(stmt.clone())
+                    .then(just(Token::Keyword("done")))
+                    .map_with(|(((cond, _), body), _), e| ReturningStmt {
+                        returning: false,
+                        statement: (Stmt::While(cond, Box::new(body)), e.span()),
+                    });
+
+                let scoped = just(Token::Keyword("begin"))
+                    .ignore_then(stmt.clone())
+                    .then_ignore(just(Token::Keyword("end")))
+                    .map_with(|sc, e| ReturningStmt {
+                        returning: sc.0.returning,
+                        statement: (Stmt::Scope(Box::new(sc)), e.span()),
+                    });
+
+                let unary_statement = skip
+                    .or(free)
+                    .or(return_)
+                    .or(exit_)
+                    .or(print)
+                    .or(println)
+                    .or(if_)
+                    .or(while_)
+                    .or(scoped)
+                    .boxed();
+
+                unary_statement.map_with(|st, e| (st, e.span()))
             };
 
             let stmt_serial = {
@@ -91,7 +167,7 @@ fn can_parse_statement() {
 
 #[test]
 fn can_parse_serial() {
-    let src = "skip; skip";
+    let src = "skip; free (2 + 4)";
     let tokens = lexer().parse(src).into_result().unwrap();
     let expression = stmt()
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
