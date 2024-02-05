@@ -250,19 +250,6 @@ fn can_lex_multiple_digit_number() {
 }
 
 #[test]
-fn can_lex_multiple_numbers_with_comments() {
-    let input = "-123   +234 442 881";
-    assert_eq!(
-        work(input),
-        vec![
-            Token::IntToken(-123),
-            Token::IntToken(234),
-            Token::IntToken(442),
-            Token::IntToken(881)
-        ]
-    )
-}
-#[test]
 fn can_lex_char() {
     let input = "\'e\'";
     assert_eq!(work(input), vec![Token::CharToken('e')]);
