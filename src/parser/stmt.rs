@@ -18,6 +18,7 @@ fn array_liter<'tokens, 'src: 'tokens>() -> impl Parser<
 > + Clone {
     expr()
         .separated_by(just(Token::Ctrl(',')))
+        .at_least(1)
         .collect::<Vec<Spanned<Expr>>>()
         .delimited_by(just(Token::Ctrl('[')), just(Token::Ctrl(']')))
         .map_with(|x, e| (ArrayLiter { val: x }, e.span()))
