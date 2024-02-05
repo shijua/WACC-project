@@ -36,10 +36,11 @@ fn func_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         .then(ident())
         .then(just(Token::Ctrl('(')))
         .then(param_list)
-        .then(just(Token::Ctrl('(')))
+        .then(just(Token::Ctrl(')')))
         .then(just(Token::Keyword("is")))
         .then(stmt())
-        .try_map_with(|((((((type_, id), _), params_list), _), _), st), e| {
+        .then(just(Token::Keyword("end")))
+        .try_map_with(|(((((((type_, id), _), params_list), _), _), st), _), e| {
             let func_prototype = Function {
                 ident: id,
                 return_type: type_,

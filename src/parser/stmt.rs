@@ -64,16 +64,19 @@ fn array_elem<'tokens, 'src: 'tokens>() -> impl Parser<
     let vec_indices = expr()
         .delimited_by(just(Token::Ctrl('[')), just(Token::Ctrl(']')))
         .repeated()
+        .at_least(1)
         .collect::<Vec<Spanned<Expr>>>();
-    base.then(vec_indices).map_with(|(id, vec_indices), e| {
-        (
-            ArrayElem {
-                ident: String::from(id),
-                indices: vec_indices.clone(),
-            },
-            e.span(),
-        )
-    })
+    base.clone()
+        .then(vec_indices)
+        .map_with(|(id, vec_indices), e| {
+            (
+                ArrayElem {
+                    ident: String::from(id),
+                    indices: vec_indices.clone(),
+                },
+                e.span(),
+            )
+        })
 }
 
 pub fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
@@ -99,7 +102,7 @@ pub fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
                 let l_pair_elem = pair_elem
                     .clone()
                     .map_with(|p, e| (Lvalue::LPairElem(p), e.span()));
-                l_ident.or(l_arr_elem).or(l_pair_elem)
+                l_arr_elem.or(l_ident).or(l_pair_elem)
             });
 
             pair_elem.define({
@@ -170,14 +173,21 @@ pub fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
                     });
 
                 // ⟨lvalue⟩ ‘=’ ⟨rvalue⟩
-                let assign =
-                    lvalue
-                        .then(just(Token::Op("=")))
-                        .then(rvalue)
-                        .map_with(|((lv, _), rv), e| ReturningStmt {
-                            returning: false,
-                            statement: (Stmt::Assign(lv, rv), e.span()),
-                        });
+                let assign = lvalue
+                    .clone()
+                    .then(just(Token::Op("=")))
+                    .then(rvalue)
+                    .map_with(|((lv, _), rv), e| ReturningStmt {
+                        returning: false,
+                        statement: (Stmt::Assign(lv, rv), e.span()),
+                    });
+
+                let read = just(Token::Keyword("read"))
+                    .ignore_then(lvalue.clone())
+                    .map_with(|x, e| ReturningStmt {
+                        returning: false,
+                        statement: (Stmt::Read(x), e.span()),
+                    });
 
                 let free = just(Token::Keyword("free"))
                     .ignore_then(expr())
@@ -248,6 +258,7 @@ pub fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
                 let unary_statement = skip
                     .or(declare)
                     .or(assign)
+                    .or(read)
                     .or(free)
                     .or(return_)
                     .or(exit_)

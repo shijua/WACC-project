@@ -133,15 +133,30 @@ pub fn lexer<'src>(
             Token::StrToken(result)
         });
 
-    // A parser for operators
-    let op = one_of("+-!*%/>=<&|")
-        .repeated()
-        .at_least(1)
-        .to_slice()
-        .map(|s| Token::Op(s));
+    // A parser for symbolic operators
+    let op = choice((
+        just(">="),
+        just("<="),
+        just("=="),
+        just("!="),
+        just("&&"),
+        just("||"),
+        just(">"),
+        just("<"),
+        just("+"),
+        just("-"),
+        just("!"),
+        just("*"),
+        just("/"),
+        just("%"),
+        just("="),
+    ))
+    .to_slice()
+    .padded()
+    .map(|s| Token::Op(s));
 
     // A parser for scope control brackets and separation symbols
-    let ctrl = one_of("()[],;").map(Token::Ctrl);
+    let ctrl = one_of("()[],;").padded().map(Token::Ctrl);
 
     // keywords
     let is_keyword = text::ascii::keyword("true")

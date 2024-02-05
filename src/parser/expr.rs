@@ -52,7 +52,7 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
 
         // <atom> ::= <int-liter> | <bool-liter> | <char-liter> | <str-liter> | <pair-liter> |
         //            <ident>     | <array-elem> | <expr>
-        let atom = choice((atomic_liter, array_elem, ident_expr))
+        let atom = choice((array_elem, atomic_liter, ident_expr))
             .map_with(|expr, e| (expr, e.span()))
             .or(expr
                 .clone()
@@ -65,6 +65,7 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
             Token::Op("-") => UnaryOperator::Negative,
             Token::Keyword("len") => UnaryOperator::Len,
             Token::Keyword("chr") => UnaryOperator::Chr,
+            Token::Keyword("ord") => UnaryOperator::Ord,
         }
         .labelled("unary operator");
 
@@ -127,6 +128,16 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
 #[test]
 fn can_parse_expr() {
     let src = "1 < 2";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = expr()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    assert!(expression.is_ok());
+}
+
+#[test]
+fn can_parse_plus_plus_expr() {
+    let src = "1++2";
     let tokens = lexer().parse(src).into_result().unwrap();
     let expression = expr()
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
