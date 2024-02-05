@@ -38,12 +38,14 @@ fn main() {
 
     let (tokens, mut errs) = lexer().parse(src.as_str()).into_output_errors();
 
+    let mut exit_code = 0;
+
     let parse_errs = if let Some(tokens) = &tokens {
         let (ast, parse_errs) = program()
             .map_with(|ast, e| (ast, e.span()))
             .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
             .into_output_errors();
-
+        exit_code = 100;
         parse_errs
     } else {
         Vec::new()
@@ -73,4 +75,6 @@ fn main() {
                 .print(sources([(input_file.clone(), src.clone())]))
                 .unwrap()
         });
+
+    exit(exit_code);
 }
