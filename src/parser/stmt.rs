@@ -4,8 +4,8 @@ use crate::parser::lexer::{ParserInput, Token};
 use crate::{Span, Spanned};
 use chumsky::error::Rich;
 use chumsky::prelude::{just, todo};
-use chumsky::IterParser;
 use chumsky::{extra, Parser};
+use chumsky::{select, IterParser};
 
 // <array-liter> ::= ‘[’ ( <expr> (‘,’ <expr>)* )? ‘]’
 fn array_liter<'tokens, 'src: 'tokens>() -> impl Parser<
@@ -19,4 +19,16 @@ fn array_liter<'tokens, 'src: 'tokens>() -> impl Parser<
         .collect::<Vec<Spanned<Expr>>>()
         .delimited_by(just(Token::Ctrl('[')), just(Token::Ctrl(']')))
         .map_with(|x, e| (ArrayLiter { val: x }, e.span()))
+}
+
+fn ident<'tokens, 'src: 'tokens>() -> impl Parser<
+    'tokens,
+    ParserInput<'tokens, 'src>,
+    Spanned<String>,
+    extra::Err<Rich<'tokens, Token<'src>, Span>>,
+> + Clone {
+    let base = select! {
+        Token::Ident(id) => id
+    };
+    base.map_with(|x, e| (String::from(x), e.span()))
 }
