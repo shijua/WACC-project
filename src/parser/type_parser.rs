@@ -28,7 +28,7 @@ pub fn pair_elem_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
         Ok(result) => Ok(result),
         // Another possibility: "pair" could be recognized as an abstracted pair-elem type.
         _ => value(
-            Type::Pair(Box::new(Type::Any), Box::new(Type::Any)),
+            Type::AnonyPair,
             token("pair"),
         )(input),
     }
@@ -80,7 +80,7 @@ fn pair_elem_type_test() {
 
     assert!(matches!(
         pair_elem_type("pair ##"),
-        Ok(("", Type::Pair(e1, e2))) if e1 == Box::from(Type::Any) && e2 == Box::from(Type::Any)
+        Ok(("", Type::AnonyPair))
     ));
 
     assert!(matches!(
@@ -98,7 +98,7 @@ fn pair_test() {
 
     assert!(matches!(
         type_parse("pair(pair, int)"),
-        Ok(("", ast)) if ast == Type::Pair(Box::new(Type::Pair(Box::new(Type::Any), Box::new(Type::Any))), Box::new(Type::IntType))
+        Ok(("", ast)) if ast == Type::Pair(Box::new(Type::AnonyPair), Box::new(Type::IntType))
     ));
 
     assert!(matches!(

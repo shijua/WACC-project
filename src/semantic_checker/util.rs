@@ -49,7 +49,14 @@ pub fn type_check_special(type1: &Type, type2: &Type) -> Result<Type, String> {
                     }
                     Ok(Type::Any)
                 }
+                Type::AnonyPair => Ok(Type::Any),
                 _ => Err("type mismatch in special check pair".to_string())
+            }
+        }
+        Type::AnonyPair => {
+            match type1 {
+                Type::Pair(_, _) => Ok(Type::Any),
+                _ => Err("type mismatch in special check anony pair".to_string())
             }
         }
         // check inside of array type
@@ -86,6 +93,7 @@ pub fn pair_elem_to_type(pair_elem: &PairElem, symbol_table: &SymbolTable) -> Re
 
             match type_result {
                 Type::Pair(inner1, _) => Ok(*inner1),
+                Type::AnonyPair => Ok(Type::Any),
                 _ => Err("elem is not a pair".to_string())
             }
         }
@@ -97,6 +105,7 @@ pub fn pair_elem_to_type(pair_elem: &PairElem, symbol_table: &SymbolTable) -> Re
             let type_result = type_result.unwrap();
             match type_result {
                 Type::Pair(_, inner2) => Ok(*inner2),
+                Type::AnonyPair => Ok(Type::Any),
                 _ => Err("elem is not a pair".to_string())
             }
         }

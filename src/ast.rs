@@ -57,6 +57,7 @@ pub enum Type {
     StringType,
     Array(Box<Type>),
     Pair(Box<Type>, Box<Type>),
+    AnonyPair,
     Any,
 }
 
