@@ -7,7 +7,7 @@ use chumsky::{extra, text, Parser};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token<'src> {
-    IntToken(i32),
+    IntToken(i64),
     BoolToken(bool),
     StrToken(String),
     CharToken(char),
@@ -41,13 +41,11 @@ impl<'src> std::fmt::Display for Token<'src> {
 
 pub fn lexer<'src>(
 ) -> impl Parser<'src, &'src str, Vec<(Token<'src>, Span)>, extra::Err<Rich<'src, char, Span>>> {
-    let int_token = one_of("+-")
-        .or_not()
-        .then(text::digits(10)) // accepting decimal digits only
+    let int_token = text::digits(10) // accepting decimal digits only
         .to_slice()
         .padded()
         .validate(|s: &str, e, emitter| {
-            let num = s.parse::<i32>();
+            let num = s.parse::<i64>();
             if num.is_err() {
                 emitter.emit(Rich::custom(
                     e.span(),
@@ -133,15 +131,30 @@ pub fn lexer<'src>(
             Token::StrToken(result)
         });
 
-    // A parser for operators
-    let op = one_of("+-!*%/>=<&|")
-        .repeated()
-        .at_least(1)
-        .to_slice()
-        .map(|s| Token::Op(s));
+    // A parser for symbolic operators
+    let op = choice((
+        just(">="),
+        just("<="),
+        just("=="),
+        just("!="),
+        just("&&"),
+        just("||"),
+        just(">"),
+        just("<"),
+        just("+"),
+        just("-"),
+        just("!"),
+        just("*"),
+        just("/"),
+        just("%"),
+        just("="),
+    ))
+    .to_slice()
+    .padded()
+    .map(|s| Token::Op(s));
 
     // A parser for scope control brackets and separation symbols
-    let ctrl = one_of("()[],;").map(Token::Ctrl);
+    let ctrl = one_of("()[],;").padded().map(Token::Ctrl);
 
     // keywords
     let is_keyword = text::ascii::keyword("true")
@@ -236,19 +249,6 @@ fn can_lex_multiple_digit_number() {
     assert_eq!(work(input), vec![Token::IntToken(245)]);
 }
 
-#[test]
-fn can_lex_multiple_numbers_with_comments() {
-    let input = "-123   +234 442 881";
-    assert_eq!(
-        work(input),
-        vec![
-            Token::IntToken(-123),
-            Token::IntToken(234),
-            Token::IntToken(442),
-            Token::IntToken(881)
-        ]
-    )
-}
 #[test]
 fn can_lex_char() {
     let input = "\'e\'";

@@ -5,14 +5,14 @@ use crate::Spanned;
 
 // unary operator check
 pub fn unary_operator_check(operator: &UnaryOperator, operand: &Spanned<Expr>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, String> {
-    // check inside of the unary operator first
+    // check inside the unary operator first
     let operand_result = expr_to_type(operand, symbol_table);
     if operand_result.is_err() {
         return operand_result;
     }
     let operand_type = operand_result.unwrap();
 
-    match from_span(operator) {
+    match operator {
         UnaryOperator::Bang => {
             match from_span(&operand_type) {
                 Type::BoolType => Ok(bool_span()),

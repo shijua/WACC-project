@@ -15,14 +15,50 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
     extra::Err<Rich<'tokens, Token<'src>, Span>>,
 > + Clone {
     recursive(|expr| {
+        // TODO: Edge Case: -2^31;
+        let int_base = select! {Token::IntToken(x) => x}.labelled("int, unsigned");
+
+        let plus_int = just(Token::Op("+"))
+            .then(int_base.clone())
+            .try_map(|(_, x), s| {
+                let result = i32::try_from(x);
+                return if result.is_err() {
+                    Err(Rich::custom(s, "Integer out of range"))
+                } else {
+                    Ok(Expr::IntLiter(result.unwrap()))
+                };
+            });
+
+        let minus_int = just(Token::Op("-"))
+            .then(int_base.clone())
+            .try_map(|(_, x), s| {
+                let result = i32::try_from(-x);
+                return if result.is_err() {
+                    Err(Rich::custom(s, "Integer out of range"))
+                } else {
+                    Ok(Expr::IntLiter(result.unwrap()))
+                };
+            });
+
+        let unsigned_int = int_base.clone().try_map(|x, s| {
+            let result = i32::try_from(x);
+            return if result.is_err() {
+                Err(Rich::custom(s, "Integer out of range"))
+            } else {
+                Ok(Expr::IntLiter(result.unwrap()))
+            };
+        });
+
+        let int_expr_parser = plus_int.or(minus_int).or(unsigned_int);
+
         // for <int-liter>, <bool-liter>, <char-liter>, <str-liter>, <pair-liter>
         let atomic_liter = select! {
-            Token::IntToken(x) => Expr::IntLiter(x),
             Token::BoolToken(x) => Expr::BoolLiter(x),
             Token::CharToken(x) => Expr::CharLiter(x),
             Token::StrToken(x) => Expr::StrLiter(x),
             Token::Keyword("null") => Expr::PairLiter,
         }
+        .or(int_expr_parser)
         .labelled("base value");
 
         let ident = select! {
@@ -40,11 +76,14 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
                     .at_least(1)
                     .collect::<Vec<_>>(),
             )
-            .map(|(ident_name, indices_vec)| {
-                Expr::ArrayElem(ArrayElem {
-                    ident: String::from(ident_name),
-                    indices: indices_vec,
-                })
+            .map_with(|(ident_name, indices_vec), e| {
+                Expr::ArrayElem((
+                    ArrayElem {
+                        ident: String::from(ident_name),
+                        indices: indices_vec,
+                    },
+                    e.span(),
+                ))
             });
 
         // <ident>
@@ -52,7 +91,7 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
 
         // <atom> ::= <int-liter> | <bool-liter> | <char-liter> | <str-liter> | <pair-liter> |
         //            <ident>     | <array-elem> | <expr>
-        let atom = choice((atomic_liter, array_elem, ident_expr))
+        let atom = choice((array_elem, atomic_liter, ident_expr))
             .map_with(|expr, e| (expr, e.span()))
             .or(expr
                 .clone()
@@ -65,6 +104,7 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
             Token::Op("-") => UnaryOperator::Negative,
             Token::Keyword("len") => UnaryOperator::Len,
             Token::Keyword("chr") => UnaryOperator::Chr,
+            Token::Keyword("ord") => UnaryOperator::Ord,
         }
         .labelled("unary operator");
 
@@ -127,6 +167,16 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
 #[test]
 fn can_parse_expr() {
     let src = "1 < 2";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = expr()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    assert!(expression.is_ok());
+}
+
+#[test]
+fn can_parse_plus_plus_expr() {
+    let src = "1++2";
     let tokens = lexer().parse(src).into_result().unwrap();
     let expression = expr()
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))

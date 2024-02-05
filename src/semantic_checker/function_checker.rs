@@ -31,11 +31,11 @@ pub fn program_check(functions: &Vec<Spanned<Function>>, body: &Spanned<Returnin
 }
 
 pub fn function_check(function: &Function, function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
-    let mut para_symbol_table = SymbolTable::create(None, true, Some(from_span(&from_span(function).ident)));
+    let mut para_symbol_table = SymbolTable::create(None, true, Some(from_span(&function.ident)));
 
     // add function's parameters in para_symbol_table
     for param in &function.parameters {
-        let Parameter(param_type, param_ident) = param;
+        let Parameter(param_type, param_ident) = from_span(param);
         if para_symbol_table.add(param_ident, param_type.clone()).is_err() {
             return Err("ident already exists".to_string());
         }

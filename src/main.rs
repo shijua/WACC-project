@@ -46,12 +46,14 @@ fn main() {
             .map_with(|ast, e| (ast, e.span()))
             .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
             .into_output_errors();
-        // println!("{:?}", ast);
-        exit_code = 100;
         parse_errs
     } else {
         panic!("lexer failed")
     };
+
+    if !errs.is_empty() || !parse_errs.is_empty() {
+        exit_code = 100;
+    }
 
     errs.into_iter()
         .map(|e| e.map_token(|c| c.to_string()))

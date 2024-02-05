@@ -5,7 +5,7 @@ use crate::semantic_checker::util::{any_span, bool_span, char_span, create_span,
 use crate::Spanned;
 
 // variable declaration
-pub fn declaration_check(type_given: &Spanned<Type>, ident: &Spanned<String>, rvalue: &Spanned<Rvalue>, symbol_table: &mut SymbolTable,
+pub fn declaration_check<'a>(type_given: &Spanned<Type>, ident: &'a Spanned<String>, rvalue: &Spanned<Rvalue>, symbol_table: &mut SymbolTable<'a>,
                          function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
     // check if rvalue is valid and get its type
     let rvalue_result = rvalue_to_type(rvalue, symbol_table, function_table);
@@ -63,7 +63,7 @@ pub fn read_check(lvalue: &Spanned<Lvalue>, symbol_table: &SymbolTable) -> Resul
     }
     let lvalue_type = lvalue_result.unwrap();
 
-    if from_span(&lvalue_type) != int_span() && from_span(&lvalue_type) != char_span() {
+    if from_span(&lvalue_type) != &Type::IntType && from_span(&lvalue_type) != &Type::CharType {
         return Err("type need to be int or char".to_string());
     }
     return Ok(lvalue_type);
@@ -78,7 +78,7 @@ pub fn free_check(expr: &Spanned<Expr>, symbol_table: &SymbolTable) -> Result<Sp
     }
     let expr_type = expr_result.unwrap();
 
-    match from_span(expr_type) {
+    match from_span(&expr_type) {
         Type::Array(..) => Ok(expr_type),
         Type::Pair(..)=> Ok(expr_type),
         _ => Err("type need to be array or pair".to_string())
@@ -122,7 +122,7 @@ pub fn exit_check(expr: &Spanned<Expr>, symbol_table: &SymbolTable) -> Result<Sp
     }
     let expr_type = expr_result.unwrap();
 
-    if from_span(&expr_type) != Type::IntType {
+    if from_span(&expr_type) != &Type::IntType {
         return Err("type need to be int".to_string());
     }
     Ok(expr_type)
@@ -142,7 +142,7 @@ pub fn if_check(expr: &Spanned<Expr>, stmt1: &Spanned<ReturningStmt>, stmt2: &Sp
         return expr_result;
     }
     let expr_type = expr_result.unwrap();
-    if from_span(&expr_type) != bool_span() {
+    if from_span(&expr_type) != &Type::BoolType {
         return Err("type need to be bool".to_string());
     }
 
@@ -163,7 +163,7 @@ pub fn while_check(expr: &Spanned<Expr>, stmt: &Spanned<ReturningStmt>,
         return expr_result;
     }
     let expr_type = expr_result.unwrap();
-    if from_span(&expr_type) != Type::BoolType {
+    if from_span(&expr_type) != &Type::BoolType {
         return Err("type need to be bool".to_string());
     }
     scope_check(stmt, &symbol_table, function_table)
@@ -178,7 +178,7 @@ pub fn scope_check(stmt: &Spanned<ReturningStmt>, symbol_table: &SymbolTable,
     stmt_check(stmt, &mut new_symbol_table, function_table)
 }
 
-pub fn stmt_check(ret_stmt: &Spanned<ReturningStmt>, symbol_table: &mut SymbolTable,
+pub fn stmt_check<'a>(ret_stmt: &'a Spanned<ReturningStmt>, symbol_table: &mut SymbolTable<'a>,
                   function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
     let stmt = from_span(&from_span(ret_stmt).statement);
     match stmt {

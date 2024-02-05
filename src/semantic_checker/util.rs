@@ -32,10 +32,7 @@ pub fn pair_span() -> Spanned<Type> {
 
 // create a span for type(span is not important here as it is ok)
 pub fn create_span<T>(elem: T) -> Spanned<T> {
-    Spanned {
-        node: elem,
-        span: 0..0,
-    }
+    (elem, Span::new(0, 0))
 }
 
 pub fn from_span<T>(type1: &Spanned<T>) -> &T {
@@ -59,13 +56,20 @@ pub fn type_check_array_elem(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Re
 
 // convert char[] to string
 pub fn char_to_string_conversion(type1: &Spanned<Type>) -> Spanned<Type> {
-    match type1 {
-        Type::Array(char_type) if char_type == &Box::from(Type::CharType) => {
-            create_span(Type::StringType)
+    match from_span(type1) {
+        Type::Array(elem) => {
+            if from_span(elem) == &Type::CharType {
+                create_span(Type::StringType)
+            } else {
+                create_span(Type::Array(Box::from(char_to_string_conversion(elem))))
+            }
         }
-        Type::Array(inner) => {
-            create_span(Type::Array(Box::from(char_to_string_conversion(inner))))
-        }
+        // Type::Array(char_type) if char_type == &Box::from(Type::CharType) => {
+        //     create_span(Type::StringType)
+        // }
+        // Type::Array(inner) => {
+        //     create_span(Type::Array(Box::from(char_to_string_conversion(inner))))
+        // }
         _ => type1.clone()
     }
 }
@@ -96,15 +100,15 @@ pub fn type_check_special(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Resul
                 _ => Err("type mismatch in special check pair".to_string())
             }
         }
-        pair_span() => {
-            match type1 {
-                Type::Pair(_, _) => Ok(any_span()),
+        Type::NestedPair => {
+            match from_span(type1) {
+                Type::Pair(..) => Ok(any_span()),
                 _ => Err("type mismatch in special check anony pair".to_string())
             }
         }
         // check inside of array type
         Type::Array(inner) => {
-            match type1 {
+            match from_span(type1) {
                 Type::Array(inner1) => type_check_special(inner1, inner),
                 _ => Err("type mismatch in special check array".to_string())
             }
@@ -126,7 +130,7 @@ pub fn get_type_from_table(ident: &Spanned<String>, symbol_table: &SymbolTable) 
 }
 
 pub fn pair_elem_to_type(pair_elem: &Spanned<PairElem>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, String> {
-    match pair_elem {
+    match from_span(pair_elem) {
         PairElem::PairElemFst(lvalue) => {
             let type_result = lvalue_to_type(lvalue, symbol_table);
             if type_result.is_err() {
@@ -135,7 +139,7 @@ pub fn pair_elem_to_type(pair_elem: &Spanned<PairElem>, symbol_table: &SymbolTab
             let type_result = type_result.unwrap();
 
             match from_span(&type_result) {
-                Type::Pair(inner1, _) => Ok(**inner1),
+                Type::Pair(inner1, _) => Ok(*inner1.clone()),
                 Type::NestedPair => Ok(any_span()),
                 _ => Err("elem is not a pair".to_string())
             }
@@ -147,7 +151,7 @@ pub fn pair_elem_to_type(pair_elem: &Spanned<PairElem>, symbol_table: &SymbolTab
             }
             let type_result = type_result.unwrap();
             match from_span(&type_result) {
-                Type::Pair(_, inner2) => Ok(**inner2),
+                Type::Pair(_, inner2) => Ok(*inner2.clone()),
                 Type::NestedPair => Ok(any_span()),
                 _ => Err("elem is not a pair".to_string())
             }
@@ -164,7 +168,7 @@ pub fn array_elem_to_type(array_elem: &Spanned<ArrayElem>, symbol_table: &Symbol
     let mut array_elem_type = array_elem_type.unwrap();
 
 
-    for expr in from_span(array_elem).indices {
+    for expr in from_span(array_elem).indices.clone() {
         // check expr hos type int
         let expr_result = expr_to_type(&expr, symbol_table);
         if expr_result.is_err() {
@@ -176,9 +180,9 @@ pub fn array_elem_to_type(array_elem: &Spanned<ArrayElem>, symbol_table: &Symbol
         }
 
         // unwrap one box each time
-        match array_elem_type {
+        match from_span(&array_elem_type) {
             Type::Array(inner) => {
-                array_elem_type = *inner;
+                array_elem_type = *inner.clone();
             }
             _ => {
                 return Err("ident is more than the dimension of the array".to_string());
@@ -190,7 +194,7 @@ pub fn array_elem_to_type(array_elem: &Spanned<ArrayElem>, symbol_table: &Symbol
 
 // array out of bound?
 pub fn lvalue_to_type(lvalue: &Spanned<Lvalue>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, String> {
-    match lvalue {
+    match from_span(lvalue) {
         Lvalue::LIdent(ident) => get_type_from_table(ident, symbol_table),
         Lvalue::LArrElem(array) => {
             array_elem_to_type(array, symbol_table)
@@ -263,13 +267,13 @@ pub fn new_pair_to_type(expr1: &Spanned<Expr>, expr2: &Spanned<Expr>, symbol_tab
 pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_table: &SymbolTable,
                   function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
     // check if function is in the function table
-    let function = function_table.get(ident);
+    let function = function_table.get(from_span(ident));
     if function.is_none() {
         return Err("function not found".to_string());
     }
     let function = function.unwrap();
     // get Vec from arg_list
-    let ArgList::Arg(args) = arg_list;
+    let ArgList::Arg(args) = from_span(arg_list);
 
     let parameters = &from_span(function).parameters;
     if parameters.len() != args.len() {
@@ -283,7 +287,7 @@ pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_t
             return arg_type;
         }
         let arg_type = arg_type.unwrap();
-        let Param::Parameter(param_type, _) = &parameters[ind];
+        let Param::Parameter(param_type, _) = from_span(&parameters[ind]);
         if &arg_type != param_type && type_check_special(param_type, &arg_type).is_err() {
             return Err("function call parameter type mismatch".to_string());
         }
@@ -293,7 +297,7 @@ pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_t
 
 pub fn rvalue_to_type(rvalue: &Spanned<Rvalue>, symbol_table: &SymbolTable,
                       function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
-    match rvalue {
+    match from_span(rvalue) {
         Rvalue::RExpr(expr) => expr_to_type(expr, symbol_table),
         Rvalue::RArrLit(array) => arr_lit_to_type(array, symbol_table),
         Rvalue::RNewPair(expr1, expr2) => new_pair_to_type(expr1, expr2, symbol_table),
