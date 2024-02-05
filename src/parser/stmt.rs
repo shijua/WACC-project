@@ -229,3 +229,13 @@ pub fn stmt_serial(input: &str) -> IResult<&str, ReturningStmt, ErrorTree<&str>>
 pub fn stmt(input: &str) -> IResult<&str, ReturningStmt, ErrorTree<&str>> {
     alt((stmt_serial, stmt_unary))(input)
 }
+
+#[test]
+fn arg_list_test() {
+    // no arg (only for our implementation now)
+    assert!(matches!(
+        arg_mod_list(""),
+        Ok(("", ArgList::Arg(vec))) if vec == Vec::new()
+    ));
+
+}
