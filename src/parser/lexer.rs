@@ -41,9 +41,7 @@ impl<'src> std::fmt::Display for Token<'src> {
 
 pub fn lexer<'src>(
 ) -> impl Parser<'src, &'src str, Vec<(Token<'src>, Span)>, extra::Err<Rich<'src, char, Span>>> {
-    let int_token = one_of("+-")
-        .or_not()
-        .then(text::digits(10)) // accepting decimal digits only
+    let int_token = text::digits(10) // accepting decimal digits only
         .to_slice()
         .padded()
         .validate(|s: &str, e, emitter| {

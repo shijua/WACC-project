@@ -15,14 +15,27 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
     extra::Err<Rich<'tokens, Token<'src>, Span>>,
 > + Clone {
     recursive(|expr| {
+        // TODO: Edge Case: -2^31;
+        let int_base = select! {Token::IntToken(x) => x}.labelled("int, unsigned");
+
+        let plus_int = just(Token::Op("+"))
+            .ignore_then(int_base.clone())
+            .map(Expr::IntLiter);
+
+        let minus_int = just(Token::Op("-"))
+            .ignore_then(int_base.clone())
+            .map(|x| Expr::IntLiter(-x));
+
+        let int_expr_parser = plus_int.or(minus_int).or(int_base.map(Expr::IntLiter));
+
         // for <int-liter>, <bool-liter>, <char-liter>, <str-liter>, <pair-liter>
         let atomic_liter = select! {
-            Token::IntToken(x) => Expr::IntLiter(x),
             Token::BoolToken(x) => Expr::BoolLiter(x),
             Token::CharToken(x) => Expr::CharLiter(x),
             Token::StrToken(x) => Expr::StrLiter(x),
             Token::Keyword("null") => Expr::PairLiter,
         }
+        .or(int_expr_parser)
         .labelled("base value");
 
         let ident = select! {

@@ -144,7 +144,7 @@ pub fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
                     .ignore_then(ident())
                     .then(just(Token::Ctrl('(')))
                     .then(arg_list())
-                    .then(just(Token::Ctrl('(')))
+                    .then(just(Token::Ctrl(')')))
                     .map_with(|(((id, _), args_list), _), e| {
                         (Rvalue::RCall(id, args_list), e.span())
                     });
