@@ -100,7 +100,7 @@ pub fn return_check(expr: &Expr, symbol_table: &SymbolTable,
     let expr_type = expr_result.unwrap();
 
     // check the return type of the function
-    let func_type = function_table.get(symbol_table.func_name.as_ref().unwrap()).unwrap().return_type.clone();
+    let func_type = function_table.get(symbol_table.func_name.unwrap()).unwrap().return_type.clone();
     if func_type == expr_type || type_check_special(&func_type, &expr_type).is_ok() ||
         type_check_array_elem(&func_type, &expr_type).is_ok() {
         return Ok(expr_type);
@@ -168,7 +168,7 @@ pub fn while_check(expr: &Expr, stmt: &ReturningStmt,
 pub fn scope_check(stmt: &ReturningStmt, symbol_table: &SymbolTable,
                    function_table: &HashMap<String, Function>) -> Result<Type, String> {
     // create a new symbol table for the scope
-    let mut new_symbol_table = SymbolTable::create(Some(Box::from(symbol_table.clone())),
+    let mut new_symbol_table = SymbolTable::create(Some(Box::from(symbol_table)),
                                                    symbol_table.is_func, symbol_table.func_name.clone());
     stmt_check(stmt, &mut new_symbol_table, function_table)
 }

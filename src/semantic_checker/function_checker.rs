@@ -28,7 +28,7 @@ pub fn program_check(functions: &Vec<Function>, body: &ReturningStmt) -> Result<
 }
 
 pub fn function_check(function: &Function, function_table: &HashMap<String, Function>) -> Result<Type, String> {
-    let mut para_symbol_table = SymbolTable::create(None, true, Some(function.ident.clone()));
+    let mut para_symbol_table = SymbolTable::create(None, true, Some(&function.ident));
 
     // add function's parameters in para_symbol_table
     for param in &function.parameters {

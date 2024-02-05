@@ -3,7 +3,7 @@ mod symbol_checker_tests {
     use crate::ast::{Type};
     use crate::semantic_checker::symbol_table::{Symbol, SymbolTable};
 
-    fn create_symbol_table() -> SymbolTable {
+    fn create_symbol_table() -> SymbolTable<'static> {
         let mut symbol_table = SymbolTable::create(None, false, None);
         let _test = symbol_table.add("a", Type::IntType);
         let _test = symbol_table.add("b", Type::CharType);
@@ -13,7 +13,7 @@ mod symbol_checker_tests {
         symbol_table
     }
 
-    fn create_empty_symbol_table() -> SymbolTable {
+    fn create_empty_symbol_table() -> SymbolTable<'static> {
         SymbolTable::create(None, false, None)
     }
 
@@ -40,7 +40,7 @@ mod symbol_checker_tests {
     #[test]
     fn find_all_test() {
         let symbol_table = create_symbol_table();
-        let mut child_symbol_table = SymbolTable::create(Some(Box::new(symbol_table.clone())), false, None);
+        let mut child_symbol_table = SymbolTable::create(Some(Box::new(&symbol_table)), false, None);
         let _check = child_symbol_table.add("f", Type::IntType);
         assert_eq!(child_symbol_table.find_all("a").unwrap(), &Symbol { symbol_type: Type::IntType });
         assert_eq!(child_symbol_table.find_all("b").unwrap(), &Symbol { symbol_type: Type::CharType });

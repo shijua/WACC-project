@@ -5,7 +5,7 @@ mod type_tests {
     use crate::semantic_checker::type_checker::{binary_operator_check, unary_operator_check};
 
     // create empty symbol table
-    fn create_empty_symbol_table() -> SymbolTable {
+    fn create_empty_symbol_table() -> SymbolTable<'static> {
         SymbolTable::create(None, false, None)
     }
     #[test]

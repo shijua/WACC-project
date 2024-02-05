@@ -6,7 +6,7 @@ mod type_tests {
     use crate::semantic_checker::util::{array_elem_to_type, expr_to_type, get_type_from_table, pair_elem_to_type, rvalue_to_type};
 
     // create symbol table
-    fn create_symbol_table() -> SymbolTable {
+    fn create_symbol_table() -> SymbolTable<'static> {
         let mut symbol_table = SymbolTable::create(None, false, None);
         let _test = symbol_table.add("a", Type::IntType);
         let _test = symbol_table.add("b", Type::CharType);

@@ -7,7 +7,7 @@ mod stmt_checker_tests {
     use crate::semantic_checker::stmt_checker::{assignment_check, declaration_check, free_check, if_check, print_println_check, read_check, scope_check, stmt_check, while_check};
 
     // create symbol table
-    fn create_symbol_table() -> SymbolTable {
+    fn create_symbol_table() -> SymbolTable<'static> {
         let mut symbol_table = SymbolTable::create(None, false, None);
         let _test = symbol_table.add("a", Type::IntType);
         let _test = symbol_table.add("b", Type::CharType);

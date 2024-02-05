@@ -1,6 +1,5 @@
 use crate::ast::{ArrayElem, BinaryOperator, Expr, UnaryOperator};
 use crate::parser::expr::Associativity::{Left, NotApplicable, Right};
-use crate::parser::expr::Expr::IntLiter;
 use crate::parser::util::{consume_meaningless, ident, keyword, token};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -10,6 +9,7 @@ use nom::multi::{many0, many1};
 use nom::sequence::{delimited, pair, preceded};
 use nom::IResult;
 use nom_supreme::error::{BaseErrorKind, ErrorTree, Expectation};
+use crate::ast::Expr::IntLiter;
 
 const BASELINE_BINDING_POWER: u32 = 0;
 

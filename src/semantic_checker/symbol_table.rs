@@ -3,11 +3,11 @@ use crate::ast::Type;
 
 // symbol table type
 #[derive(Debug, Clone, PartialEq)]
-pub struct SymbolTable {
-    pub parent: Option<Box<SymbolTable>>,
+pub struct SymbolTable<'a> {
+    pub parent: Option<Box<&'a SymbolTable<'a>>>,
     pub table: HashMap<String, Symbol>,
     pub is_func: bool,
-    pub func_name: Option<String>,
+    pub func_name: Option<&'a String>,
 }
 
 // symbol type
@@ -18,8 +18,8 @@ pub struct Symbol {
 }
 
 // symbol table constructor
-impl SymbolTable {
-    pub fn create(parent: Option<Box<SymbolTable>>, is_func: bool, func_name: Option<String>) -> SymbolTable {
+impl<'a> SymbolTable<'a> {
+    pub fn create (parent: Option<Box<&'a SymbolTable>>, is_func: bool, func_name: Option<&'a String>) -> SymbolTable<'a> {
         SymbolTable {
             parent,
             table: HashMap::new(),
@@ -29,7 +29,7 @@ impl SymbolTable {
     }
 
     // insert a symbol into the symbol table
-    pub fn add(&mut self, ident: &str, symbol_type: Type) -> Result<Type, String>{
+    pub fn add(&mut self, ident: &str, symbol_type: Type) -> Result<Type, String> {
         if self.find(ident).is_some() {
             return Err(format!("ident already exists"));
         }
