@@ -60,7 +60,7 @@ fn func_parser<'tokens, 'src: 'tokens>() -> impl Parser<
 }
 
 // <program> ::= ‘begin’ ⟨func⟩* ⟨stmt⟩ ‘end’
-fn program<'tokens, 'src: 'tokens>() -> impl Parser<
+pub fn program<'tokens, 'src: 'tokens>() -> impl Parser<
     'tokens,
     ParserInput<'tokens, 'src>,
     Spanned<Program>,

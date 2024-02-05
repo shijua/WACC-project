@@ -1,6 +1,7 @@
 use crate::Span;
 use chumsky::error::Rich;
 use chumsky::prelude::{any, choice, just, none_of, one_of};
+use chumsky::text::newline;
 use chumsky::IterParser;
 use chumsky::{extra, text, Parser};
 
@@ -184,6 +185,10 @@ pub fn lexer<'src>(
         .padded()
         .map(Token::Ident);
 
+    let comment = just("#")
+        .then(any().and_is(newline().not()).repeated())
+        .padded();
+
     // token
     //     .map_with(|tok, e| (tok, e.span()))
     //     .padded_by(comments.repeated())
@@ -201,6 +206,7 @@ pub fn lexer<'src>(
         ident,
     ))
     .map_with(|tok, e| (tok, e.span()))
+    .padded_by(comment.repeated())
     .padded()
     .repeated()
     .collect()

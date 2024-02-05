@@ -186,28 +186,29 @@ pub fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
                         statement: (Stmt::Free(x), e.span()),
                     });
 
-                let return_ = just(Token::Keyword("free"))
-                    .ignore_then(expr())
-                    .map_with(|x, e| ReturningStmt {
-                        returning: true,
-                        statement: (Stmt::Return(x), e.span()),
-                    });
+                let return_ =
+                    just(Token::Keyword("return"))
+                        .ignore_then(expr())
+                        .map_with(|x, e| ReturningStmt {
+                            returning: true,
+                            statement: (Stmt::Return(x), e.span()),
+                        });
 
-                let exit_ = just(Token::Keyword("free"))
+                let exit_ = just(Token::Keyword("exit"))
                     .ignore_then(expr())
                     .map_with(|x, e| ReturningStmt {
                         returning: true,
                         statement: (Stmt::Exit(x), e.span()),
                     });
 
-                let print = just(Token::Keyword("free"))
+                let print = just(Token::Keyword("print"))
                     .ignore_then(expr())
                     .map_with(|x, e| ReturningStmt {
                         returning: false,
                         statement: (Stmt::Print(x), e.span()),
                     });
 
-                let println = just(Token::Keyword("free"))
+                let println = just(Token::Keyword("println"))
                     .ignore_then(expr())
                     .map_with(|x, e| ReturningStmt {
                         returning: false,
