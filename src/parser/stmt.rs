@@ -39,7 +39,7 @@ fn arg_list<'tokens, 'src: 'tokens>() -> impl Parser<
         .map_with(|x, e| (ArgList::Arg(x), e.span()))
 }
 
-fn ident<'tokens, 'src: 'tokens>() -> impl Parser<
+pub fn ident<'tokens, 'src: 'tokens>() -> impl Parser<
     'tokens,
     ParserInput<'tokens, 'src>,
     Spanned<String>,
@@ -76,7 +76,7 @@ fn array_elem<'tokens, 'src: 'tokens>() -> impl Parser<
     })
 }
 
-fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
+pub fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
     'tokens,
     ParserInput<'tokens, 'src>,
     Spanned<ReturningStmt>,

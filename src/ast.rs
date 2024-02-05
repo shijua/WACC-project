@@ -118,3 +118,29 @@ pub struct ReturningStmt {
     pub statement: Spanned<Stmt>,
     pub returning: bool,
 }
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum Param {
+    Parameter(Spanned<Type>, Spanned<String>),
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub struct Function {
+    // ident
+    pub ident: Spanned<String>,
+
+    // type
+    pub return_type: Spanned<Type>,
+
+    // param-list
+    pub parameters: Vec<Spanned<Param>>,
+
+    // body statement
+    pub body: Spanned<ReturningStmt>,
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub struct Program {
+    pub functions: Vec<Spanned<Function>>,
+    pub body: Spanned<ReturningStmt>,
+}
