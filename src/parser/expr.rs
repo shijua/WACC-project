@@ -19,14 +19,37 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
         let int_base = select! {Token::IntToken(x) => x}.labelled("int, unsigned");
 
         let plus_int = just(Token::Op("+"))
-            .ignore_then(int_base.clone())
-            .map(Expr::IntLiter);
+            .then(int_base.clone())
+            .try_map(|(_, x), s| {
+                let result = i32::try_from(x);
+                return if result.is_err() {
+                    Err(Rich::custom(s, "Integer out of range"))
+                } else {
+                    Ok(Expr::IntLiter(result.unwrap()))
+                };
+            });
 
         let minus_int = just(Token::Op("-"))
-            .ignore_then(int_base.clone())
-            .map(|x| Expr::IntLiter(-x));
+            .then(int_base.clone())
+            .try_map(|(_, x), s| {
+                let result = i32::try_from(-x);
+                return if result.is_err() {
+                    Err(Rich::custom(s, "Integer out of range"))
+                } else {
+                    Ok(Expr::IntLiter(result.unwrap()))
+                };
+            });
 
-        let int_expr_parser = plus_int.or(minus_int).or(int_base.map(Expr::IntLiter));
+        let unsigned_int = int_base.clone().try_map(|x, s| {
+            let result = i32::try_from(x);
+            return if result.is_err() {
+                Err(Rich::custom(s, "Integer out of range"))
+            } else {
+                Ok(Expr::IntLiter(result.unwrap()))
+            };
+        });
+
+        let int_expr_parser = plus_int.or(minus_int).or(unsigned_int);
 
         // for <int-liter>, <bool-liter>, <char-liter>, <str-liter>, <pair-liter>
         let atomic_liter = select! {

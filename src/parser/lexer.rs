@@ -7,7 +7,7 @@ use chumsky::{extra, text, Parser};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token<'src> {
-    IntToken(i32),
+    IntToken(i64),
     BoolToken(bool),
     StrToken(String),
     CharToken(char),
@@ -45,7 +45,7 @@ pub fn lexer<'src>(
         .to_slice()
         .padded()
         .validate(|s: &str, e, emitter| {
-            let num = s.parse::<i32>();
+            let num = s.parse::<i64>();
             if num.is_err() {
                 emitter.emit(Rich::custom(
                     e.span(),
