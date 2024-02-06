@@ -69,7 +69,7 @@ pub fn char_to_string_conversion(type1: &Spanned<Type>) -> Spanned<Type> {
             if from_span(elem) == &Type::CharType {
                 create_span(Type::StringType, get_span(type1))
             } else {
-                // create_span(Type::Array(Box::from(char_to_string_conversion(elem))), get_span(type1))
+                // does not allow char[][] == string[]
                 type1.clone()
             }
         }
@@ -272,7 +272,7 @@ pub fn arr_lit_to_type(array: &Spanned<ArrayLiter>, symbol_table: &SymbolTable) 
         }
         let expr_type = expr_type.unwrap();
         if array_type == any_span() { // for first element
-            array_type = expr_type;
+            array_type = char_to_string_conversion(&expr_type);
         } else if array_type != expr_type {
             // need to check double side here for type_check_array_elem
             if type_check_special(&array_type, &expr_type).is_err() && type_check_array_elem(&array_type, &expr_type).is_err()
