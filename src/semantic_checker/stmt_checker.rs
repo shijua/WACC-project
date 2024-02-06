@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::ast::{Expr, Function, Lvalue, ReturningStmt, Rvalue, Stmt, Type};
 use crate::semantic_checker::symbol_table::SymbolTable;
-use crate::semantic_checker::util::{any_span, bool_span, char_span, create_span, empty_span, expr_to_type, from_span, int_span, lvalue_to_type, rvalue_to_type, span_cmp, type_check_array_elem, type_check_special};
+use crate::semantic_checker::util::{create_span, empty_span, expr_to_type, from_span, lvalue_to_type, rvalue_to_type, span_cmp, type_check_array_elem, type_check_special};
 use crate::Spanned;
 
 // variable declaration
@@ -18,7 +18,7 @@ pub fn declaration_check<'a>(type_given: &Spanned<Type>, ident: &'a Spanned<Stri
     println!("type_given: {:?}", type_given);
     println!("rvalue_type: {:?}", rvalue_type);
     // check if type_given is valid and get its type
-    if !span_cmp(type_given, &rvalue_type) && type_check_special(type_given, &rvalue_type).is_err()
+    if type_check_special(type_given, &rvalue_type).is_err()
         && type_check_array_elem(type_given, &rvalue_type).is_err() {
         return Err("type mismatch in declaration check".to_string());
     }
@@ -111,7 +111,7 @@ pub fn return_check(expr: &Spanned<Expr>, symbol_table: &SymbolTable,
             symbol_table.func_name.unwrap())
             .unwrap())
         .return_type.clone();
-    if !span_cmp(&func_type , &expr_type) || type_check_special(&func_type, &expr_type).is_ok() ||
+    if type_check_special(&func_type, &expr_type).is_ok() ||
         type_check_array_elem(&func_type, &expr_type).is_ok() {
         return Ok(expr_type);
     }

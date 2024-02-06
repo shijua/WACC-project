@@ -3,34 +3,13 @@ use crate::ast::{ArgList, ArrayElem, ArrayLiter, Expr, Function, Lvalue, PairEle
 use crate::semantic_checker::symbol_table::SymbolTable;
 use crate::semantic_checker::type_checker::{binary_operator_check, unary_operator_check};
 use crate::{Span, Spanned};
-use crate::ast::Type::Any;
 
 pub fn span_cmp<T: PartialEq>(span1: &Spanned<T>, span2: &Spanned<T>) -> bool {
     span1.0 == span2.0
 }
 
-pub fn bool_span() -> Spanned<Type> {
-    create_span(Type::BoolType, empty_span())
-}
-
-pub fn int_span() -> Spanned<Type> {
-    create_span(Type::IntType, empty_span())
-}
-
-pub fn char_span() -> Spanned<Type> {
-    create_span(Type::CharType, empty_span())
-}
-
-pub fn string_span() -> Spanned<Type> {
-    create_span(Type::StringType, empty_span())
-}
-
 pub fn any_span() -> Spanned<Type> {
     create_span(Type::Any, empty_span())
-}
-
-pub fn pair_span() -> Spanned<Type> {
-    create_span(Type::NestedPair, empty_span())
 }
 
 pub fn empty_span() -> Span {
@@ -196,7 +175,7 @@ pub fn array_elem_to_type<T>(array_elem: &Spanned<ArrayElem>, symbol_table: &Sym
     Ok(array_elem_type)
 }
 
-// array out of bound?
+
 pub fn lvalue_to_type(lvalue: &Spanned<Lvalue>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, String> {
     match from_span(lvalue) {
         Lvalue::LIdent(ident) => get_type_from_table(ident, symbol_table),
@@ -292,7 +271,7 @@ pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_t
         }
         let arg_type = arg_type.unwrap();
         let Param::Parameter(param_type, _) = from_span(&parameters[ind]);
-        if &arg_type != param_type && type_check_special(param_type, &arg_type).is_err() {
+        if type_check_special(param_type, &arg_type).is_err() {
             return Err("function call parameter type mismatch".to_string());
         }
     }

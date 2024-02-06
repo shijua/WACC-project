@@ -1,6 +1,6 @@
 use crate::ast::{BinaryOperator, Expr, Type, UnaryOperator};
 use crate::semantic_checker::symbol_table::SymbolTable;
-use crate::semantic_checker::util::{expr_to_type, from_span, type_check_special, bool_span, int_span, char_span, get_span, create_span};
+use crate::semantic_checker::util::{expr_to_type, from_span, type_check_special, get_span, create_span};
 use crate::Spanned;
 
 // unary operator check
@@ -79,7 +79,7 @@ pub fn binary_operator_check<T>(lhs: &Spanned<Expr>, operator: &BinaryOperator, 
         }
 
         BinaryOperator::Eq | BinaryOperator::Neq => {
-            if lhs_type == rhs_type || type_check_special(lhs_span, rhs_span).is_ok() {
+            if type_check_special(lhs_span, rhs_span).is_ok() {
                 Ok(create_span(Type::BoolType, get_span(&span)))
             } else {
                 Err(format!("Expected same type, found {:?} and {:?}", lhs_type, rhs_type))

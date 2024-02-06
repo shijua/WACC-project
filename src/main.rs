@@ -50,21 +50,23 @@ fn main() {
 
         (ast, parse_errs)
     } else {
-        panic!("lexer failed")
+        (None, Vec::new())
     };
 
     if !errs.is_empty() || !parse_errs.is_empty() {
         exit_code = 100;
     }
 
-    let semantic_errs = if let Some(ast) = &ast {
-        semantic_check_start(&ast.0)
-    } else {
-        Err("parser failed".to_string())
-    };
+    if exit_code == 0 {
+        let semantic_errs = if let Some(ast) = &ast {
+            semantic_check_start(&ast.0)
+        } else {
+            Err("parser failed".to_string())
+        };
 
-    if (semantic_errs.is_err()) {
-        exit_code = 200;
+        if (semantic_errs.is_err()) {
+            exit_code = 200;
+        }
     }
 
     errs.into_iter()
@@ -91,6 +93,5 @@ fn main() {
                 .print(sources([(input_file.clone(), src.clone())]))
                 .unwrap()
         });
-    println!("{:?}", semantic_errs);
     exit(exit_code);
 }
