@@ -65,7 +65,7 @@ pub fn char_to_string_conversion(type1: &Spanned<Type>) -> Spanned<Type> {
 }
 
 pub fn type_check_special(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Result<Spanned<Type>, Error> {
-    if (span_cmp(type1, type2)) {
+    if span_cmp(type1, type2) {
         return Ok(type1.clone());
     }
     match from_span(type2) {
@@ -99,28 +99,40 @@ pub fn type_check_special(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Resul
         Type::NestedPair => {
             match from_span(type1) {
                 Type::Pair(..) | Type::NestedPair => Ok(any_span()),
-                _ => Err("type mismatch in special check anony pair".to_string())
+                _ => Err(Error{
+                    span: *type1.1,
+                    msg: "corresponding element is not legal pair type".to_string(),
+                })
             }
         }
         // check inside of array type
         Type::Array(inner) => {
             match from_span(type1) {
                 Type::Array(inner1) => type_check_special(inner1, inner),
-                _ => Err("type mismatch in special check array".to_string())
+                _ => Err(Error{
+                    span: *type1.1,
+                    msg: "corresponding element is not array type".to_string(),
+                })
             }
         }
         // if rhs is any, then it is ok
         Type::Any => {
             Ok(any_span())
         }
-        _ => Err("Do not a special type case".to_string()),
+        _ => Err(Error{
+            span: *type1.1,
+            msg: "corresponding element is not valid type".to_string()
+        }),
     }
 }
 
 pub fn get_type_from_table(ident: &Spanned<String>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, Error> {
     let symbol = symbol_table.find_all(ident);
     if symbol.is_none() {
-        return Err("ident not found".to_string());
+        return Err(Error{
+            span: *ident.1,
+            msg: "ident undefined".to_string(),
+        });
     }
     Ok(symbol.unwrap().symbol_type.clone())
 }
@@ -137,7 +149,10 @@ pub fn pair_elem_to_type<T>(pair_elem: &Spanned<PairElem>, symbol_table: &Symbol
             match from_span(&type_result) {
                 Type::Pair(inner1, _) => Ok(*inner1.clone()),
                 Type::NestedPair => Ok(create_span(Type::Any, get_span(&span))),
-                _ => Err("elem is not a pair".to_string())
+                _ => Err(Error{
+                    span: *type_result.1,
+                    msg: "pair element type invalid".to_string(),
+                })
             }
         }
         PairElem::PairElemSnd(lvalue) => {
@@ -149,7 +164,10 @@ pub fn pair_elem_to_type<T>(pair_elem: &Spanned<PairElem>, symbol_table: &Symbol
             match from_span(&type_result) {
                 Type::Pair(_, inner2) => Ok(*inner2.clone()),
                 Type::NestedPair => Ok(create_span(Type::Any, get_span(&span))),
-                _ => Err("elem is not a pair".to_string())
+                _ => Err(Error{
+                    span: *type_result.1,
+                    msg: "such elem is not a pair".to_string(),
+                })
             }
         }
     }
@@ -172,7 +190,10 @@ pub fn array_elem_to_type<T>(array_elem: &Spanned<ArrayElem>, symbol_table: &Sym
         }
         let expr_type = expr_result.unwrap();
         if from_span(&expr_type) != &Type::IntType {
-            return Err("array index is not int type".to_string());
+            return Err(Error{
+                span: *expr_type.1,
+                msg: "array index is not an int type".to_string(),
+            });
         }
 
         // unwrap one box each time
@@ -181,7 +202,10 @@ pub fn array_elem_to_type<T>(array_elem: &Spanned<ArrayElem>, symbol_table: &Sym
                 array_elem_type = *inner.clone();
             }
             _ => {
-                return Err("ident is more than the dimension of the array".to_string());
+                return Err(Error{
+                    span: *array_elem_type.1,
+                    msg: "dimensions given exceeds dimension of array".to_string(),
+                });
             }
         }
     }
@@ -241,7 +265,10 @@ pub fn arr_lit_to_type(array: &Spanned<ArrayLiter>, symbol_table: &SymbolTable) 
             // need to check double side here for type_check_array_elem
             if type_check_special(&array_type, &expr_type).is_err() && type_check_array_elem(&array_type, &expr_type).is_err()
                 && type_check_array_elem(&expr_type, &array_type).is_err() {
-                return Err("array elements are not the same type".to_string());
+                return Err(Error {
+                    span: *array_type,
+                    msg: "array elements are not the same type".to_string(),
+                });
             }
         }
     }
@@ -265,7 +292,10 @@ pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_t
     // check if function is in the function table
     let function = function_table.get(from_span(ident));
     if function.is_none() {
-        return Err("function not found".to_string());
+        return Err(Error{
+            span: get_span(ident),
+            msg: "function not found".to_string(),
+        });
     }
     let function = function.unwrap();
     // get Vec from arg_list
@@ -273,7 +303,9 @@ pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_t
 
     let parameters = &from_span(function).parameters;
     if parameters.len() != args.len() {
-        return Err("function call parameter length mismatch".to_string());
+        return Err(Error{
+            span: *arg_list.1,
+            msg: "function call parameter length mismatch".to_string()});
     }
 
     // check if each parameter has the same type as the argument
@@ -285,7 +317,10 @@ pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_t
         let arg_type = arg_type.unwrap();
         let Param::Parameter(param_type, _) = from_span(&parameters[ind]);
         if type_check_special(param_type, &arg_type).is_err() {
-            return Err("function call parameter type mismatch".to_string());
+            return Err(Error{
+                span: *param_type.1,
+                msg: "function call parameter type mismatch".to_string(),
+            });
         }
     }
     Ok(from_span(function).return_type.clone())
