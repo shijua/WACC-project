@@ -7,10 +7,16 @@ use chumsky::prelude::{SimpleSpan};
 use chumsky::{Parser};
 use std::process::exit;
 use std::{env, fs};
+use chumsky::error::Rich;
 
 mod ast;
 mod parser;
 mod semantic_checker;
+
+const READ_ERROR: i32 = -1;
+const VALID_CODE: i32 = 0;
+const SYNTAX_ERROR_CODE: i32 = 100;
+const SEMANTIC_ERROR_CODE: i32 = 200;
 
 pub type Span = SimpleSpan<usize>;
 
@@ -23,7 +29,7 @@ fn main() {
     // at least one argument (for input path)
     if args.len() < 2 {
         println!("Error: expecting more arguments for file input");
-        exit(-1);
+        exit(READ_ERROR);
     }
 
     let input_file = &args[1];
@@ -32,14 +38,13 @@ fn main() {
 
     if src_content.is_err() {
         println!("Error: Failed to read input file");
-        exit(-1);
+        exit(READ_ERROR);
     }
 
     let src = src_content.unwrap();
 
     let (tokens, mut errs) = lexer().parse(src.as_str()).into_output_errors();
 
-    let mut exit_code = 0;
 
     let (ast, parse_errs) = if let Some(tokens) = &tokens {
         let (ast, parse_errs) = program()
@@ -52,7 +57,7 @@ fn main() {
         (None, Vec::new())
     };
 
-    let pretty_print = |error_type: &str| {
+    let pretty_print = |error_type: &str, errs: &Vec<Rich<char>>| {
         errs.clone()
             .into_iter()
             .map(|e| e.map_token(|c| c.to_string()))
@@ -82,19 +87,19 @@ fn main() {
     };
 
     if !errs.clone().is_empty() || !parse_errs.clone().is_empty() {
-        exit_code = 100;
-        pretty_print("Syntax Error");
-        exit(exit_code);
+        pretty_print("Syntax Error", &errs);
+        exit(SYNTAX_ERROR_CODE);
     }
 
-    if exit_code == 0 && ast.is_some() {
+    if ast.is_some() {
         let semantic_errs = semantic_check_start(&ast.unwrap().0);
 
         if semantic_errs.is_err() {
-            exit_code = 200;
-            pretty_print("Semantic Error");
-            exit(exit_code);
+            let semantic_error = semantic_errs.unwrap_err();
+            errs.push(Rich::custom(semantic_error.extract_span(), semantic_error.extract_msg()));
+            pretty_print("Semantic Error", &errs);
+            exit(SEMANTIC_ERROR_CODE);
         }
     }
-    exit(0);
+    exit(VALID_CODE);
 }

@@ -16,6 +16,14 @@ impl Error {
             span, msg
         }
     }
+
+    pub fn extract_span(&self) -> Span {
+        self.span
+    }
+
+    pub fn extract_msg(&self) -> String {
+        self.msg.clone()
+    }
 }
 
 pub fn span_cmp<T: PartialEq>(span1: &Spanned<T>, span2: &Spanned<T>) -> bool {
