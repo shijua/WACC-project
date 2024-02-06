@@ -1,10 +1,10 @@
 use crate::ast::{BinaryOperator, Expr, Type, UnaryOperator};
 use crate::semantic_checker::symbol_table::SymbolTable;
-use crate::semantic_checker::util::{expr_to_type, from_span, type_check_special, bool_span, int_span, char_span};
+use crate::semantic_checker::util::{expr_to_type, from_span, type_check_special, bool_span, int_span, char_span, get_span, create_span};
 use crate::Spanned;
 
 // unary operator check
-pub fn unary_operator_check(operator: &UnaryOperator, operand: &Spanned<Expr>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, String> {
+pub fn unary_operator_check<T>(operator: &UnaryOperator, operand: &Spanned<Expr>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, String> {
     // check inside the unary operator first
     let operand_result = expr_to_type(operand, symbol_table);
     if operand_result.is_err() {
@@ -15,31 +15,31 @@ pub fn unary_operator_check(operator: &UnaryOperator, operand: &Spanned<Expr>, s
     match operator {
         UnaryOperator::Bang => {
             match from_span(&operand_type) {
-                Type::BoolType => Ok(bool_span()),
+                Type::BoolType => Ok(create_span(Type::BoolType, get_span(&span))),
                 _ => Err(format!("Expected bool type, found {:?}", operand_type))
             }
         }
         UnaryOperator::Negative => {
            match from_span(&operand_type) {
-                Type::IntType => Ok(int_span()),
+                Type::IntType => Ok(create_span(Type::IntType, get_span(&span))),
                 _ => Err(format!("Expected int type, found {:?}", operand_type))
            }
         }
         UnaryOperator::Len => {
             match from_span(&operand_type) {
-                Type::Array(_) => Ok(int_span()),
+                Type::Array(_) => Ok(create_span(Type::IntType, get_span(&span))),
                 _ => Err(format!("Expected array type, found {:?}", operand_type))
             }
         }
         UnaryOperator::Ord => {
             match from_span(&operand_type) {
-                Type::CharType => Ok(int_span()),
+                Type::CharType => Ok(create_span(Type::IntType, get_span(&span))),
                 _ => Err(format!("Expected char type, found {:?}", operand_type))
             }
         }
         UnaryOperator::Chr => {
             match from_span(&operand_type) {
-                Type::IntType => Ok(char_span()),
+                Type::IntType => Ok(create_span(Type::CharType, get_span(&operand_type))),
                 _ => Err(format!("Expected int type, found {:?}", operand_type))
             }
         }
@@ -47,46 +47,48 @@ pub fn unary_operator_check(operator: &UnaryOperator, operand: &Spanned<Expr>, s
 }
 
 // binary operator check
-pub fn binary_operator_check(lhs: &Spanned<Expr>, operator: &BinaryOperator, rhs: &Spanned<Expr>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, String> {
+pub fn binary_operator_check<T>(lhs: &Spanned<Expr>, operator: &BinaryOperator, rhs: &Spanned<Expr>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, String> {
     // check lhs and rhs first
     let lhs_result = expr_to_type(lhs, symbol_table);
     if lhs_result.is_err() {
         return lhs_result;
     }
-    let lhs_type = lhs_result.unwrap();
+    let lhs_span = &lhs_result.unwrap();
+    let lhs_type = from_span(&lhs_span);
     let rhs_result = expr_to_type(rhs, symbol_table);
     if rhs_result.is_err() {
         return rhs_result;
     }
-    let rhs_type = rhs_result.unwrap();
+    let rhs_span = &rhs_result.unwrap();
+    let rhs_type = from_span(&rhs_span);
     match operator {
         BinaryOperator::Mul | BinaryOperator::Div | BinaryOperator::Modulo | BinaryOperator::Add | BinaryOperator::Sub => {
-            if lhs_type == int_span() && rhs_type == int_span() {
-                Ok(int_span())
+            if lhs_type == &Type::IntType && rhs_type == &Type::IntType {
+                Ok(create_span(Type::IntType, get_span(&span)))
             } else {
                 Err(format!("Expected int type, found {:?} and {:?}", lhs_type, rhs_type))
             }
         }
         BinaryOperator::Gt | BinaryOperator::Gte | BinaryOperator::Lt | BinaryOperator::Lte => {
-            if (lhs_type == int_span() && rhs_type == int_span()) ||
-                (lhs_type == char_span() && rhs_type == char_span()) {
-                Ok(bool_span())
+            if (lhs_type == &Type::IntType && rhs_type == &Type::IntType) ||
+                (lhs_type == &Type::CharType && rhs_type == &Type::CharType) {
+                Ok(create_span(Type::BoolType, get_span(&span)))
             } else {
                 Err(format!("Expected int type, found {:?} and {:?}", lhs_type, rhs_type))
             }
         }
 
         BinaryOperator::Eq | BinaryOperator::Neq => {
-            if lhs_type == rhs_type || type_check_special(&lhs_type, &rhs_type).is_ok() {
-                Ok(bool_span())
+            if lhs_type == rhs_type || type_check_special(lhs_span, rhs_span).is_ok() {
+                Ok(create_span(Type::BoolType, get_span(&span)))
             } else {
                 Err(format!("Expected same type, found {:?} and {:?}", lhs_type, rhs_type))
             }
         }
 
         BinaryOperator::And | BinaryOperator::Or => {
-            if lhs_type == bool_span() && rhs_type == bool_span() {
-                Ok(bool_span())
+            if lhs_type == &Type::BoolType && rhs_type == &Type::BoolType {
+                Ok(create_span(Type::BoolType, get_span(&span)))
             } else {
                 Err(format!("Expected bool type, found {:?} and {:?}", lhs_type, rhs_type))
             }

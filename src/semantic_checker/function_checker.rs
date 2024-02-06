@@ -47,6 +47,6 @@ pub fn function_check(function: &Function, function_table: &HashMap<String, Span
 
 
 
-pub fn semantic_check_start(program: &Program) -> Result<Spanned<Type>, String>  {
-    program_check(&program.functions, &program.body)
+pub fn semantic_check_start(program: &Spanned<Program>) -> Result<Spanned<Type>, String>  {
+    program_check(&from_span(program).functions, &from_span(program).body)
 }

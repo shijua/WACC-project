@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::ast::{Expr, Function, Lvalue, ReturningStmt, Rvalue, Stmt, Type};
 use crate::semantic_checker::symbol_table::SymbolTable;
-use crate::semantic_checker::util::{any_span, bool_span, char_span, create_span, expr_to_type, from_span, int_span, lvalue_to_type, rvalue_to_type, type_check_array_elem, type_check_special};
+use crate::semantic_checker::util::{any_span, bool_span, char_span, create_span, empty_span, expr_to_type, from_span, int_span, lvalue_to_type, rvalue_to_type, span_cmp, type_check_array_elem, type_check_special};
 use crate::Spanned;
 
 // variable declaration
@@ -15,8 +15,10 @@ pub fn declaration_check<'a>(type_given: &Spanned<Type>, ident: &'a Spanned<Stri
 
     let rvalue_type = rvalue_result.unwrap();
 
+    println!("type_given: {:?}", type_given);
+    println!("rvalue_type: {:?}", rvalue_type);
     // check if type_given is valid and get its type
-    if type_given != &rvalue_type && type_check_special(type_given, &rvalue_type).is_err()
+    if !span_cmp(type_given, &rvalue_type) && type_check_special(type_given, &rvalue_type).is_err()
         && type_check_array_elem(type_given, &rvalue_type).is_err() {
         return Err("type mismatch in declaration check".to_string());
     }
@@ -32,25 +34,28 @@ pub fn assignment_check(lvalue: &Spanned<Lvalue>, rvalue: &Spanned<Rvalue>, symb
     if lvalue_result.is_err() {
         return lvalue_result;
     }
-    let lvalue_type = lvalue_result.unwrap();
+    let lvalue_span = lvalue_result.unwrap();
+    let lvalue_type = from_span(&lvalue_span);
 
     // check if rvalue is valid and get its type
     let rvalue_result = rvalue_to_type(rvalue, symbol_table, function_table);
     if rvalue_result.is_err() {
         return rvalue_result;
     }
-    let rvalue_type = rvalue_result.unwrap();
+    let rvalue_span = rvalue_result.unwrap();
+    let rvalue_type = from_span(&rvalue_span);
 
     // Assert that not both sides can be any at the same time.
-    if lvalue_type == any_span() && rvalue_type == any_span() {
+    if lvalue_type == &Type::Any && rvalue_type == &Type::Any {
         return Err("type mismatch in assignment check(both side is any)".to_string());
     }
 
     // check if lvalue and rvalue have the same type
-    if lvalue_type == any_span() || lvalue_type == rvalue_type || type_check_array_elem(&lvalue_type, &rvalue_type).is_ok()
-        || type_check_special(&lvalue_type, &rvalue_type).is_ok() {
-        return Ok(lvalue_type);
+    if lvalue_type == &Type::Any || lvalue_type == rvalue_type || type_check_array_elem(&lvalue_span, &rvalue_span).is_ok()
+        || type_check_special(&lvalue_span, &rvalue_span).is_ok() {
+        return Ok(lvalue_span);
     }
+
     Err("type mismatch in assignment check".to_string())
 }
 
@@ -106,7 +111,7 @@ pub fn return_check(expr: &Spanned<Expr>, symbol_table: &SymbolTable,
             symbol_table.func_name.unwrap())
             .unwrap())
         .return_type.clone();
-    if func_type == expr_type || type_check_special(&func_type, &expr_type).is_ok() ||
+    if !span_cmp(&func_type , &expr_type) || type_check_special(&func_type, &expr_type).is_ok() ||
         type_check_array_elem(&func_type, &expr_type).is_ok() {
         return Ok(expr_type);
     }
@@ -182,7 +187,7 @@ pub fn stmt_check<'a>(ret_stmt: &'a Spanned<ReturningStmt>, symbol_table: &mut S
                   function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
     let stmt = from_span(&from_span(ret_stmt).statement);
     match stmt {
-        Stmt::Skip => Ok(create_span(Type::Any)),
+        Stmt::Skip => Ok(create_span(Type::Any, empty_span())),
         Stmt::Declare(type_given, ident, rvalue) => {
             declaration_check(&type_given, &ident, &rvalue, symbol_table, function_table)
         }

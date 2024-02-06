@@ -7,6 +7,7 @@ use chumsky::prelude::{just, SimpleSpan};
 use chumsky::{extra, Parser};
 use std::process::exit;
 use std::{env, fs};
+use crate::semantic_checker::function_checker::{program_check, semantic_check_start};
 
 mod ast;
 mod parser;
@@ -41,18 +42,29 @@ fn main() {
 
     let mut exit_code = 0;
 
-    let parse_errs = if let Some(tokens) = &tokens {
+    let (ast, parse_errs) = if let Some(tokens) = &tokens {
         let (ast, parse_errs) = program()
             .map_with(|ast, e| (ast, e.span()))
             .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
             .into_output_errors();
-        parse_errs
+
+        (ast, parse_errs)
     } else {
         panic!("lexer failed")
     };
 
     if !errs.is_empty() || !parse_errs.is_empty() {
         exit_code = 100;
+    }
+
+    let semantic_errs = if let Some(ast) = &ast {
+        semantic_check_start(&ast.0)
+    } else {
+        Err("parser failed".to_string())
+    };
+
+    if (semantic_errs.is_err()) {
+        exit_code = 200;
     }
 
     errs.into_iter()
@@ -79,5 +91,6 @@ fn main() {
                 .print(sources([(input_file.clone(), src.clone())]))
                 .unwrap()
         });
+    println!("{:?}", semantic_errs);
     exit(exit_code);
 }
