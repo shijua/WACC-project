@@ -1,12 +1,10 @@
 use crate::parser::lexer::lexer;
 use crate::parser::program::program;
-use crate::semantic_checker::function_checker::{program_check, semantic_check_start};
+use crate::semantic_checker::function_checker::{semantic_check_start};
 use ariadne::{sources, Color, Label, Report, ReportKind};
-use chumsky::error::{Rich, Simple};
 use chumsky::input::Input;
-use chumsky::prelude::{just, SimpleSpan};
-use chumsky::{extra, Parser};
-use std::alloc::handle_alloc_error;
+use chumsky::prelude::{SimpleSpan};
+use chumsky::{Parser};
 use std::process::exit;
 use std::{env, fs};
 
@@ -89,12 +87,8 @@ fn main() {
         exit(exit_code);
     }
 
-    if exit_code == 0 {
-        let semantic_errs = if let Some(ast) = &ast {
-            semantic_check_start(&ast.0)
-        } else {
-            Err("parser failed".to_string())
-        };
+    if exit_code == 0 && ast.is_some() {
+        let semantic_errs = semantic_check_start(&ast.unwrap().0);
 
         if semantic_errs.is_err() {
             exit_code = 200;

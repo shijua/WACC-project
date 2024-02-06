@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use crate::ast::Type;
-use crate::semantic_checker::util::{create_span, from_span, get_span};
+use crate::semantic_checker::util::{create_span, from_span, get_span, Error};
 use crate::Spanned;
 
 // symbol table type
@@ -34,7 +34,7 @@ impl<'a> SymbolTable<'a> {
     pub fn add(&mut self, ident: &'a Spanned<String>, symbol_type: Spanned<Type>) -> Result<Spanned<Type>, Error> {
         // check if the ident already exists
         if self.find(ident).is_some() {
-            return Err("ident already exists".to_string());
+            return Err(Error::new_error(get_span(ident), "ident already exists".to_string()));
         }
         self.table.insert(from_span(ident), Symbol { symbol_type });
         Ok(create_span(Type::Any, get_span(ident)))

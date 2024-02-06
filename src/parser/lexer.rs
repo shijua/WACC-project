@@ -35,10 +35,6 @@ impl<'src> std::fmt::Display for Token<'src> {
     }
 }
 
-// fn tag(input: &str) -> impl Parser<&str, &str, extra::Err<Rich<char>>> {
-//     just(input).padded_by(comments().repeated()).padded()
-// }
-
 pub fn lexer<'src>(
 ) -> impl Parser<'src, &'src str, Vec<(Token<'src>, Span)>, extra::Err<Rich<'src, char, Span>>> {
     let int_token = text::digits(10) // accepting decimal digits only
@@ -70,7 +66,7 @@ pub fn lexer<'src>(
     // Regarding transformation:
     // Ideally we would recognize a specific pattern for escape characters and perform correct analysis
     // The character transformation only applies for <char-liter> and <str-liter>.
-    // This should be an ascii character, and it should not parse unicodes.
+    // This should be an ascii character, and it should not parse uni-codes.
 
     let graphic_ascii_char = any::<'src, &'src str, extra::Err<Rich<'src, char, Span>>>()
         .filter(char::is_ascii)

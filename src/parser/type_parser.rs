@@ -1,9 +1,8 @@
 use crate::ast::Type;
-use crate::parser::lexer::{lexer, ParserInput, Token};
+use crate::parser::lexer::{ParserInput, Token};
 use crate::{Span, Spanned};
 use chumsky::error::Rich;
-use chumsky::input::Input;
-use chumsky::prelude::{just, none_of, todo, Recursive};
+use chumsky::prelude::just;
 use chumsky::recursive::recursive;
 use chumsky::{extra, select, Parser};
 
@@ -26,7 +25,7 @@ pub fn type_parse<'tokens, 'src: 'tokens>() -> impl Parser<
         .labelled("base type");
 
     recursive(|type_parse| {
-        let pair_type = recursive(|pair_type| {
+        let pair_type = {
             // let pair_elem_base = type_parse.clone().validate();
 
             let pair_elem_type = type_parse
@@ -43,7 +42,7 @@ pub fn type_parse<'tokens, 'src: 'tokens>() -> impl Parser<
                 .map_with(|(((p1, _), p2), _), e| {
                     (Type::Pair(Box::new(p1), Box::new(p2)), e.span())
                 })
-        });
+        };
 
         let array_base = base_type.or(pair_type);
 

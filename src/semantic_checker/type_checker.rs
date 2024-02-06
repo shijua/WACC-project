@@ -1,6 +1,6 @@
 use crate::ast::{BinaryOperator, Expr, Type, UnaryOperator};
 use crate::semantic_checker::symbol_table::SymbolTable;
-use crate::semantic_checker::util::{expr_to_type, from_span, type_check_special, get_span, create_span};
+use crate::semantic_checker::util::{expr_to_type, from_span, type_check_special, get_span, create_span, Error};
 use crate::Spanned;
 
 // unary operator check
@@ -16,31 +16,31 @@ pub fn unary_operator_check<T>(operator: &UnaryOperator, operand: &Spanned<Expr>
         UnaryOperator::Bang => {
             match from_span(&operand_type) {
                 Type::BoolType => Ok(create_span(Type::BoolType, get_span(&span))),
-                _ => Err(format!("Expected bool type, found {:?}", operand_type))
+                _ => Err(Error::new_error(get_span(&operand_type), format!("Expected bool type, found {:?}", operand_type)))
             }
         }
         UnaryOperator::Negative => {
            match from_span(&operand_type) {
                 Type::IntType => Ok(create_span(Type::IntType, get_span(&span))),
-                _ => Err(format!("Expected int type, found {:?}", operand_type))
+                _ => Err(Error::new_error(get_span(&operand_type), format!("Expected int type, found {:?}", operand_type)))
            }
         }
         UnaryOperator::Len => {
             match from_span(&operand_type) {
                 Type::Array(_) => Ok(create_span(Type::IntType, get_span(&span))),
-                _ => Err(format!("Expected array type, found {:?}", operand_type))
+                _ => Err(Error::new_error(get_span(&operand_type), format!("Expected array type, found {:?}", operand_type)))
             }
         }
         UnaryOperator::Ord => {
             match from_span(&operand_type) {
                 Type::CharType => Ok(create_span(Type::IntType, get_span(&span))),
-                _ => Err(format!("Expected char type, found {:?}", operand_type))
+                _ => Err(Error::new_error(get_span(&operand_type), format!("Expected char type, found {:?}", operand_type)))
             }
         }
         UnaryOperator::Chr => {
             match from_span(&operand_type) {
                 Type::IntType => Ok(create_span(Type::CharType, get_span(&operand_type))),
-                _ => Err(format!("Expected int type, found {:?}", operand_type))
+                _ => Err(Error::new_error(get_span(&operand_type), format!("Expected int type, found {:?}", operand_type)))
             }
         }
     }
@@ -66,7 +66,7 @@ pub fn binary_operator_check<T>(lhs: &Spanned<Expr>, operator: &BinaryOperator, 
             if lhs_type == &Type::IntType && rhs_type == &Type::IntType {
                 Ok(create_span(Type::IntType, get_span(&span)))
             } else {
-                Err(format!("Expected int type, found {:?} and {:?}", lhs_type, rhs_type))
+                Err(Error::new_error(get_span(span), format!("Expected int type on both sides, found {:?} and {:?}", lhs_type, rhs_type)))
             }
         }
         BinaryOperator::Gt | BinaryOperator::Gte | BinaryOperator::Lt | BinaryOperator::Lte => {
@@ -74,7 +74,7 @@ pub fn binary_operator_check<T>(lhs: &Spanned<Expr>, operator: &BinaryOperator, 
                 (lhs_type == &Type::CharType && rhs_type == &Type::CharType) {
                 Ok(create_span(Type::BoolType, get_span(&span)))
             } else {
-                Err(format!("Expected int type, found {:?} and {:?}", lhs_type, rhs_type))
+                Err(Error::new_error(get_span(span), "lhs and rhs incompatible with operators".to_string()))
             }
         }
 
@@ -82,7 +82,7 @@ pub fn binary_operator_check<T>(lhs: &Spanned<Expr>, operator: &BinaryOperator, 
             if type_check_special(lhs_span, rhs_span).is_ok() {
                 Ok(create_span(Type::BoolType, get_span(&span)))
             } else {
-                Err(format!("Expected same type, found {:?} and {:?}", lhs_type, rhs_type))
+                Err(Error::new_error(get_span(span), format!("Expected int type on both sides, found {:?} and {:?}", lhs_type, rhs_type)))
             }
         }
 
@@ -90,10 +90,8 @@ pub fn binary_operator_check<T>(lhs: &Spanned<Expr>, operator: &BinaryOperator, 
             if lhs_type == &Type::BoolType && rhs_type == &Type::BoolType {
                 Ok(create_span(Type::BoolType, get_span(&span)))
             } else {
-                Err(format!("Expected bool type, found {:?} and {:?}", lhs_type, rhs_type))
+                Err(Error::new_error(get_span(span), format!("Expected bool type on both sides, found {:?} and {:?}", lhs_type, rhs_type)))
             }
         }
     }
 }
-
-

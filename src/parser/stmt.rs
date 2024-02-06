@@ -1,13 +1,12 @@
 use crate::ast::{
-    ArgList, ArrayElem, ArrayLiter, Expr, Lvalue, PairElem, ReturningStmt, Rvalue, Stmt, Type,
+    ArgList, ArrayElem, ArrayLiter, Expr, Lvalue, PairElem, ReturningStmt, Rvalue, Stmt,
 };
 use crate::parser::expr::expr;
-use crate::parser::lexer::{lexer, ParserInput, Token};
+use crate::parser::lexer::{ParserInput, Token};
 use crate::parser::type_parser::type_parse;
 use crate::{Span, Spanned};
 use chumsky::error::Rich;
-use chumsky::input::Input;
-use chumsky::prelude::{just, recursive, todo, Recursive};
+use chumsky::prelude::{just, recursive, Recursive};
 use chumsky::{extra, Parser};
 use chumsky::{select, IterParser};
 
@@ -130,7 +129,7 @@ pub fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
                     .then(just(Token::Ctrl(',')))
                     .then(expr())
                     .then(just(Token::Ctrl(')')))
-                    .map_with(|((((ex1), _), ex2), _), e| {
+                    .map_with(|(((ex1, _), ex2), _), e| {
                         (Rvalue::RNewPair(Box::new(ex1), Box::new(ex2)), e.span())
                     });
 

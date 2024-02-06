@@ -1,10 +1,10 @@
-use crate::ast::{Expr, Function, Param, Program};
+use crate::ast::{Function, Param, Program};
 use crate::parser::lexer::{ParserInput, Token};
 use crate::parser::stmt::{ident, stmt};
 use crate::parser::type_parser::type_parse;
 use crate::{Span, Spanned};
 use chumsky::error::Rich;
-use chumsky::prelude::{just, todo};
+use chumsky::prelude::just;
 use chumsky::{extra, IterParser, Parser};
 
 // <param> ::= ⟨type⟩ ⟨ident⟩

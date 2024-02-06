@@ -1,8 +1,8 @@
 use crate::ast::{ArrayElem, BinaryOperator, Expr, UnaryOperator};
-use crate::parser::lexer::{lexer, ParserInput, Token};
+use crate::parser::lexer::{ParserInput, Token};
 use crate::{Span, Spanned};
 use chumsky::error::Rich;
-use chumsky::input::{Input, MapExtra};
+use chumsky::input::MapExtra;
 use chumsky::pratt::{infix, non, prefix};
 use chumsky::prelude::{choice, just, recursive};
 use chumsky::IterParser;

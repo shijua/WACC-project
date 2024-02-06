@@ -3,7 +3,7 @@ use crate::ast::{Function, Program, ReturningStmt, Type};
 use crate::ast::Param::Parameter;
 use crate::semantic_checker::stmt_checker::{scope_check, stmt_check};
 use crate::semantic_checker::symbol_table::{SymbolTable};
-use crate::semantic_checker::util::from_span;
+use crate::semantic_checker::util::{from_span, Error, get_span};
 use crate::Spanned;
 
 pub fn program_check(functions: &Vec<Spanned<Function>>, body: &Spanned<ReturningStmt>) -> Result<Spanned<Type>, Error> {
@@ -14,7 +14,7 @@ pub fn program_check(functions: &Vec<Spanned<Function>>, body: &Spanned<Returnin
     for function in functions {
         let ident = from_span(&from_span(function).ident);
         if function_table.contains_key(ident) {
-            return Err("function already exists".to_string());
+            return Err(Error::new_error(get_span(&from_span(function).ident), "function already exists".to_string()));
         }
         function_table.insert(ident.clone(), function.clone());
     }
@@ -37,15 +37,16 @@ pub fn function_check(function: &Function, function_table: &HashMap<String, Span
     for param in &function.parameters {
         let Parameter(param_type, param_ident) = from_span(param);
         if para_symbol_table.add(param_ident, param_type.clone()).is_err() {
-            return Err("ident already exists".to_string());
+            return Err(Error::new_error(
+                get_span(param_type),
+                format!("{}", "ident already exists".to_string())
+            ))
         }
     }
 
     // check function's body
     scope_check(&function.body, &para_symbol_table, function_table)
 }
-
-
 
 pub fn semantic_check_start(program: &Spanned<Program>) -> Result<Spanned<Type>, Error>  {
     program_check(&from_span(program).functions, &from_span(program).body)
