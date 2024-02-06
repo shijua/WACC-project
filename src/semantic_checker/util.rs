@@ -4,6 +4,12 @@ use crate::semantic_checker::symbol_table::SymbolTable;
 use crate::semantic_checker::type_checker::{binary_operator_check, unary_operator_check};
 use crate::{Span, Spanned};
 
+
+struct Error {
+    span: Span,
+    msg: String,
+}
+
 pub fn span_cmp<T: PartialEq>(span1: &Spanned<T>, span2: &Spanned<T>) -> bool {
     span1.0 == span2.0
 }
@@ -32,11 +38,14 @@ pub fn get_span<T>(type1: &Spanned<T>) -> Span {
 // check type2 (usually rvalue) is the same as type1 (usually lvalue) between char[] and string
 // we will convert type2 in to char of array in array_elem_to_type
 // so what we are doing now is to convert type1 to char of array and compare with type2
-pub fn type_check_array_elem(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Result<Spanned<Type>, String> {
+pub fn type_check_array_elem(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Result<Spanned<Type>, Error> {
     if span_cmp(&char_to_string_conversion(type1), type2) {
         Ok(type1.clone())
     } else {
-        Err("type mismatch in check array elem".to_string())
+        Err(Error{
+            span: (*type2).1,
+            msg: format!("Type mismatch in checking <array-elem> {}", *type2.0)
+        })
     }
 }
 
@@ -47,14 +56,15 @@ pub fn char_to_string_conversion(type1: &Spanned<Type>) -> Spanned<Type> {
             if from_span(elem) == &Type::CharType {
                 create_span(Type::StringType, get_span(type1))
             } else {
-                create_span(Type::Array(Box::from(char_to_string_conversion(elem))), get_span(type1))
+                // create_span(Type::Array(Box::from(char_to_string_conversion(elem))), get_span(type1))
+                type1.clone()
             }
         }
         _ => type1.clone()
     }
 }
 
-pub fn type_check_special(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Result<Spanned<Type>, String> {
+pub fn type_check_special(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Result<Spanned<Type>, Error> {
     if (span_cmp(type1, type2)) {
         return Ok(type1.clone());
     }
@@ -80,12 +90,15 @@ pub fn type_check_special(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Resul
                     Ok(any_span())
                 }
                 Type::NestedPair => Ok(any_span()),
-                _ => Err("type mismatch in special check pair".to_string())
+                _ => Err(Error{
+                    span: *p1.1,
+                    msg: "corresponding element is not legal pair type".to_string(),
+                })
             }
         }
         Type::NestedPair => {
             match from_span(type1) {
-                Type::Pair(..) => Ok(any_span()),
+                Type::Pair(..) | Type::NestedPair => Ok(any_span()),
                 _ => Err("type mismatch in special check anony pair".to_string())
             }
         }
@@ -104,7 +117,7 @@ pub fn type_check_special(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Resul
     }
 }
 
-pub fn get_type_from_table(ident: &Spanned<String>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, String> {
+pub fn get_type_from_table(ident: &Spanned<String>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, Error> {
     let symbol = symbol_table.find_all(ident);
     if symbol.is_none() {
         return Err("ident not found".to_string());
@@ -112,7 +125,7 @@ pub fn get_type_from_table(ident: &Spanned<String>, symbol_table: &SymbolTable) 
     Ok(symbol.unwrap().symbol_type.clone())
 }
 
-pub fn pair_elem_to_type<T>(pair_elem: &Spanned<PairElem>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, String> {
+pub fn pair_elem_to_type<T>(pair_elem: &Spanned<PairElem>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, Error> {
     match from_span(pair_elem) {
         PairElem::PairElemFst(lvalue) => {
             let type_result = lvalue_to_type(lvalue, symbol_table);
@@ -142,7 +155,7 @@ pub fn pair_elem_to_type<T>(pair_elem: &Spanned<PairElem>, symbol_table: &Symbol
     }
 }
 
-pub fn array_elem_to_type<T>(array_elem: &Spanned<ArrayElem>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, String> {
+pub fn array_elem_to_type<T>(array_elem: &Spanned<ArrayElem>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, Error> {
     // get type of indent
     let array_elem_type = get_type_from_table(&create_span(from_span(&array_elem).ident.clone(), get_span(span)), symbol_table);
     if array_elem_type.is_err() {
@@ -176,7 +189,7 @@ pub fn array_elem_to_type<T>(array_elem: &Spanned<ArrayElem>, symbol_table: &Sym
 }
 
 
-pub fn lvalue_to_type(lvalue: &Spanned<Lvalue>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, String> {
+pub fn lvalue_to_type(lvalue: &Spanned<Lvalue>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, Error> {
     match from_span(lvalue) {
         Lvalue::LIdent(ident) => get_type_from_table(ident, symbol_table),
         Lvalue::LArrElem(array) => {
@@ -188,7 +201,7 @@ pub fn lvalue_to_type(lvalue: &Spanned<Lvalue>, symbol_table: &SymbolTable) -> R
     }
 }
 
-pub fn expr_to_type(expr: &Spanned<Expr>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, String> {
+pub fn expr_to_type(expr: &Spanned<Expr>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, Error> {
     match from_span(expr) {
         Expr::IntLiter(_) => Ok(create_span(Type::IntType, get_span(&expr))),
         Expr::BoolLiter(_) => Ok(create_span(Type::BoolType, get_span(&expr))),
@@ -208,7 +221,7 @@ pub fn expr_to_type(expr: &Spanned<Expr>, symbol_table: &SymbolTable) -> Result<
     }
 }
 
-pub fn arr_lit_to_type(array: &Spanned<ArrayLiter>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, String> {
+pub fn arr_lit_to_type(array: &Spanned<ArrayLiter>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, Error> {
     // check if array is null
     let array_val = &from_span(array).val;
     if array_val.is_empty() {
@@ -235,7 +248,7 @@ pub fn arr_lit_to_type(array: &Spanned<ArrayLiter>, symbol_table: &SymbolTable) 
     Ok(char_to_string_conversion(&create_span(Type::Array(Box::from(array_type)), get_span(array))))
 }
 
-pub fn new_pair_to_type<T>(expr1: &Spanned<Expr>, expr2: &Spanned<Expr>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, String> {
+pub fn new_pair_to_type<T>(expr1: &Spanned<Expr>, expr2: &Spanned<Expr>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, Error> {
     let expr1_type = expr_to_type(expr1, symbol_table);
     if expr1_type.is_err() {
         return expr1_type;
@@ -248,7 +261,7 @@ pub fn new_pair_to_type<T>(expr1: &Spanned<Expr>, expr2: &Spanned<Expr>, symbol_
 }
 
 pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_table: &SymbolTable,
-                  function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
+                  function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, Error> {
     // check if function is in the function table
     let function = function_table.get(from_span(ident));
     if function.is_none() {
@@ -279,7 +292,7 @@ pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_t
 }
 
 pub fn rvalue_to_type(rvalue: &Spanned<Rvalue>, symbol_table: &SymbolTable,
-                      function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
+                      function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, Error> {
     match from_span(rvalue) {
         Rvalue::RExpr(expr) => expr_to_type(expr, symbol_table),
         Rvalue::RArrLit(array) => arr_lit_to_type(array, symbol_table),

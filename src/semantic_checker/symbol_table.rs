@@ -31,7 +31,7 @@ impl<'a> SymbolTable<'a> {
     }
 
     // insert a symbol into the symbol table
-    pub fn add(&mut self, ident: &'a Spanned<String>, symbol_type: Spanned<Type>) -> Result<Spanned<Type>, String> {
+    pub fn add(&mut self, ident: &'a Spanned<String>, symbol_type: Spanned<Type>) -> Result<Spanned<Type>, Error> {
         // check if the ident already exists
         if self.find(ident).is_some() {
             return Err("ident already exists".to_string());

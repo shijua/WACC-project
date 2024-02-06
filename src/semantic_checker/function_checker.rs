@@ -6,7 +6,7 @@ use crate::semantic_checker::symbol_table::{SymbolTable};
 use crate::semantic_checker::util::from_span;
 use crate::Spanned;
 
-pub fn program_check(functions: &Vec<Spanned<Function>>, body: &Spanned<ReturningStmt>) -> Result<Spanned<Type>, String> {
+pub fn program_check(functions: &Vec<Spanned<Function>>, body: &Spanned<ReturningStmt>) -> Result<Spanned<Type>, Error> {
     let mut symbol_table = SymbolTable::create(None, false, None);
     let mut function_table: HashMap<String, Spanned<Function>> = HashMap::new();
 
@@ -30,7 +30,7 @@ pub fn program_check(functions: &Vec<Spanned<Function>>, body: &Spanned<Returnin
     stmt_check(body, &mut symbol_table, &function_table)
 }
 
-pub fn function_check(function: &Function, function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, String> {
+pub fn function_check(function: &Function, function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, Error> {
     let mut para_symbol_table = SymbolTable::create(None, true, Some(from_span(&function.ident)));
 
     // add function's parameters in para_symbol_table
@@ -47,6 +47,6 @@ pub fn function_check(function: &Function, function_table: &HashMap<String, Span
 
 
 
-pub fn semantic_check_start(program: &Spanned<Program>) -> Result<Spanned<Type>, String>  {
+pub fn semantic_check_start(program: &Spanned<Program>) -> Result<Spanned<Type>, Error>  {
     program_check(&from_span(program).functions, &from_span(program).body)
 }

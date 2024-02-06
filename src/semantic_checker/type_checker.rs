@@ -4,7 +4,7 @@ use crate::semantic_checker::util::{expr_to_type, from_span, type_check_special,
 use crate::Spanned;
 
 // unary operator check
-pub fn unary_operator_check<T>(operator: &UnaryOperator, operand: &Spanned<Expr>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, String> {
+pub fn unary_operator_check<T>(operator: &UnaryOperator, operand: &Spanned<Expr>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, Error> {
     // check inside the unary operator first
     let operand_result = expr_to_type(operand, symbol_table);
     if operand_result.is_err() {
@@ -47,7 +47,7 @@ pub fn unary_operator_check<T>(operator: &UnaryOperator, operand: &Spanned<Expr>
 }
 
 // binary operator check
-pub fn binary_operator_check<T>(lhs: &Spanned<Expr>, operator: &BinaryOperator, rhs: &Spanned<Expr>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, String> {
+pub fn binary_operator_check<T>(lhs: &Spanned<Expr>, operator: &BinaryOperator, rhs: &Spanned<Expr>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, Error> {
     // check lhs and rhs first
     let lhs_result = expr_to_type(lhs, symbol_table);
     if lhs_result.is_err() {
