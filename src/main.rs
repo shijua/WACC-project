@@ -1,13 +1,13 @@
 use crate::parser::lexer::lexer;
 use crate::parser::program::program;
-use crate::semantic_checker::function_checker::{semantic_check_start};
-use ariadne::{sources, Color, Label, Report, ReportKind};
+use crate::semantic_checker::function_checker::semantic_check_start;
+use ariadne::{sources, CharSet, Color, Config, Label, Report, ReportKind};
+use chumsky::error::Rich;
 use chumsky::input::Input;
-use chumsky::prelude::{SimpleSpan};
-use chumsky::{Parser};
+use chumsky::prelude::SimpleSpan;
+use chumsky::Parser;
 use std::process::exit;
 use std::{env, fs};
-use chumsky::error::Rich;
 
 mod ast;
 mod parser;
@@ -45,7 +45,6 @@ fn main() {
 
     let (tokens, mut errs) = lexer().parse(src.as_str()).into_output_errors();
 
-
     let (ast, parse_errs) = if let Some(tokens) = &tokens {
         let (ast, parse_errs) = program()
             .map_with(|ast, e| (ast, e.span()))
@@ -72,17 +71,20 @@ fn main() {
                     .with_message(format!("{}: {}", error_type, e.to_string()))
                     .with_label(
                         Label::new((input_file.clone(), e.span().into_range()))
-                            .with_message(e.reason().to_string())
-                            .with_color(Color::Red),
+                            .with_message(e.reason().to_string()),
                     )
                     .with_labels(e.contexts().map(|(label, span)| {
                         Label::new((input_file.clone(), span.into_range()))
                             .with_message(format!("while parsing this {}", label))
-                            .with_color(Color::Yellow)
                     }))
+                    .with_config(
+                        Config::default()
+                            .with_char_set(CharSet::Ascii)
+                            .with_color(false),
+                    )
                     .finish()
                     .print(sources([(input_file.clone(), src.clone())]))
-                    .unwrap()
+                    .unwrap();
             })
     };
 
@@ -96,7 +98,10 @@ fn main() {
 
         if semantic_errs.is_err() {
             let semantic_error = semantic_errs.unwrap_err();
-            errs.push(Rich::custom(semantic_error.extract_span(), semantic_error.extract_msg()));
+            errs.push(Rich::custom(
+                semantic_error.extract_span(),
+                semantic_error.extract_msg(),
+            ));
             pretty_print("Semantic Error", &errs);
             exit(SEMANTIC_ERROR_CODE);
         }
