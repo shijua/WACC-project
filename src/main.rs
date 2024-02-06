@@ -1,13 +1,14 @@
 use crate::parser::lexer::lexer;
 use crate::parser::program::program;
+use crate::semantic_checker::function_checker::{program_check, semantic_check_start};
 use ariadne::{sources, Color, Label, Report, ReportKind};
 use chumsky::error::{Rich, Simple};
 use chumsky::input::Input;
 use chumsky::prelude::{just, SimpleSpan};
 use chumsky::{extra, Parser};
+use std::alloc::handle_alloc_error;
 use std::process::exit;
 use std::{env, fs};
-use crate::semantic_checker::function_checker::{program_check, semantic_check_start};
 
 mod ast;
 mod parser;
@@ -53,8 +54,39 @@ fn main() {
         (None, Vec::new())
     };
 
-    if !errs.is_empty() || !parse_errs.is_empty() {
+    let pretty_print = |error_type: &str| {
+        errs.clone()
+            .into_iter()
+            .map(|e| e.map_token(|c| c.to_string()))
+            .chain(
+                parse_errs
+                    .clone()
+                    .into_iter()
+                    .map(|e| e.map_token(|tok| tok.to_string())),
+            )
+            .for_each(|e| {
+                Report::build(ReportKind::Error, input_file.clone(), e.span().start)
+                    .with_message(format!("{}: {}", error_type, e.to_string()))
+                    .with_label(
+                        Label::new((input_file.clone(), e.span().into_range()))
+                            .with_message(e.reason().to_string())
+                            .with_color(Color::Red),
+                    )
+                    .with_labels(e.contexts().map(|(label, span)| {
+                        Label::new((input_file.clone(), span.into_range()))
+                            .with_message(format!("while parsing this {}", label))
+                            .with_color(Color::Yellow)
+                    }))
+                    .finish()
+                    .print(sources([(input_file.clone(), src.clone())]))
+                    .unwrap()
+            })
+    };
+
+    if !errs.clone().is_empty() || !parse_errs.clone().is_empty() {
         exit_code = 100;
+        pretty_print("Syntax Error");
+        exit(exit_code);
     }
 
     if exit_code == 0 {
@@ -64,34 +96,11 @@ fn main() {
             Err("parser failed".to_string())
         };
 
-        if (semantic_errs.is_err()) {
+        if semantic_errs.is_err() {
             exit_code = 200;
+            pretty_print("Semantic Error");
+            exit(exit_code);
         }
     }
-
-    errs.into_iter()
-        .map(|e| e.map_token(|c| c.to_string()))
-        .chain(
-            parse_errs
-                .into_iter()
-                .map(|e| e.map_token(|tok| tok.to_string())),
-        )
-        .for_each(|e| {
-            Report::build(ReportKind::Error, input_file.clone(), e.span().start)
-                .with_message(e.to_string())
-                .with_label(
-                    Label::new((input_file.clone(), e.span().into_range()))
-                        .with_message(e.reason().to_string())
-                        .with_color(Color::Red),
-                )
-                .with_labels(e.contexts().map(|(label, span)| {
-                    Label::new((input_file.clone(), span.into_range()))
-                        .with_message(format!("while parsing this {}", label))
-                        .with_color(Color::Yellow)
-                }))
-                .finish()
-                .print(sources([(input_file.clone(), src.clone())]))
-                .unwrap()
-        });
-    exit(exit_code);
+    exit(0);
 }
