@@ -4,7 +4,7 @@ use crate::{Span, Spanned};
 use chumsky::error::Rich;
 use chumsky::input::MapExtra;
 use chumsky::pratt::{infix, non, prefix};
-use chumsky::prelude::{choice, Input, just, recursive};
+use chumsky::prelude::{choice, just, recursive, Input};
 use chumsky::IterParser;
 use chumsky::{extra, select, Parser};
 
@@ -16,7 +16,7 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
 > + Clone {
     recursive(|expr| {
         // TODO: Edge Case: -2^31;
-        let int_base = select! {Token::IntToken(x) => x}.labelled("int, unsigned");
+        let int_base = select! {Token::IntToken(x) => x}.labelled("raw absolute value of integer");
 
         let plus_int = just(Token::Op("+"))
             .then(int_base.clone())
@@ -27,7 +27,8 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
                 } else {
                     Ok(Expr::IntLiter(result.unwrap()))
                 };
-            });
+            })
+            .labelled("int-sign \'+\'");
 
         let minus_int = just(Token::Op("-"))
             .then(int_base.clone())
@@ -38,18 +39,25 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
                 } else {
                     Ok(Expr::IntLiter(result.unwrap()))
                 };
-            });
+            })
+            .labelled("int-sign \'-\'");
 
-        let unsigned_int = int_base.clone().try_map(|x, s| {
-            let result = i32::try_from(x);
-            return if result.is_err() {
-                Err(Rich::custom(s, "Integer out of range"))
-            } else {
-                Ok(Expr::IntLiter(result.unwrap()))
-            };
-        });
+        let unsigned_int = int_base
+            .clone()
+            .try_map(|x, s| {
+                let result = i32::try_from(x);
+                return if result.is_err() {
+                    Err(Rich::custom(s, "Integer out of range"))
+                } else {
+                    Ok(Expr::IntLiter(result.unwrap()))
+                };
+            })
+            .labelled("legal absolute value of integer");
 
-        let int_expr_parser = plus_int.or(minus_int).or(unsigned_int);
+        let int_expr_parser = plus_int
+            .or(minus_int)
+            .or(unsigned_int)
+            .labelled("legal integer");
 
         // for <int-liter>, <bool-liter>, <char-liter>, <str-liter>, <pair-liter>
         let atomic_liter = select! {
@@ -84,7 +92,8 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
                     },
                     e.span(),
                 ))
-            });
+            })
+            .labelled("array elem");
 
         // <ident>
         let ident_expr = ident.map(|s| Expr::Ident(s.to_string()));

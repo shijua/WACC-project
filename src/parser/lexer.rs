@@ -50,7 +50,8 @@ pub fn lexer<'src>(
             }
             num.unwrap_or(0)
         })
-        .map(Token::IntToken);
+        .map(Token::IntToken)
+        .labelled("integer absolute value raw input");
 
     let bool_token = choice((
         text::ascii::keyword("true")
@@ -61,7 +62,8 @@ pub fn lexer<'src>(
             .to_slice()
             .padded()
             .to(Token::BoolToken(false)),
-    ));
+    ))
+    .labelled("bool tokens");
 
     // Regarding transformation:
     // Ideally we would recognize a specific pattern for escape characters and perform correct analysis
@@ -70,22 +72,27 @@ pub fn lexer<'src>(
 
     let graphic_ascii_char = any::<'src, &'src str, extra::Err<Rich<'src, char, Span>>>()
         .filter(char::is_ascii)
-        .filter(|c| c >= &' ');
+        .filter(|c| c >= &' ')
+        .labelled("graphical ASCII char");
 
-    let normal_char = graphic_ascii_char.and_is(none_of("\\\'\""));
+    let normal_char = graphic_ascii_char
+        .and_is(none_of("\\\'\""))
+        .labelled("graphical ASCII char except backslash and quotes");
 
     // <escaped-char> ::= ‘0’|‘b’|‘t’|‘n’|‘f’|‘r’|‘"’|‘'’|‘\’
-    let escape_char = just('\\').ignore_then(choice((
-        just('0').to('\0'),
-        just('b').to('\x08'),
-        just('t').to('\t'),
-        just('n').to('\n'),
-        just('f').to('\x0C'),
-        just('r').to('\r'),
-        just('\"').to('\"'),
-        just('\'').to('\''),
-        just('\\').to('\\'),
-    )));
+    let escape_char = just('\\')
+        .ignore_then(choice((
+            just('0').to('\0'),
+            just('b').to('\x08'),
+            just('t').to('\t'),
+            just('n').to('\n'),
+            just('f').to('\x0C'),
+            just('r').to('\r'),
+            just('\"').to('\"'),
+            just('\'').to('\''),
+            just('\\').to('\\'),
+        )))
+        .labelled("escape chars");
 
     let char_elem = normal_char
         .or(escape_char)
@@ -106,16 +113,21 @@ pub fn lexer<'src>(
                 emitter.emit(Rich::custom(e.span(), "invalid char: unaccepted pattern"));
                 return ' ';
             }
-        });
+        })
+        .labelled("legal char");
 
     let char_token = char_elem
         .delimited_by(just('\''), just('\''))
         .padded()
-        .map(Token::CharToken);
+        .map(Token::CharToken)
+        .labelled("char literal");
 
-    let str_preprocess = char_elem.clone().repeated();
+    let str_preprocess = char_elem.clone().repeated().labelled("legal string input");
 
-    let str_parts = char_elem.repeated().collect::<String>();
+    let str_parts = char_elem
+        .repeated()
+        .collect::<String>()
+        .labelled("legal string elements");
 
     let str_token = str_preprocess
         .to_slice()
@@ -125,7 +137,8 @@ pub fn lexer<'src>(
             println!("{}", s);
             let result = str_parts.parse(s).into_result().unwrap();
             Token::StrToken(result)
-        });
+        })
+        .labelled("string literal");
 
     // A parser for symbolic operators
     let op = choice((
@@ -147,10 +160,14 @@ pub fn lexer<'src>(
     ))
     .to_slice()
     .padded()
-    .map(|s| Token::Op(s));
+    .map(|s| Token::Op(s))
+    .labelled("operator");
 
     // A parser for scope control brackets and separation symbols
-    let ctrl = one_of("()[],;").padded().map(Token::Ctrl);
+    let ctrl = one_of("()[],;")
+        .padded()
+        .map(Token::Ctrl)
+        .labelled("control sequence characters");
 
     // keywords
     let is_keyword = text::ascii::keyword("true")
@@ -183,7 +200,8 @@ pub fn lexer<'src>(
         .or(text::ascii::keyword("newpair"))
         .or(text::ascii::keyword("call"))
         .or(text::ascii::keyword("fst"))
-        .or(text::ascii::keyword("snd"));
+        .or(text::ascii::keyword("snd"))
+        .labelled("WACC keywords");
 
     // A parser for keywords
     let keyword_token = is_keyword.clone().map(Token::Keyword);
@@ -192,18 +210,14 @@ pub fn lexer<'src>(
         .and_is(is_keyword.clone().not())
         .to_slice()
         .padded()
-        .map(Token::Ident);
+        .map(Token::Ident)
+        .labelled("ident");
 
     let comment = just("#")
         .then(any().and_is(newline().not()).repeated())
-        .padded();
+        .padded()
+        .labelled("comments");
 
-    // token
-    //     .map_with(|tok, e| (tok, e.span()))
-    //     .padded_by(comments.repeated())
-    //     .padded()
-    //     .repeated()
-    //     .collect::<Vec<_>>()
     choice((
         int_token,
         bool_token,
@@ -219,6 +233,7 @@ pub fn lexer<'src>(
     .padded()
     .repeated()
     .collect()
+    .labelled("legal tokens")
 }
 
 pub fn work(s: &str) -> Vec<Token> {
