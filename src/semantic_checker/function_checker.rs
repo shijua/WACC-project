@@ -38,7 +38,7 @@ pub fn function_check(function: &Function, function_table: &HashMap<String, Span
         let Parameter(param_type, param_ident) = from_span(param);
         if para_symbol_table.add(param_ident, param_type.clone()).is_err() {
             return Err(Error::new_error(
-                get_span(param_type),
+                get_span(param_ident),
                 format!("{}", "ident already exists".to_string())
             ))
         }

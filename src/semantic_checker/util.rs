@@ -27,15 +27,12 @@ impl Error {
 }
 
 pub fn span_cmp<T: PartialEq>(span1: &Spanned<T>, span2: &Spanned<T>) -> bool {
-    span1.0 == span2.0
+    from_span(span1) == from_span(span2)
 }
 
+// only use any_span() when its span is not used
 pub fn any_span() -> Spanned<Type> {
-    create_span(Type::Any, empty_span())
-}
-
-pub fn empty_span() -> Span {
-    Span::new(0, 0)
+    create_span(Type::Any, Span::new(0, 0))
 }
 
 // create a span for type(span is not important here as it is ok)
@@ -48,17 +45,17 @@ pub fn from_span<T>(type1: &Spanned<T>) -> &T {
 }
 
 pub fn get_span<T>(type1: &Spanned<T>) -> Span {
-    type1.1.clone()
+    type1.1
 }
 
 // check type2 (usually rvalue) is the same as type1 (usually lvalue) between char[] and string
-// we will convert type2 in to char of array in array_elem_to_type
+// we will convert type2 in to char of array in array_elem_to_type into string
 // so what we are doing now is to convert type1 to char of array and compare with type2
 pub fn type_check_array_elem(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Result<Spanned<Type>, Error> {
     if span_cmp(&char_to_string_conversion(type1), type2) {
         Ok(type1.clone())
     } else {
-        Err(Error::new_error(type2.1, format!("Type mismatch in checking <array-elem> {:?}", type2.0)))
+        Err(Error::new_error(get_span(type2), format!("Type mismatch in checking <array-elem> {:?}", from_span(type2))))
     }
 }
 
@@ -77,7 +74,8 @@ pub fn char_to_string_conversion(type1: &Spanned<Type>) -> Spanned<Type> {
     }
 }
 
-pub fn type_check_special(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Result<Spanned<Type>, Error> {
+// the return span or type is not important here
+pub fn type_check(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Result<Spanned<Type>, Error> {
     if span_cmp(type1, type2) {
         return Ok(type1.clone());
     }
@@ -86,16 +84,16 @@ pub fn type_check_special(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Resul
         Type::Pair(p1, p2) => {
             match from_span(type1) {
                 Type::Pair(p3, p4) => {
-                    let p1_result = type_check_special(p1, p3);
+                    let p1_result = type_check(p1, p3);
                     if p1_result.is_err() && !span_cmp(p1, p3) {
-                        let p1_result = type_check_special(p3, p1);
+                        let p1_result = type_check(p3, p1);
                         if p1_result.is_err() {
                             return p1_result;
                         }
                     }
-                    let p2_result = type_check_special(p2, p4);
+                    let p2_result = type_check(p2, p4);
                     if p2_result.is_err() && !span_cmp(p2, p4) {
-                        let p2_result = type_check_special(p4, p2);
+                        let p2_result = type_check(p4, p2);
                         if p2_result.is_err() {
                             return p2_result;
                         }
@@ -121,7 +119,7 @@ pub fn type_check_special(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Resul
         // check inside of array type
         Type::Array(inner) => {
             match from_span(type1) {
-                Type::Array(inner1) => type_check_special(inner1, inner),
+                Type::Array(inner1) => type_check(inner1, inner),
                 _ => Err(Error{
                     span: get_span(type1),
                     msg: "corresponding element is not array type".to_string(),
@@ -144,10 +142,11 @@ pub fn get_type_from_table(ident: &Spanned<String>, symbol_table: &SymbolTable) 
     if symbol.is_none() {
         return Err(Error{
             span: get_span(ident),
-            msg: "ident undefined".to_string(),
+            msg: "ident undefined in symbol table".to_string(),
         });
     }
-    Ok(symbol.unwrap().symbol_type.clone())
+    // set span as ident
+    Ok(create_span(from_span(&symbol.unwrap().symbol_type).clone(), get_span(ident)))
 }
 
 pub fn pair_elem_to_type<T>(pair_elem: &Spanned<PairElem>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, Error> {
@@ -204,7 +203,7 @@ pub fn array_elem_to_type<T>(array_elem: &Spanned<ArrayElem>, symbol_table: &Sym
         let expr_type = expr_result.unwrap();
         if from_span(&expr_type) != &Type::IntType {
             return Err(Error::new_error(
-                expr_type.1, format!("{}", "array index is not an int type".to_string())
+                get_span(&expr_type), format!("array index is not an int type: Expected Int, found {:?}", from_span(&expr_type))
             ))
         }
 
@@ -215,8 +214,8 @@ pub fn array_elem_to_type<T>(array_elem: &Spanned<ArrayElem>, symbol_table: &Sym
             }
             _ => {
                 return Err(Error::new_error(
-                    array_elem_type.1,
-                    format!("{}", "array index is not an int type".to_string())
+                    get_span(&array_elem),
+                    format!("{}", "There is more indices than the dimension of the array".to_string())
                 ))
             }
         }
@@ -271,19 +270,15 @@ pub fn arr_lit_to_type(array: &Spanned<ArrayLiter>, symbol_table: &SymbolTable) 
             return expr_type;
         }
         let expr_type = expr_type.unwrap();
-        if array_type == any_span() { // for first element
+        if from_span(&array_type) == &Type::Any { // for first element
             array_type = char_to_string_conversion(&expr_type);
-        } else if array_type != expr_type {
+        } else {
             // need to check double side here for type_check_array_elem
-            if type_check_special(&array_type, &expr_type).is_err() && type_check_array_elem(&array_type, &expr_type).is_err()
+            if type_check(&array_type, &expr_type).is_err() && type_check_array_elem(&array_type, &expr_type).is_err()
                 && type_check_array_elem(&expr_type, &array_type).is_err() {
-                // return Err(Error {
-                //     span: *array_type,
-                //     msg: "array elements are not the same type".to_string(),
-                // });
                 return Err(Error::new_error(
-                    array_type.1,
-                    format!("{}", "array elements are not the same type".to_string())
+                    get_span(&expr_type),
+                    format!("array elements are not the same type: Expected {:?}, found {:?}", from_span(&array_type), from_span(&expr_type))
                 ))
             }
         }
@@ -320,8 +315,8 @@ pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_t
     let parameters = &from_span(function).parameters;
     if parameters.len() != args.len() {
         return Err(Error::new_error(
-            arg_list.1,
-            format!("{}", "function call parameter length mismatch".to_string())
+            get_span(arg_list),
+            format!("function call parameter length mismatch: expected {:?}, actual {:?}", parameters.len(), args.len())
         ))
     }
 
@@ -333,7 +328,7 @@ pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_t
         }
         let arg_type = arg_type.unwrap();
         let Param::Parameter(param_type, _) = from_span(&parameters[ind]);
-        if type_check_special(param_type, &arg_type).is_err() {
+        if type_check(param_type, &arg_type).is_err() {
             return Err(Error{
                 span: get_span(param_type),
                 msg: "function call parameter type mismatch".to_string(),
