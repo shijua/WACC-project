@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use crate::ast::{Expr, Function, Lvalue, ReturningStmt, Rvalue, Stmt, Type};
 use crate::semantic_checker::symbol_table::SymbolTable;
-use crate::semantic_checker::util::{any_span, Error, expr_to_type, from_span, get_span, lvalue_to_type, rvalue_to_type, type_check_array_elem, type_check};
-use crate::Spanned;
+use crate::semantic_checker::util::{Error, expr_to_type, lvalue_to_type, rvalue_to_type, type_check_array_elem, type_check};
+use crate::{any_span, from_span, get_span, Spanned};
 
 // variable declaration
 pub fn declaration_check<'a, T>(type_given: &Spanned<Type>, ident: &'a Spanned<String>, rvalue: &Spanned<Rvalue>, symbol_table: &mut SymbolTable<'a>,

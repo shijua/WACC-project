@@ -15,7 +15,6 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
     extra::Err<Rich<'tokens, Token<'src>, Span>>,
 > + Clone {
     recursive(|expr| {
-        // TODO: Edge Case: -2^31;
         let int_base = select! {Token::IntToken(x) => x}.labelled("raw absolute value of integer");
 
         let plus_int = just(Token::Op("+"))

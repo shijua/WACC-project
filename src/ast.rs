@@ -1,4 +1,4 @@
-use crate::semantic_checker::util::from_span;
+use crate::from_span;
 use crate::Spanned;
 
 #[derive(PartialEq, Clone, Debug)]

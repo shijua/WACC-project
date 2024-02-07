@@ -4,7 +4,7 @@ use crate::ast::{
 use crate::parser::expr::expr;
 use crate::parser::lexer::{lexer, ParserInput, Token};
 use crate::parser::type_parser::type_parse;
-use crate::{Span, Spanned};
+use crate::{Span, Spanned, from_span};
 use chumsky::error::Rich;
 use chumsky::input::Input;
 use chumsky::prelude::{just, recursive, Recursive};
@@ -306,7 +306,9 @@ fn can_parse_statement() {
     let expression = stmt()
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
         .into_result();
-    assert!(expression.is_ok());
+    let returning_stmt = expression.unwrap().0;
+    assert!(!returning_stmt.returning);
+    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Skip));
 }
 
 #[test]
@@ -316,15 +318,140 @@ fn can_parse_serial() {
     let expression = stmt()
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
         .into_result();
-    assert!(expression.is_ok());
+
+    // check overall structure is "serial"
+    let returning_stmt = expression.unwrap().0;
+    let stmt_0 = from_span(&returning_stmt.statement);
+    assert!(matches!(stmt_0, Stmt::Serial(..)));
+
+    // check serial correctly concatenate two assertions
+    if let Stmt::Serial(st1, st2) = stmt_0 {
+        let stmt_1 = &(**st1).0.statement.0;
+        assert!(matches!(*stmt_1, Stmt::Skip));
+        let stmt_2 = &(**st2).0.statement.0;
+        assert!(matches!(*stmt_2, Stmt::Free(..)));
+    } else {
+        panic!("serial concatenation of statements failed");
+    }
 }
 
 #[test]
 fn can_parse_declare() {
-    let src = "int x = 3; y = 89; z = newpair(3, 4)";
+    let src = "int x = 3";
     let tokens = lexer().parse(src).into_result().unwrap();
     let expression = stmt()
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
         .into_result();
-    assert!(expression.is_ok());
+    let returning_stmt = expression.unwrap().0;
+    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Declare(..)));
+}
+
+#[test]
+fn can_parse_assign() {
+    let src = "x = 3";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = stmt()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    let returning_stmt = expression.unwrap().0;
+    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Assign(..)));
+}
+
+#[test]
+fn can_parse_read() {
+    let src = "read x";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = stmt()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    let returning_stmt = expression.unwrap().0;
+    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Read(..)));
+}
+
+#[test]
+fn can_parse_free() {
+    let src = "free x";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = stmt()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    let returning_stmt = expression.unwrap().0;
+    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Free(..)));
+}
+
+#[test]
+fn can_parse_return() {
+    let src = "return 3";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = stmt()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    let returning_stmt = expression.unwrap().0;
+    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Return(..)));
+}
+
+#[test]
+fn can_parse_exit() {
+    let src = "exit 3";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = stmt()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    let returning_stmt = expression.unwrap().0;
+    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Exit(..)));
+}
+
+#[test]
+fn can_parse_print() {
+    let src = "print 3";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = stmt()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    let returning_stmt = expression.unwrap().0;
+    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Print(..)));
+}
+
+#[test]
+fn can_parse_println() {
+    let src = "println 3";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = stmt()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    let returning_stmt = expression.unwrap().0;
+    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Println(..)));
+}
+
+#[test]
+fn can_parse_if() {
+    let src = "if 3 then skip else skip fi";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = stmt()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    let returning_stmt = expression.unwrap().0;
+    assert!(matches!(from_span(&returning_stmt.statement), Stmt::If(..)));
+}
+
+#[test]
+fn can_parse_while() {
+    let src = "while 3 do skip done";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = stmt()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    let returning_stmt = expression.unwrap().0;
+    assert!(matches!(from_span(&returning_stmt.statement), Stmt::While(..)));
+}
+
+#[test]
+fn can_parse_scope() {
+    let src = "begin skip end";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = stmt()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    let returning_stmt = expression.unwrap().0;
+    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Scope(..)));
 }

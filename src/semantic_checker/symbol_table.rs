@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::ast::Type;
-use crate::semantic_checker::util::{create_span, from_span, get_span, Error};
-use crate::Spanned;
+use crate::semantic_checker::util::{Error};
+use crate::{create_span, from_span, get_span, Spanned};
 
 // symbol table type
 #[derive(Debug, Clone, PartialEq)]

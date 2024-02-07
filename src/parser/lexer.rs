@@ -289,3 +289,27 @@ fn can_lex_identifier() {
     let input = "length";
     assert_eq!(work(input), vec![Token::Ident("length")]);
 }
+
+#[test]
+fn can_lex_op() {
+    let input = "&&";
+    assert_eq!(work(input), vec![Token::Op("&&")]);
+}
+
+#[test]
+fn can_lex_ctrl() {
+    let input = "(";
+    assert_eq!(work(input), vec![Token::Ctrl('(')]);
+}
+
+#[test]
+fn can_ignore_comment() {
+    let input = "245 # this is a comment";
+    assert_eq!(work(input), vec![Token::IntToken(245)]);
+
+    let mut input2 = String::new();
+    input2.push_str("# this is a comment # this is a comment inside a comment\n");
+    input2.push_str("245");
+    input2.push_str("# this is a comment too");
+    assert_eq!(work(&input2[..]), vec![Token::IntToken(245)]);
+}

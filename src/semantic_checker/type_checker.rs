@@ -1,7 +1,7 @@
 use crate::ast::{BinaryOperator, Expr, Type, UnaryOperator};
 use crate::semantic_checker::symbol_table::SymbolTable;
-use crate::semantic_checker::util::{expr_to_type, from_span, type_check, get_span, create_span, Error};
-use crate::Spanned;
+use crate::semantic_checker::util::{expr_to_type, type_check, Error};
+use crate::{create_span, from_span, get_span, Spanned};
 
 // unary operator check
 pub fn unary_operator_check<T>(operator: &UnaryOperator, operand: &Spanned<Expr>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, Error> {

@@ -3,8 +3,8 @@ use crate::ast::{Function, Program, ReturningStmt, Type};
 use crate::ast::Param::Parameter;
 use crate::semantic_checker::stmt_checker::{scope_check, stmt_check};
 use crate::semantic_checker::symbol_table::{SymbolTable};
-use crate::semantic_checker::util::{from_span, Error, get_span};
-use crate::Spanned;
+use crate::semantic_checker::util::{Error};
+use crate::{from_span, get_span, Spanned};
 
 pub fn program_check(functions: &Vec<Spanned<Function>>, body: &Spanned<ReturningStmt>) -> Result<Spanned<Type>, Error> {
     let mut symbol_table = SymbolTable::create(None, false, None);
