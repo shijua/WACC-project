@@ -1,3 +1,4 @@
+use crate::semantic_checker::util::from_span;
 use crate::Spanned;
 
 #[derive(PartialEq, Clone, Debug)]
@@ -46,7 +47,7 @@ pub enum BinaryOperator {
     Or,
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone)]
 pub enum Type {
     IntType,
     BoolType,
@@ -56,6 +57,20 @@ pub enum Type {
     Pair(Box<Spanned<Type>>, Box<Spanned<Type>>),
     NestedPair,
     Any,
+}
+impl std::fmt::Debug for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::IntType => write!(f, "Int"),
+            Type::BoolType => write!(f, "Bool"),
+            Type::CharType => write!(f, "Char"),
+            Type::StringType => write!(f, "String"),
+            Type::Array(t) => write!(f, "Array of ({:?})", from_span(t)),
+            Type::Pair(t1, t2) => write!(f, "Pair({:?}, {:?})", from_span(t1), from_span(t2)),
+            Type::NestedPair => write!(f, "Pair"),
+            Type::Any => write!(f, "Any"),
+        }
+    }
 }
 
 #[derive(PartialEq, Clone, Debug)]

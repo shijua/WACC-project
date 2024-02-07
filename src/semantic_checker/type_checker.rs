@@ -1,6 +1,6 @@
 use crate::ast::{BinaryOperator, Expr, Type, UnaryOperator};
 use crate::semantic_checker::symbol_table::SymbolTable;
-use crate::semantic_checker::util::{expr_to_type, from_span, type_check_special, get_span, create_span, Error};
+use crate::semantic_checker::util::{expr_to_type, from_span, type_check, get_span, create_span, Error};
 use crate::Spanned;
 
 // unary operator check
@@ -74,12 +74,12 @@ pub fn binary_operator_check<T>(lhs: &Spanned<Expr>, operator: &BinaryOperator, 
                 (lhs_type == &Type::CharType && rhs_type == &Type::CharType) {
                 Ok(create_span(Type::BoolType, get_span(&span)))
             } else {
-                Err(Error::new_error(get_span(span), "lhs and rhs incompatible with operators".to_string()))
+                Err(Error::new_error(get_span(span), format!("Expected Int or Char type on both sides, found {:?} and {:?}", lhs_type, rhs_type)))
             }
         }
 
         BinaryOperator::Eq | BinaryOperator::Neq => {
-            if type_check_special(lhs_span, rhs_span).is_ok() {
+            if type_check(lhs_span, rhs_span).is_ok() {
                 Ok(create_span(Type::BoolType, get_span(&span)))
             } else {
                 Err(Error::new_error(get_span(span), format!("Expected int type on both sides, found {:?} and {:?}", lhs_type, rhs_type)))

@@ -57,7 +57,7 @@ fn func_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             };
 
             Ok((func_prototype, e.span()))
-        })
+        }).labelled("function")
 }
 
 // <program> ::= ‘begin’ ⟨func⟩* ⟨stmt⟩ ‘end’

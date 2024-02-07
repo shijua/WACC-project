@@ -296,7 +296,7 @@ pub fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
 
             stmt_serial.or(stmt_unary)
         },
-    )
+    ).labelled("statement")
 }
 
 #[test]
