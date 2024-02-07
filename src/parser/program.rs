@@ -99,18 +99,10 @@ fn can_parse_simple_program() {
 #[test]
 fn can_parse_printing_program() {
     let src1 = "int x = 1";
-    let tokens1 = lexer().parse(src1).into_result().unwrap();
-    let expression1 = stmt()
-        .parse(tokens1.as_slice().spanned((src1.len()..src1.len()).into()))
-        .into_result();
-    let stmt1 = expression1.unwrap().0.statement.0;
+    let stmt1 = get_statement_from_str(src1);
 
     let src2 = "println x";
-    let tokens2 = lexer().parse(src2).into_result().unwrap();
-    let expression2 = stmt()
-        .parse(tokens2.as_slice().spanned((src2.len()..src2.len()).into()))
-        .into_result();
-    let stmt2 = expression2.unwrap().0.statement.0;
+    let stmt2 = get_statement_from_str(src2);
 
     let src = "begin int x = 1; println x end";
     let tokens = lexer().parse(src).into_result().unwrap();
@@ -127,4 +119,13 @@ fn can_parse_printing_program() {
     } else {
         assert!(false);
     }
+}
+
+fn get_statement_from_str(src: &str) -> Stmt {
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let expression = stmt()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    let stmt = expression.unwrap().0.statement.0;
+    stmt
 }
