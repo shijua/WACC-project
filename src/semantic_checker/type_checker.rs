@@ -95,3 +95,91 @@ pub fn binary_operator_check<T>(lhs: &Spanned<Expr>, operator: &BinaryOperator, 
         }
     }
 }
+
+#[cfg(test)]
+mod type_tests {
+use crate::ast::{ArrayElem, BinaryOperator, Expr, Type, UnaryOperator};
+    use crate::{create_span, span_cmp, empty_span};
+    use crate::semantic_checker::symbol_table::SymbolTable;
+    use crate::semantic_checker::type_checker::{binary_operator_check, unary_operator_check};
+
+    // create empty symbol table
+    fn create_empty_symbol_table() -> SymbolTable<'static> {
+        SymbolTable::create(None, false, None)
+    }
+    #[test]
+    fn unary_operator_test() {
+        let symbol_table = create_empty_symbol_table();
+        assert!(matches!(
+            unary_operator_check(&UnaryOperator::Bang, &create_span(Expr::BoolLiter(true), empty_span()), &symbol_table, &create_span(Expr::BoolLiter(true), empty_span())),
+            Ok(types) if span_cmp(&types, &create_span(Type::BoolType, empty_span()))
+        ));
+
+        assert!(matches!(
+            unary_operator_check(&UnaryOperator::Negative, &create_span(Expr::IntLiter(1), empty_span()), &symbol_table, &create_span(Expr::IntLiter(1), empty_span())),
+            Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
+        ));
+
+        assert!(matches!(
+            unary_operator_check(&UnaryOperator::Ord, &create_span(Expr::CharLiter('a'), empty_span()), &symbol_table, &create_span(Expr::CharLiter('a'), empty_span())),
+            Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
+        ));
+
+        assert!(matches!(
+            unary_operator_check(&UnaryOperator::Chr, &create_span(Expr::IntLiter(1), empty_span()), &symbol_table, &create_span(Expr::IntLiter(1), empty_span())),
+            Ok(types) if span_cmp(&types, &create_span(Type::CharType, empty_span()))
+        ));
+
+        assert!(matches!(
+            unary_operator_check(&UnaryOperator::Ord, &create_span(Expr::IntLiter(1), empty_span()), &symbol_table, &create_span(Expr::IntLiter(1), empty_span())),
+            Err(_)
+        ));
+
+        assert!(matches!(
+            unary_operator_check(&UnaryOperator::Len, &create_span(Expr::ArrayElem(create_span(ArrayElem{
+                ident: "a".to_string(),
+                indices: vec![create_span(Expr::IntLiter(1), empty_span())]
+            }, empty_span())), empty_span()), &symbol_table, &create_span(Expr::IntLiter(1), empty_span())),
+            Err(_)
+        ));
+    }
+
+    #[test]
+    fn binary_operator_test() {
+        let symbol_table = create_empty_symbol_table();
+        assert!(matches!(
+            binary_operator_check(&create_span(Expr::IntLiter(1), empty_span()), &BinaryOperator::Add, &create_span(Expr::IntLiter(1), empty_span()), &symbol_table, &create_span(Expr::IntLiter(1), empty_span())),
+            Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
+        ));
+
+        assert!(matches!(
+            binary_operator_check(&create_span(Expr::CharLiter('1'), empty_span()), &BinaryOperator::Sub, &create_span(Expr::IntLiter(1), empty_span()), &symbol_table, &create_span(Expr::IntLiter(1), empty_span())),
+            Err(_)
+        ));
+
+        assert!(matches!(
+            binary_operator_check(&create_span(Expr::IntLiter(1), empty_span()), &BinaryOperator::Eq, &create_span(Expr::IntLiter(1), empty_span()), &symbol_table, &create_span(Expr::IntLiter(1), empty_span())),
+            Ok(types) if span_cmp(&types, &create_span(Type::BoolType, empty_span()))
+        ));
+
+        assert!(matches!(
+            binary_operator_check(&create_span(Expr::IntLiter(1), empty_span()), &BinaryOperator::Eq, &create_span(Expr::CharLiter('1'), empty_span()), &symbol_table, &create_span(Expr::CharLiter('1'), empty_span())),
+            Err(_)
+        ));
+
+        assert!(matches!(
+            binary_operator_check(&create_span(Expr::StrLiter("abc".to_string()), empty_span()), &BinaryOperator::Eq, &create_span(Expr::StrLiter("abc".to_string()), empty_span()), &symbol_table, &create_span(Expr::StrLiter("abc".to_string()), empty_span())),
+            Ok(types) if span_cmp(&types, &create_span(Type::BoolType, empty_span()))
+        ));
+
+        assert!(matches!(
+            binary_operator_check(&create_span(Expr::BoolLiter(true), empty_span()), &BinaryOperator::And, &create_span(Expr::BoolLiter(true), empty_span()), &symbol_table, &create_span(Expr::BoolLiter(true), empty_span())),
+            Ok(types) if span_cmp(&types, &create_span(Type::BoolType, empty_span()))
+        ));
+
+        assert!(matches!(
+            binary_operator_check(&create_span(Expr::BoolLiter(true), empty_span()), &BinaryOperator::And, &create_span(Expr::IntLiter(1), empty_span()), &symbol_table, &create_span(Expr::IntLiter(1), empty_span())),
+            Err(_)
+        ));
+    }
+}

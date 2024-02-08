@@ -166,5 +166,5 @@ mod stmt_checker_tests {
         ));
     }
 
-    // todo!("missing return exit");
+    todo!("missing return exit");
 }

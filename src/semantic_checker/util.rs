@@ -327,152 +327,188 @@ pub fn rvalue_to_type(rvalue: &Spanned<Rvalue>, symbol_table: &SymbolTable,
     }
 }
 
+#[cfg(test)]
+mod util_tests {
+    use std::collections::HashMap;
+    use crate::ast::{ArgList, ArrayElem, ArrayLiter, Expr, Function, Lvalue, PairElem, Rvalue, Type};
+    use crate::semantic_checker::symbol_table::SymbolTable;
+    use crate::semantic_checker::util::{array_elem_to_type, expr_to_type, get_type_from_table, pair_elem_to_type, rvalue_to_type};
+    use crate::{create_span, span_cmp, empty_span, Spanned};
 
-// #[cfg(test)]
-// mod type_tests {
-//     use std::collections::HashMap;
-//     use crate::ast::{ArrayElem, ArrayLiter, BinaryOperator, Expr, Function, Lvalue, PairElem, Rvalue, Type, UnaryOperator};
-//     use crate::empty_span;
-//     use crate::semantic_checker::symbol_table::SymbolTable;
-//     use crate::semantic_checker::util::{array_elem_to_type, create_span, expr_to_type, get_type_from_table, pair_elem_to_type, rvalue_to_type};
-//
-//     // create symbol table
-//     fn create_symbol_table() -> SymbolTable<'static> {
-//         let mut symbol_table = SymbolTable::create(None, false, None);
-//         let _test = symbol_table.add(create_span("a", empty_span()), Type::IntType);
-//         let _test = symbol_table.add(create_span("b", empty_span()), Type::CharType);
-//         let _test = symbol_table.add(create_span("c", empty_span()), Type::Array(Box::new(Type::IntType)));
-//         let _test = symbol_table.add(create_span("d", empty_span()), Type::Pair(Box::new(Type::IntType), Box::new(Type::CharType)));
-//         symbol_table
-//     }
-//
-//     fn create_function_table() -> HashMap<String, Function> {
-//         let function_table: HashMap<String, Function> = HashMap::new();
-//         function_table
-//     }
-//
-//     #[test]
-//     fn get_type_from_table_test() {
-//         let symbol_table = create_symbol_table();
-//         assert!(matches!(
-//             get_type_from_table("a", &symbol_table),
-//             Ok(Type::IntType)
-//         ));
-//         assert!(matches!(
-//             get_type_from_table("b", &symbol_table),
-//             Ok(Type::CharType)
-//         ));
-//         assert!(matches!(
-//             get_type_from_table("c", &symbol_table),
-//             Ok(Type::Array(types)) if types == Box::from(Type::IntType)
-//         ));
-//     }
-//
-//     #[test]
-//     fn pair_elem_to_type_test() {
-//         let symbol_table = create_symbol_table();
-//         assert!(matches!(
-//             pair_elem_to_type(&PairElem::PairElemFst(Box::from(Lvalue::LIdent("d".to_string()))), &symbol_table),
-//             Ok(Type::IntType)
-//         ));
-//         assert!(matches!(
-//             pair_elem_to_type(&PairElem::PairElemSnd(Box::from(Lvalue::LIdent("d".to_string()))), &symbol_table),
-//             Ok(Type::CharType)
-//         ));
-//         assert!(matches!(
-//             pair_elem_to_type(&PairElem::PairElemFst(Box::from(Lvalue::LIdent("a".to_string()))), &symbol_table),
-//             Err(_)
-//         ));
-//     }
-//
-//     #[test]
-//     fn array_elem_to_type_test() {
-//         let symbol_table = create_symbol_table();
-//         assert!(matches!(
-//             array_elem_to_type(&ArrayElem {
-//                 ident: "c".to_string(),
-//                 indices: Vec::new()
-//             }, &symbol_table),
-//             Ok(Type::Array(types)) if types == Box::from(Type::IntType)
-//         ));
-//         assert!(matches!(
-//             array_elem_to_type(&ArrayElem {
-//                 ident: "c".to_string(),
-//                 indices: vec![Expr::IntLiter(1)]
-//             }, &symbol_table),
-//             Ok(Type::IntType)
-//         ));
-//         assert!(matches!(
-//             array_elem_to_type(&ArrayElem {
-//                 ident: "c".to_string(),
-//                 indices: vec![Expr::IntLiter(1), Expr::IntLiter(1), Expr::IntLiter(1)]
-//             }, &symbol_table),
-//             Err(_)
-//         ));
-//         assert!(matches!(
-//             array_elem_to_type(&ArrayElem {
-//                 ident: "c".to_string(),
-//                 indices: vec![Expr::CharLiter('1')]
-//             }, &symbol_table),
-//             Err(_)
-//         ));
-//         assert!(matches!(
-//             array_elem_to_type(&ArrayElem {
-//                 ident: "c".to_string(),
-//                 indices: vec![Expr::IntLiter(1), Expr::CharLiter('1')]
-//             }, &symbol_table),
-//             Err(_)
-//         ));
-//     }
-//
-//     #[test]
-//     fn expr_to_type_test() {
-//         assert!(matches!(
-//             expr_to_type(&Expr::IntLiter(1), &create_symbol_table()),
-//             Ok(Type::IntType)
-//         ));
-//         assert!(matches!(
-//             expr_to_type(&Expr::ArrayElem(ArrayElem {
-//                 ident: "c".to_string(),
-//                 indices: Vec::new()
-//             }), &create_symbol_table()),
-//             Ok(Type::Array(types)) if types == Box::from(Type::IntType)
-//         ));
-//         assert!(matches!(
-//             expr_to_type(&Expr::UnaryApp(UnaryOperator::Bang, Box::from(Expr::BoolLiter(true))), &create_symbol_table()),
-//             Ok(Type::BoolType)
-//         ));
-//         assert!(matches!(
-//             expr_to_type(&Expr::BinaryApp(Box::from(Expr::IntLiter(1)), BinaryOperator::Add, Box::from(Expr::IntLiter(1))), &create_symbol_table()),
-//             Ok(Type::IntType)
-//         ));
-//     }
-//
-//     #[test]
-//     fn rvalue_to_type_test() {
-//         let function_table = create_function_table();
-//         let symbol_table = create_symbol_table();
-//         assert!(matches!(
-//             rvalue_to_type(&Rvalue::RExpr(Expr::IntLiter(1)), &symbol_table, &function_table),
-//             Ok(Type::IntType)
-//         ));
-//         assert!(matches!(
-//             rvalue_to_type(&Rvalue::RArrLit(ArrayLiter {val: vec![Expr::IntLiter(1)]}), &symbol_table, &function_table),
-//             Ok(Type::Array(types)) if types == Box::from(Type::IntType)
-//         ));
-//         // array with different types
-//         assert!(matches!(
-//             rvalue_to_type(&Rvalue::RArrLit(ArrayLiter {val: vec![Expr::IntLiter(1), Expr::CharLiter('1')]}), &symbol_table, &function_table),
-//             Err(_)
-//         ));
-//         assert!(matches!(
-//             rvalue_to_type(&Rvalue::RNewPair(Expr::IntLiter(1), Expr::CharLiter('1')), &symbol_table, &function_table),
-//             Ok(Type::Pair(e1, e2)) if e1 == Box::from(Type::IntType) && e2 == Box::from(Type::CharType)
-//         ));
-//         assert!(matches!(
-//             rvalue_to_type(&Rvalue::RPairElem(PairElem::PairElemFst(Box::from(Lvalue::LIdent("d".to_string())))), &symbol_table, &function_table),
-//             Ok(Type::IntType)
-//         ));
-//         // todo!("missing RCall");
-//     }
-// }
+    fn create_empty_symbol_table() -> SymbolTable<'static> {
+        SymbolTable::create(None, false, None)
+    }
+
+    fn create_function_table() -> HashMap<String, Spanned<Function>> {
+        let function_table: HashMap<String, Spanned<Function>> = HashMap::new();
+        function_table
+    }
+
+    #[test]
+    fn get_type_from_table_test() {
+        let mut symbol_table = create_empty_symbol_table();
+        let a = create_span("a".to_string(), empty_span());
+        let b = create_span("b".to_string(), empty_span());
+        let c = create_span("c".to_string(), empty_span());
+        let d = create_span("d".to_string(), empty_span());
+        let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
+        let _test = symbol_table.add(&b, create_span(Type::CharType, empty_span()));
+        let _test = symbol_table.add(&c, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
+        let _test = symbol_table.add(&d, create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span()));
+        assert!(matches!(
+            get_type_from_table(&create_span("a".to_string(), empty_span()), &symbol_table),
+            Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
+        ));
+
+        assert!(matches!(
+            get_type_from_table(&create_span("b".to_string(), empty_span()), &symbol_table),
+            Ok(types) if span_cmp(&types, &create_span(Type::CharType, empty_span()))
+        ));
+    }
+
+    #[test]
+    fn pair_elem_to_type_test() {
+        let mut symbol_table = create_empty_symbol_table();
+        let a = create_span("a".to_string(), empty_span());
+        let b = create_span("b".to_string(), empty_span());
+        let c = create_span("c".to_string(), empty_span());
+        let d = create_span("d".to_string(), empty_span());
+        let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
+        let _test = symbol_table.add(&b, create_span(Type::CharType, empty_span()));
+        let _test = symbol_table.add(&c, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
+        let _test = symbol_table.add(&d, create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span()));
+        assert!(matches!(
+            pair_elem_to_type(&create_span(
+                PairElem::PairElemFst(Box::from(
+                    create_span(Lvalue::LIdent(
+                        create_span("d".to_string(), empty_span())), empty_span())
+                )), empty_span()), &symbol_table, &create_span("d".to_string(), empty_span())),
+            Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
+        ));
+
+        assert!(matches!(
+            pair_elem_to_type(&create_span(
+                PairElem::PairElemSnd(Box::from(
+                    create_span(Lvalue::LIdent(
+                        create_span("d".to_string(), empty_span())), empty_span())
+                )), empty_span()), &symbol_table, &create_span("d".to_string(), empty_span())),
+            Ok(types) if span_cmp(&types, &create_span(Type::CharType, empty_span()))
+        ));
+    }
+
+    #[test]
+    fn array_elem_to_type_test() {
+        let mut symbol_table = create_empty_symbol_table();
+        let a = create_span("a".to_string(), empty_span());
+        let b = create_span("b".to_string(), empty_span());
+        let c = create_span("c".to_string(), empty_span());
+        let d = create_span("d".to_string(), empty_span());
+        let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
+        let _test = symbol_table.add(&b, create_span(Type::CharType, empty_span()));
+        let _test = symbol_table.add(&c, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
+        let _test = symbol_table.add(&d, create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span()));
+        assert!(matches!(
+            array_elem_to_type(&create_span(
+                ArrayElem {
+                    ident: "c".to_string(),
+                    indices: Vec::new()
+                }, empty_span()), &symbol_table, &create_span("c".to_string(), empty_span())),
+            Ok(types) if span_cmp(&types, &create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()))
+        ));
+
+        assert!(matches!(
+            array_elem_to_type(&create_span(
+                ArrayElem {
+                    ident: "c".to_string(),
+                    indices: vec![create_span(Expr::IntLiter(1), empty_span())]
+                }, empty_span()), &symbol_table, &create_span("c".to_string(), empty_span())),
+            Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
+        ));
+
+    }
+
+    #[test]
+    fn expr_to_type_test() {
+        let mut symbol_table = create_empty_symbol_table();
+        let a = create_span("a".to_string(), empty_span());
+        let b = create_span("b".to_string(), empty_span());
+        let c = create_span("c".to_string(), empty_span());
+        let d = create_span("d".to_string(), empty_span());
+        let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
+        let _test = symbol_table.add(&b, create_span(Type::CharType, empty_span()));
+        let _test = symbol_table.add(&c, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
+        let _test = symbol_table.add(&d, create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span()));
+        assert!(matches!(
+            expr_to_type(&create_span(Expr::IntLiter(1), empty_span()), &symbol_table),
+            Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
+        ));
+
+        assert!(matches!(
+            expr_to_type(&create_span(Expr::BoolLiter(true), empty_span()), &symbol_table),
+            Ok(types) if span_cmp(&types, &create_span(Type::BoolType, empty_span()))
+        ));
+
+        assert!(matches!(
+            expr_to_type(&create_span(Expr::CharLiter('a'), empty_span()), &symbol_table),
+            Ok(types) if span_cmp(&types, &create_span(Type::CharType, empty_span()))
+        ));
+
+        assert!(matches!(
+            expr_to_type(&create_span(Expr::StrLiter("a".to_string()), empty_span()), &symbol_table),
+            Ok(types) if span_cmp(&types, &create_span(Type::StringType, empty_span()))
+        ));
+
+        assert!(matches!(
+            expr_to_type(&create_span(Expr::Ident("a".to_string()), empty_span()), &symbol_table),
+            Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
+        ));
+    }
+
+    #[test]
+    fn rvalue_to_type_test() {
+        let mut symbol_table = create_empty_symbol_table();
+        let a = create_span("a".to_string(), empty_span());
+        let b = create_span("b".to_string(), empty_span());
+        let c = create_span("c".to_string(), empty_span());
+        let d = create_span("d".to_string(), empty_span());
+        let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
+        let _test = symbol_table.add(&b, create_span(Type::CharType, empty_span()));
+        let _test = symbol_table.add(&c, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
+        let _test = symbol_table.add(&d, create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span()));
+        let function_table = create_function_table();
+        assert!(matches!(
+            rvalue_to_type(&create_span(Rvalue::RExpr(Box::from(create_span(Expr::IntLiter(1), empty_span()))), empty_span()), &symbol_table, &function_table),
+            Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
+        ));
+
+        assert!(matches!(
+            rvalue_to_type(&create_span(Rvalue::RArrLit(Box::from(create_span(
+                ArrayLiter {
+                    val: vec![create_span(Expr::IntLiter(1), empty_span())]
+                }, empty_span())
+            )), empty_span()), &symbol_table, &function_table),
+            Ok(types) if span_cmp(&types, &create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()))
+        ));
+
+        assert!(matches!(
+            rvalue_to_type(&create_span(Rvalue::RNewPair(Box::from(create_span(Expr::IntLiter(1), empty_span())), Box::from(create_span(Expr::CharLiter('a'), empty_span()))), empty_span()), &symbol_table, &function_table),
+            Ok(types) if span_cmp(&types, &create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span()))
+        ));
+
+        assert!(matches!(
+            rvalue_to_type(&create_span(Rvalue::RPairElem(Box::from(create_span(
+                PairElem::PairElemFst(Box::from(
+                    create_span(Lvalue::LIdent(
+                        create_span("d".to_string(), empty_span())), empty_span())
+                )), empty_span())
+            )), empty_span()), &symbol_table, &function_table),
+            Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
+        ));
+
+        assert!(matches!(
+            rvalue_to_type(&create_span(Rvalue::RCall(create_span("d".to_string(), empty_span()), create_span(ArgList::Arg(Vec::new()), empty_span())), empty_span()), &symbol_table, &function_table),
+            Err(_)
+        ));
+
+    }
+}

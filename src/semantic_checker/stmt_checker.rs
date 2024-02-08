@@ -244,3 +244,187 @@ pub fn stmt_check<'a>(ret_stmt: &'a Spanned<ReturningStmt>, symbol_table: &mut S
         }
     }
 }
+
+#[cfg(test)]
+mod stmt_checker_tests {
+    use std::collections::HashMap;
+    use crate::ast::{Expr, Function, Lvalue, ReturningStmt, Rvalue, Stmt, Type};
+    use crate::ast::Expr::{CharLiter, IntLiter};
+    use crate::semantic_checker::stmt_checker::{assignment_check, declaration_check, free_check, if_check, print_println_check, read_check};
+    use crate::semantic_checker::symbol_table::SymbolTable;
+    use crate::{create_span, empty_span, span_cmp, Spanned};
+
+    fn create_symbol_table() -> SymbolTable<'static> {
+        SymbolTable::create(None, false, None)
+    }
+    fn create_function_table() -> HashMap<String, Spanned<Function>> {
+        let function_table: HashMap<String, Spanned<Function>> = HashMap::new();
+        function_table
+    }
+
+    #[test]
+    fn declaration_check_test() {
+        let function_table = create_function_table();
+        let mut symbol_table = create_symbol_table();
+        let a = create_span("a".to_string(), empty_span());
+        let b = create_span("b".to_string(), empty_span());
+        let c = create_span("c".to_string(), empty_span());
+        let d = create_span("d".to_string(), empty_span());
+        let e = create_span("e".to_string(), empty_span());
+        let f = create_span("f".to_string(), empty_span());
+
+        let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
+        let _test = symbol_table.add(&b, create_span(Type::CharType, empty_span()));
+        let _test = symbol_table.add(&c, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
+        let _test = symbol_table.add(&d, create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span()));
+        let _test = symbol_table.add(&e, create_span(Type::BoolType, empty_span()));
+
+        assert!(matches!(
+            declaration_check(&create_span(Type::IntType, empty_span()), &f, &create_span(Rvalue::RExpr(Box::from(create_span(IntLiter(1), empty_span()))), empty_span()), &mut symbol_table, &function_table, &create_span(Type::IntType, empty_span())),
+            Ok(_)
+        ));
+
+        assert!(matches!(
+            declaration_check(&create_span(Type::IntType, empty_span()), &a, &create_span(Rvalue::RExpr(Box::from(create_span(IntLiter(1), empty_span()))), empty_span()), &mut symbol_table, &function_table, &create_span(Type::IntType, empty_span())),
+            Err(_)
+        ));
+    }
+
+    #[test]
+    fn assignment_check_test() {
+        let function_table = create_function_table();
+        let mut symbol_table = create_symbol_table();
+        let a = create_span("a".to_string(), empty_span());
+
+        let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
+
+        assert!(matches!(
+            assignment_check(&create_span(Lvalue::LIdent(create_span("a".to_string(), empty_span())), empty_span()), &create_span(Rvalue::RExpr(Box::from(create_span(IntLiter(1), empty_span()))), empty_span()), &symbol_table, &function_table, &create_span(Type::IntType, empty_span())),
+            Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
+        ));
+
+        assert!(matches!(
+            assignment_check(&create_span(Lvalue::LIdent(create_span("a".to_string(), empty_span())), empty_span()), &create_span(Rvalue::RExpr(Box::from(create_span(CharLiter('a'), empty_span()))), empty_span()), &symbol_table, &function_table, &create_span(Type::IntType, empty_span())),
+            Err(_)
+        ));
+
+    }
+
+    #[test]
+    fn read_check_test() {
+        let mut symbol_table = create_symbol_table();
+        let a = create_span("a".to_string(), empty_span());
+        let b = create_span("b".to_string(), empty_span());
+        let c = create_span("c".to_string(), empty_span());
+
+        let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
+        let _test = symbol_table.add(&b, create_span(Type::CharType, empty_span()));
+        let _test = symbol_table.add(&c, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
+
+        assert!(matches!(
+            read_check(&create_span(Lvalue::LIdent(create_span("a".to_string(), empty_span())), empty_span()), &symbol_table, &create_span(Type::IntType, empty_span())),
+            Ok(_)
+        ));
+
+        assert!(matches!(
+            read_check(&create_span(Lvalue::LIdent(create_span("b".to_string(), empty_span())), empty_span()), &symbol_table, &create_span(Type::CharType, empty_span())),
+            Ok(_)
+        ));
+
+        assert!(matches!(
+            read_check(&create_span(Lvalue::LIdent(create_span("c".to_string(), empty_span())), empty_span()), &symbol_table, &create_span(Type::IntType, empty_span())),
+            Err(_)
+        ));
+    }
+
+    #[test]
+    fn free_check_test() {
+        let mut symbol_table = create_symbol_table();
+        let a = create_span("a".to_string(), empty_span());
+        let b = create_span("b".to_string(), empty_span());
+        let c = create_span("c".to_string(), empty_span());
+        let d = create_span("d".to_string(), empty_span());
+
+        let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
+        let _test = symbol_table.add(&b, create_span(Type::CharType, empty_span()));
+        let _test = symbol_table.add(&c, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
+        let _test = symbol_table.add(&d, create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span()));
+
+        assert!(matches!(
+            free_check(&create_span(Expr::Ident("c".to_string()), empty_span()), &symbol_table, &create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span())),
+            Ok(_)
+        ));
+
+        assert!(matches!(
+            free_check(&create_span(Expr::Ident("d".to_string()), empty_span()), &symbol_table, &create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span())),
+            Ok(_)
+        ));
+
+        assert!(matches!(
+            free_check(&create_span(Expr::Ident("a".to_string()), empty_span()), &symbol_table, &create_span(Type::IntType, empty_span())),
+            Err(_)
+        ));
+    }
+
+    #[test]
+    fn print_println_check_test() {
+        let mut symbol_table = create_symbol_table();
+        let a = create_span("a".to_string(), empty_span());
+        let b = create_span("b".to_string(), empty_span());
+        let c = create_span("c".to_string(), empty_span());
+        let d = create_span("d".to_string(), empty_span());
+
+        let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
+        let _test = symbol_table.add(&b, create_span(Type::CharType, empty_span()));
+        let _test = symbol_table.add(&c, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
+        let _test = symbol_table.add(&d, create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span()));
+
+        assert!(matches!(
+            print_println_check(&create_span(Expr::Ident("a".to_string()), empty_span()), &symbol_table),
+            Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
+        ));
+    }
+
+    #[test]
+    fn if_check_test() {
+        let function_table = create_function_table();
+        let mut symbol_table = create_symbol_table();
+        let a = create_span("a".to_string(), empty_span());
+        let b = create_span("b".to_string(), empty_span());
+        let c = create_span("c".to_string(), empty_span());
+        let d = create_span("d".to_string(), empty_span());
+
+        let _test = symbol_table.add(&a, create_span(Type::BoolType, empty_span()));
+        let _test = symbol_table.add(&b, create_span(Type::IntType, empty_span()));
+        let _test = symbol_table.add(&c, create_span(Type::CharType, empty_span()));
+        let _test = symbol_table.add(&d, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
+
+        let expr = create_span(Expr::Ident("a".to_string()), empty_span());
+        let stmt1 = create_span(ReturningStmt{
+            statement: create_span(Stmt::Skip, empty_span()),
+            returning: false
+        }, empty_span());
+
+        assert!(matches!(
+            if_check(&expr, &stmt1, &stmt1, &mut symbol_table, &function_table),
+            Ok(_)
+        ));
+    }
+
+    #[test]
+    fn while_check_test() {
+        let function_table = create_function_table();
+        let mut symbol_table = create_symbol_table();
+        let a = create_span("a".to_string(), empty_span());
+        let b = create_span("b".to_string(), empty_span());
+        let c = create_span("c".to_string(), empty_span());
+        let d = create_span("d".to_string(), empty_span());
+
+        let _test = symbol_table.add(&a, create_span(Type::BoolType, empty_span()));
+        let _test = symbol_table.add(&b, create_span(Type::IntType, empty_span()));
+        let _test = symbol_table.add(&c, create_span(Type::CharType, empty_span()));
+        let _test = symbol_table.add(&d, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
+
+        //TODO: finish this test
+    }
+}

@@ -1,7 +1,7 @@
 use crate::parser::lexer::lexer;
 use crate::parser::program::program;
 use crate::semantic_checker::function_checker::semantic_check_start;
-use ariadne::{sources, CharSet, Color, Config, Label, Report, ReportKind};
+use ariadne::{sources, CharSet, Config, Label, Report, ReportKind};
 use chumsky::error::Rich;
 use chumsky::input::Input;
 use chumsky::prelude::SimpleSpan;
