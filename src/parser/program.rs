@@ -1,8 +1,8 @@
-use crate::ast::{Function, Param, Program, Stmt};
+use crate::ast::{Function, Param, Program, Stmt, Type};
 use crate::parser::lexer::{lexer, ParserInput, Token};
 use crate::parser::stmt::{ident, stmt};
 use crate::parser::type_parser::type_parse;
-use crate::{Span, Spanned};
+use crate::{from_span, Span, Spanned};
 use chumsky::error::Rich;
 use chumsky::prelude::just;
 use chumsky::{extra, IterParser, Parser};
@@ -97,7 +97,7 @@ fn can_parse_simple_program() {
 }
 
 #[test]
-fn can_parse_printing_program() {
+fn can_parse_complex_program() {
     let src1 = "int x = 1";
     let stmt1 = get_statement_from_str(src1);
 
@@ -117,7 +117,25 @@ fn can_parse_printing_program() {
         let serial_stmt_2 = &(**serial_st2).0.statement.0;
         assert!(matches!(serial_stmt_2, stmt2));
     } else {
-        assert!(false);
+        panic!("program with serial concatenation of statements failed");
+    }
+}
+
+#[test]
+fn can_parse_program_with_functions() {
+    let src = "begin int add_one ( int x ) is x = x + 1; return x end skip end";
+    let tokens = lexer().parse(src).into_result().unwrap();
+    let program_struct = program()
+        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+        .into_result();
+    let result = program_struct.unwrap().0;
+    let func = &result.functions[0].0;
+
+    assert!(matches!(&func.ident.0, given_ident if given_ident == &String::from("add_one")));
+    assert!(matches!(func.return_type.0, Type::IntType));
+    if let Param::Parameter(param_type, param_string) = &func.parameters[0].0 {
+        assert!(matches!(param_type.0, Type::IntType));
+        assert!(matches!(&param_string.0, given_string if given_string == &String::from("x")));
     }
 }
 

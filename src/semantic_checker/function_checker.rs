@@ -51,3 +51,6 @@ pub fn function_check(function: &Function, function_table: &HashMap<String, Span
 pub fn semantic_check_start(program: &Spanned<Program>) -> Result<Spanned<Type>, Error>  {
     program_check(&from_span(program).functions, &from_span(program).body)
 }
+
+// We decided not to write extra unit test for function_checker,
+// since they appear to be similar to the integration test.
