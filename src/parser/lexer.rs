@@ -40,17 +40,13 @@ pub fn lexer<'src>(
     let int_token = text::digits(10) // accepting decimal digits only
         .to_slice()
         .padded()
-        .validate(|s: &str, e, emitter| {
-            let num = s.parse::<i64>();
-            if num.is_err() {
-                emitter.emit(Rich::custom(
-                    e.span(),
-                    "Integer Oversize: this is not a 32-bit integer.",
-                ))
+        .try_map(|s: &str, e| {
+            let result = s.parse::<i64>();
+            if result.is_err() {
+                return Err(Rich::custom(e, "integer oversize"));
             }
-            num.unwrap_or(0)
+            return Ok(Token::IntToken(result.unwrap()));
         })
-        .map(Token::IntToken)
         .labelled("integer absolute value raw input");
 
     let bool_token = choice((
@@ -97,21 +93,22 @@ pub fn lexer<'src>(
     let char_elem = normal_char
         .or(escape_char)
         .to_slice()
-        .validate(move |s: &str, e, emitter| {
+        .try_map(move |s: &str, e| {
             let n = s.chars().count();
             if n == 1 {
-                normal_char.parse(s).into_result().unwrap()
+                let result = normal_char.parse(s).into_result();
+                if result.is_err() {
+                    return Err(Rich::custom(e, "invalid character"));
+                }
+                return Ok(result.unwrap());
             } else if n == 2 {
-                let try_escape = escape_char.parse(s);
-                return if try_escape.has_errors() {
-                    emitter.emit(Rich::custom(e.span(), "invalid escape character pattern"));
-                    ' '
-                } else {
-                    try_escape.into_result().unwrap()
-                };
+                let try_escape = escape_char.parse(s).into_result();
+                if try_escape.is_err() {
+                    return Err(Rich::custom(e, "invalid escape character pattern"));
+                }
+                return Ok(try_escape.unwrap());
             } else {
-                emitter.emit(Rich::custom(e.span(), "invalid char: unaccepted pattern"));
-                return ' ';
+                return Err(Rich::custom(e, "invalid WACC char pattern"));
             }
         })
         .labelled("legal char");
