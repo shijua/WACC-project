@@ -2,11 +2,11 @@ use crate::ast::{Function, Param, Program, Stmt, Type};
 use crate::parser::lexer::{lexer, ParserInput, Token};
 use crate::parser::stmt::{ident, stmt};
 use crate::parser::type_parser::type_parse;
-use crate::{Span, Spanned};
+use crate::{from_span, Span, Spanned};
 use chumsky::error::Rich;
+use chumsky::input::Input;
 use chumsky::prelude::just;
 use chumsky::{extra, IterParser, Parser};
-use chumsky::input::Input;
 
 // <param> ::= ⟨type⟩ ⟨ident⟩
 fn param<'tokens, 'src: 'tokens>() -> impl Parser<
@@ -49,7 +49,7 @@ fn func_parser<'tokens, 'src: 'tokens>() -> impl Parser<
                 body: st,
             };
 
-            if func_prototype.body.0.returning == false {
+            if from_span(&func_prototype.body).returning == false {
                 // This is a non-returning function
                 return Err(Rich::custom(
                     e.span(),
@@ -58,7 +58,8 @@ fn func_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             };
 
             Ok((func_prototype, e.span()))
-        }).labelled("function")
+        })
+        .labelled("function")
 }
 
 // <program> ::= ‘begin’ ⟨func⟩* ⟨stmt⟩ ‘end’
@@ -72,7 +73,7 @@ pub fn program<'tokens, 'src: 'tokens>() -> impl Parser<
     just(Token::Keyword("begin"))
         .then(funcs)
         .then(stmt())
-        .then(just(Token::Keyword("end")))
+        .then(just(Token::Keyword("end")).ignored())
         .map_with(|(((_, func_list), st), _), e| {
             (
                 Program {
