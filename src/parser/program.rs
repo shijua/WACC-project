@@ -2,7 +2,7 @@ use crate::ast::{Function, Param, Program, Stmt, Type};
 use crate::parser::lexer::{lexer, ParserInput, Token};
 use crate::parser::stmt::{ident, stmt};
 use crate::parser::type_parser::type_parse;
-use crate::{from_span, Span, Spanned};
+use crate::{Span, Spanned};
 use chumsky::error::Rich;
 use chumsky::prelude::just;
 use chumsky::{extra, IterParser, Parser};
@@ -133,10 +133,10 @@ fn can_parse_program_with_functions() {
 
     assert!(matches!(&func.ident.0, given_ident if given_ident == &String::from("add_one")));
     assert!(matches!(func.return_type.0, Type::IntType));
-    if let Param::Parameter(param_type, param_string) = &func.parameters[0].0 {
-        assert!(matches!(param_type.0, Type::IntType));
-        assert!(matches!(&param_string.0, given_string if given_string == &String::from("x")));
-    }
+    let Param::Parameter(param_type, param_string) = &func.parameters[0].0;
+    assert!(matches!(param_type.0, Type::IntType));
+    assert!(matches!(&param_string.0, given_string if given_string == &String::from("x")));
+
 }
 
 fn get_statement_from_str(src: &str) -> Stmt {

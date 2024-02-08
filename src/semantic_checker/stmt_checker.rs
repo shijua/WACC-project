@@ -398,7 +398,7 @@ mod stmt_checker_tests {
         ));
 
         assert!(matches!(
-            return_check(&expr_b, &mut f_symbol_table, &function_table, &span_a),
+            return_check(&expr_b, &mut f_symbol_table, &function_table, &span_b),
             Err(_)
         ));
 
