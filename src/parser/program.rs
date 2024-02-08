@@ -4,9 +4,9 @@ use crate::parser::stmt::{ident, stmt};
 use crate::parser::type_parser::type_parse;
 use crate::{Span, Spanned};
 use chumsky::error::Rich;
+use chumsky::input::Input;
 use chumsky::prelude::just;
 use chumsky::{extra, IterParser, Parser};
-use chumsky::input::Input;
 
 // <param> ::= ⟨type⟩ ⟨ident⟩
 fn param<'tokens, 'src: 'tokens>() -> impl Parser<
@@ -58,7 +58,8 @@ fn func_parser<'tokens, 'src: 'tokens>() -> impl Parser<
             };
 
             Ok((func_prototype, e.span()))
-        }).labelled("function")
+        })
+        .labelled("function")
 }
 
 // <program> ::= ‘begin’ ⟨func⟩* ⟨stmt⟩ ‘end’

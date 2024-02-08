@@ -4,7 +4,7 @@ use crate::ast::{
 use crate::parser::expr::expr;
 use crate::parser::lexer::{lexer, ParserInput, Token};
 use crate::parser::type_parser::type_parse;
-use crate::{Span, Spanned, from_span};
+use crate::{from_span, Span, Spanned};
 use chumsky::error::Rich;
 use chumsky::input::Input;
 use chumsky::prelude::{just, recursive, Recursive};
@@ -239,7 +239,7 @@ pub fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
                     .then(stmt.clone())
                     .then(just(Token::Keyword("fi")))
                     .map_with(|((((((_, cond), _), st1), _), st2), _), e| ReturningStmt {
-                        returning: st1.0.returning && st2.0.returning,
+                        returning: from_span(&st1).returning && from_span(&st2).returning,
                         statement: (Stmt::If(cond, Box::new(st1), Box::new(st2)), e.span()),
                     });
 
@@ -257,7 +257,7 @@ pub fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
                     .then(stmt.clone())
                     .then(just(Token::Keyword("end")))
                     .map_with(|((_, sc), _), e| ReturningStmt {
-                        returning: sc.0.returning,
+                        returning: from_span(&sc).returning,
                         statement: (Stmt::Scope(Box::new(sc)), e.span()),
                     });
 
@@ -278,25 +278,23 @@ pub fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
                 unary_statement.map_with(|st, e| (st, e.span()))
             };
 
-            let stmt_serial = {
-                stmt_unary
-                    .clone()
-                    .then(just(Token::Ctrl(';')))
-                    .then(stmt.clone())
-                    .map_with(|((st1, _), st2), e| {
-                        (
-                            ReturningStmt {
-                                returning: st2.0.returning,
-                                statement: (Stmt::Serial(Box::new(st1), Box::new(st2)), e.span()),
-                            },
-                            e.span(),
-                        )
-                    })
-            };
+            let stmt_serial = stmt_unary.clone().foldl_with(
+                just(Token::Ctrl(';')).then(stmt_unary.clone()).repeated(),
+                |st1, (_, st2), e| {
+                    (
+                        ReturningStmt {
+                            returning: from_span(&st2).returning,
+                            statement: (Stmt::Serial(Box::new(st1), Box::new(st2)), e.span()),
+                        },
+                        e.span(),
+                    )
+                },
+            );
 
-            stmt_serial.or(stmt_unary)
+            stmt_serial
         },
-    ).labelled("statement")
+    )
+    .labelled("statement")
 }
 
 #[test]
@@ -343,7 +341,10 @@ fn can_parse_declare() {
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
         .into_result();
     let returning_stmt = expression.unwrap().0;
-    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Declare(..)));
+    assert!(matches!(
+        from_span(&returning_stmt.statement),
+        Stmt::Declare(..)
+    ));
 }
 
 #[test]
@@ -354,7 +355,10 @@ fn can_parse_assign() {
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
         .into_result();
     let returning_stmt = expression.unwrap().0;
-    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Assign(..)));
+    assert!(matches!(
+        from_span(&returning_stmt.statement),
+        Stmt::Assign(..)
+    ));
 }
 
 #[test]
@@ -365,7 +369,10 @@ fn can_parse_read() {
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
         .into_result();
     let returning_stmt = expression.unwrap().0;
-    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Read(..)));
+    assert!(matches!(
+        from_span(&returning_stmt.statement),
+        Stmt::Read(..)
+    ));
 }
 
 #[test]
@@ -376,7 +383,10 @@ fn can_parse_free() {
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
         .into_result();
     let returning_stmt = expression.unwrap().0;
-    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Free(..)));
+    assert!(matches!(
+        from_span(&returning_stmt.statement),
+        Stmt::Free(..)
+    ));
 }
 
 #[test]
@@ -387,7 +397,10 @@ fn can_parse_return() {
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
         .into_result();
     let returning_stmt = expression.unwrap().0;
-    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Return(..)));
+    assert!(matches!(
+        from_span(&returning_stmt.statement),
+        Stmt::Return(..)
+    ));
 }
 
 #[test]
@@ -398,7 +411,10 @@ fn can_parse_exit() {
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
         .into_result();
     let returning_stmt = expression.unwrap().0;
-    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Exit(..)));
+    assert!(matches!(
+        from_span(&returning_stmt.statement),
+        Stmt::Exit(..)
+    ));
 }
 
 #[test]
@@ -409,7 +425,10 @@ fn can_parse_print() {
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
         .into_result();
     let returning_stmt = expression.unwrap().0;
-    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Print(..)));
+    assert!(matches!(
+        from_span(&returning_stmt.statement),
+        Stmt::Print(..)
+    ));
 }
 
 #[test]
@@ -420,7 +439,10 @@ fn can_parse_println() {
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
         .into_result();
     let returning_stmt = expression.unwrap().0;
-    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Println(..)));
+    assert!(matches!(
+        from_span(&returning_stmt.statement),
+        Stmt::Println(..)
+    ));
 }
 
 #[test]
@@ -442,7 +464,10 @@ fn can_parse_while() {
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
         .into_result();
     let returning_stmt = expression.unwrap().0;
-    assert!(matches!(from_span(&returning_stmt.statement), Stmt::While(..)));
+    assert!(matches!(
+        from_span(&returning_stmt.statement),
+        Stmt::While(..)
+    ));
 }
 
 #[test]
@@ -453,5 +478,8 @@ fn can_parse_scope() {
         .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
         .into_result();
     let returning_stmt = expression.unwrap().0;
-    assert!(matches!(from_span(&returning_stmt.statement), Stmt::Scope(..)));
+    assert!(matches!(
+        from_span(&returning_stmt.statement),
+        Stmt::Scope(..)
+    ));
 }
