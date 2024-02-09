@@ -131,7 +131,6 @@ pub fn lexer<'src>(
         .delimited_by(just('\"'), just('\"'))
         .padded()
         .map(move |s| {
-            println!("{}", s);
             let result = str_parts.parse(s).into_result().unwrap();
             Token::StrToken(result)
         })
@@ -241,7 +240,6 @@ pub fn work(s: &str) -> Vec<Token> {
         .iter()
         .map(|(x, _)| x.clone())
         .collect::<Vec<_>>();
-    println!("{:?}", result);
     result
 }
 
