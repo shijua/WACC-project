@@ -3,7 +3,7 @@ use crate::parser::lexer::{lexer, ParserInput, Token};
 use crate::{Span, Spanned};
 use chumsky::error::Rich;
 use chumsky::input::MapExtra;
-use chumsky::pratt::{infix, non, prefix};
+use chumsky::pratt::{infix, left, non, prefix, right};
 use chumsky::prelude::{choice, just, recursive, Input};
 use chumsky::IterParser;
 use chumsky::{extra, select, Parser};
@@ -161,12 +161,12 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
 
         atom.pratt((
             prefix(7, unary_oper, unary_fold),
-            infix(non(6), binary_mul, binary_fold),
-            infix(non(5), binary_add, binary_fold),
+            infix(left(6), binary_mul, binary_fold),
+            infix(left(5), binary_add, binary_fold),
             infix(non(4), binary_gte, binary_fold),
             infix(non(3), binary_eq, binary_fold),
-            infix(non(2), binary_and, binary_fold),
-            infix(non(1), binary_or, binary_fold),
+            infix(right(2), binary_and, binary_fold),
+            infix(right(1), binary_or, binary_fold),
         ))
         .boxed()
     })
