@@ -55,62 +55,70 @@ pub fn type_parse<'tokens, 'src: 'tokens>() -> impl Parser<
     })
 }
 
-#[test]
-fn can_parse_basic_type() {
-    let src = "int";
-    let tokens = lexer().parse(src).into_result().unwrap();
-    let expression = type_parse()
-        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
-        .into_result();
-    assert!(expression.is_ok());
-}
+#[cfg(test)]
+mod type_parse_tests {
+    use crate::parser::lexer::lexer;
+    use crate::parser::type_parser::type_parse;
+    use chumsky::input::Input;
+    use chumsky::Parser;
 
-#[test]
-fn can_parse_array_type() {
-    let src = "char[]";
-    let tokens = lexer().parse(src).into_result().unwrap();
-    let expression = type_parse()
-        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
-        .into_result();
-    assert!(expression.is_ok());
-}
+    #[test]
+    fn can_parse_basic_type() {
+        let src = "int";
+        let tokens = lexer().parse(src).into_result().unwrap();
+        let expression = type_parse()
+            .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+            .into_result();
+        assert!(expression.is_ok());
+    }
 
-#[test]
-fn can_parse_pair_type() {
-    let src = "pair(pair(int, int)[], int)";
-    let tokens = lexer().parse(src).into_result().unwrap();
-    let expression = type_parse()
-        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
-        .into_result();
-    assert!(expression.is_ok());
-}
+    #[test]
+    fn can_parse_array_type() {
+        let src = "char[]";
+        let tokens = lexer().parse(src).into_result().unwrap();
+        let expression = type_parse()
+            .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+            .into_result();
+        assert!(expression.is_ok());
+    }
 
-#[test]
-fn can_parse_pair_with_literals() {
-    let src = "pair(int, pair)";
-    let tokens = lexer().parse(src).into_result().unwrap();
-    let expression = type_parse()
-        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
-        .into_result();
-    assert!(expression.is_ok());
-}
+    #[test]
+    fn can_parse_pair_type() {
+        let src = "pair(pair(int, int)[], int)";
+        let tokens = lexer().parse(src).into_result().unwrap();
+        let expression = type_parse()
+            .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+            .into_result();
+        assert!(expression.is_ok());
+    }
 
-#[test]
-fn cannot_parse_ambiguous_pair() {
-    let src = "pair(pair[], int)";
-    let tokens = lexer().parse(src).into_result().unwrap();
-    let expression = type_parse()
-        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
-        .into_result();
-    assert!(expression.is_err());
-}
+    #[test]
+    fn can_parse_pair_with_literals() {
+        let src = "pair(int, pair)";
+        let tokens = lexer().parse(src).into_result().unwrap();
+        let expression = type_parse()
+            .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+            .into_result();
+        assert!(expression.is_ok());
+    }
 
-#[test]
-fn cannot_parse_nested_pair() {
-    let src = "pair(pair(int, int), int)";
-    let tokens = lexer().parse(src).into_result().unwrap();
-    let expression = type_parse()
-        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
-        .into_result();
-    assert!(expression.is_err());
+    #[test]
+    fn cannot_parse_ambiguous_pair() {
+        let src = "pair(pair[], int)";
+        let tokens = lexer().parse(src).into_result().unwrap();
+        let expression = type_parse()
+            .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+            .into_result();
+        assert!(expression.is_err());
+    }
+
+    #[test]
+    fn cannot_parse_nested_pair() {
+        let src = "pair(pair(int, int), int)";
+        let tokens = lexer().parse(src).into_result().unwrap();
+        let expression = type_parse()
+            .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+            .into_result();
+        assert!(expression.is_err());
+    }
 }

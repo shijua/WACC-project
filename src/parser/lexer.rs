@@ -232,79 +232,85 @@ pub fn lexer<'src>(
     .labelled("legal tokens")
 }
 
-pub fn work(s: &str) -> Vec<Token> {
-    let result = lexer()
-        .parse(s)
-        .into_result()
-        .unwrap()
-        .iter()
-        .map(|(x, _)| x.clone())
-        .collect::<Vec<_>>();
-    result
-}
+#[cfg(test)]
+mod lexer_tests {
+    use crate::parser::lexer::{lexer, Token};
+    use chumsky::Parser;
 
-#[test]
-fn can_lex_single_digit() {
-    let input = "0";
-    assert_eq!(work(input), vec![Token::IntToken(0)]);
-}
+    pub fn work(s: &str) -> Vec<Token> {
+        let result = lexer()
+            .parse(s)
+            .into_result()
+            .unwrap()
+            .iter()
+            .map(|(x, _)| x.clone())
+            .collect::<Vec<_>>();
+        result
+    }
 
-#[test]
-fn can_lex_multiple_digit_number() {
-    let input = "245";
-    assert_eq!(work(input), vec![Token::IntToken(245)]);
-}
+    #[test]
+    fn can_lex_single_digit() {
+        let input = "0";
+        assert_eq!(work(input), vec![Token::IntToken(0)]);
+    }
 
-#[test]
-fn can_lex_char() {
-    let input = "\'e\'";
-    assert_eq!(work(input), vec![Token::CharToken('e')]);
-}
+    #[test]
+    fn can_lex_multiple_digit_number() {
+        let input = "245";
+        assert_eq!(work(input), vec![Token::IntToken(245)]);
+    }
 
-#[test]
-fn can_lex_escape() {
-    let input = "\'\\0\'";
-    assert_eq!(work(input), vec![Token::CharToken('\0')]);
-}
+    #[test]
+    fn can_lex_char() {
+        let input = "\'e\'";
+        assert_eq!(work(input), vec![Token::CharToken('e')]);
+    }
 
-#[test]
-fn can_lex_a_string() {
-    let input = "\"hello\"";
-    assert_eq!(work(input), vec![Token::StrToken("hello".to_string())]);
-}
+    #[test]
+    fn can_lex_escape() {
+        let input = "\'\\0\'";
+        assert_eq!(work(input), vec![Token::CharToken('\0')]);
+    }
 
-#[test]
-fn can_lex_keywords() {
-    let input = "len";
-    assert_eq!(work(input), vec![Token::Keyword("len")]);
-}
+    #[test]
+    fn can_lex_a_string() {
+        let input = "\"hello\"";
+        assert_eq!(work(input), vec![Token::StrToken("hello".to_string())]);
+    }
 
-#[test]
-fn can_lex_identifier() {
-    let input = "length";
-    assert_eq!(work(input), vec![Token::Ident("length")]);
-}
+    #[test]
+    fn can_lex_keywords() {
+        let input = "len";
+        assert_eq!(work(input), vec![Token::Keyword("len")]);
+    }
 
-#[test]
-fn can_lex_op() {
-    let input = "&&";
-    assert_eq!(work(input), vec![Token::Op("&&")]);
-}
+    #[test]
+    fn can_lex_identifier() {
+        let input = "length";
+        assert_eq!(work(input), vec![Token::Ident("length")]);
+    }
 
-#[test]
-fn can_lex_ctrl() {
-    let input = "(";
-    assert_eq!(work(input), vec![Token::Ctrl('(')]);
-}
+    #[test]
+    fn can_lex_op() {
+        let input = "&&";
+        assert_eq!(work(input), vec![Token::Op("&&")]);
+    }
 
-#[test]
-fn can_ignore_comment() {
-    let input = "245 # this is a comment";
-    assert_eq!(work(input), vec![Token::IntToken(245)]);
+    #[test]
+    fn can_lex_ctrl() {
+        let input = "(";
+        assert_eq!(work(input), vec![Token::Ctrl('(')]);
+    }
 
-    let mut input2 = String::new();
-    input2.push_str("# this is a comment # this is a comment inside a comment\n");
-    input2.push_str("245");
-    input2.push_str("# this is a comment too");
-    assert_eq!(work(&input2[..]), vec![Token::IntToken(245)]);
+    #[test]
+    fn can_ignore_comment() {
+        let input = "245 # this is a comment";
+        assert_eq!(work(input), vec![Token::IntToken(245)]);
+
+        let mut input2 = String::new();
+        input2.push_str("# this is a comment # this is a comment inside a comment\n");
+        input2.push_str("245");
+        input2.push_str("# this is a comment too");
+        assert_eq!(work(&input2[..]), vec![Token::IntToken(245)]);
+    }
 }

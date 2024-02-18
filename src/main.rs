@@ -9,7 +9,9 @@ use std::process::exit;
 use std::{env, fs};
 
 mod ast;
+mod code_generator;
 mod parser;
+mod symbol_table;
 
 const READ_ERROR: i32 = -1;
 const VALID_CODE: i32 = 0;

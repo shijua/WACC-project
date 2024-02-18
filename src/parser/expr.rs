@@ -172,22 +172,30 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
     })
 }
 
-#[test]
-fn can_parse_expr() {
-    let src = "1 < 2";
-    let tokens = lexer().parse(src).into_result().unwrap();
-    let expression = expr()
-        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
-        .into_result();
-    assert!(expression.is_ok());
-}
+#[cfg(test)]
+mod expr_tests {
+    use crate::parser::expr::expr;
+    use crate::parser::lexer::lexer;
+    use chumsky::input::Input;
+    use chumsky::Parser;
 
-#[test]
-fn can_parse_plus_plus_expr() {
-    let src = "1++2";
-    let tokens = lexer().parse(src).into_result().unwrap();
-    let expression = expr()
-        .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
-        .into_result();
-    assert!(expression.is_ok());
+    #[test]
+    fn can_parse_expr() {
+        let src = "1 < 2";
+        let tokens = lexer().parse(src).into_result().unwrap();
+        let expression = expr()
+            .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+            .into_result();
+        assert!(expression.is_ok());
+    }
+
+    #[test]
+    fn can_parse_plus_plus_expr() {
+        let src = "1++2";
+        let tokens = lexer().parse(src).into_result().unwrap();
+        let expression = expr()
+            .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+            .into_result();
+        assert!(expression.is_ok());
+    }
 }

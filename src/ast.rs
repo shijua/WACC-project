@@ -1,5 +1,8 @@
 use crate::from_span;
 use crate::Spanned;
+use std::collections::HashMap;
+
+pub type Ident = String;
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Expr {
@@ -9,7 +12,7 @@ pub enum Expr {
     CharLiter(char),
     StrLiter(String),
     PairLiter,
-    Ident(String),
+    Ident(Ident),
     ArrayElem(Spanned<ArrayElem>),
     UnaryApp(UnaryOperator, Box<Spanned<Expr>>),
     BinaryApp(Box<Spanned<Expr>>, BinaryOperator, Box<Spanned<Expr>>),
@@ -17,7 +20,7 @@ pub enum Expr {
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct ArrayElem {
-    pub ident: String,
+    pub ident: Ident,
     pub indices: Vec<Spanned<Expr>>,
 }
 
@@ -73,6 +76,12 @@ impl std::fmt::Debug for Type {
     }
 }
 
+impl Default for Type {
+    fn default() -> Self {
+        Type::Any
+    }
+}
+
 #[derive(PartialEq, Clone, Debug)]
 pub struct ArrayLiter {
     pub val: Vec<Spanned<Expr>>,
@@ -109,30 +118,27 @@ pub enum Rvalue {
 pub enum Stmt {
     Skip,
     Declare(Spanned<Type>, Spanned<String>, Spanned<Rvalue>),
-    Assign(Spanned<Lvalue>, Spanned<Rvalue>),
-    Read(Spanned<Lvalue>),
-    Free(Spanned<Expr>),
+    Assign(Type, Spanned<Lvalue>, Spanned<Rvalue>),
+    Read(Type, Spanned<Lvalue>),
+    Free(Type, Spanned<Expr>),
     Return(Spanned<Expr>),
     Exit(Spanned<Expr>),
-    Print(Spanned<Expr>),
-    Println(Spanned<Expr>),
-    If(
-        Spanned<Expr>,
-        Box<Spanned<ReturningStmt>>,
-        Box<Spanned<ReturningStmt>>,
-    ),
-    While(Spanned<Expr>, Box<Spanned<ReturningStmt>>),
-    Scope(Box<Spanned<ReturningStmt>>),
-    Serial(Box<Spanned<ReturningStmt>>, Box<Spanned<ReturningStmt>>),
-    // // "virtual" Statement Type for enforced function returning condition.
-    // Returning(Box<Stmt>),
+    Print(Type, Spanned<Expr>),
+    Println(Type, Spanned<Expr>),
+    Serial(Box<Spanned<Stmt>>, Box<Spanned<Stmt>>),
+
+    // Scoped Statements:
+    // These statements by default can generate their own statement tables.
+    If(Spanned<Expr>, Box<Spanned<Stmt>>, Box<Spanned<Stmt>>),
+    While(Spanned<Expr>, Box<Spanned<Stmt>>),
+    Scope(Box<Spanned<Stmt>>),
 }
 
-#[derive(PartialEq, Clone, Debug)]
-pub struct ReturningStmt {
-    pub statement: Spanned<Stmt>,
-    pub returning: bool,
-}
+// #[derive(PartialEq, Clone, Debug)]
+// pub struct ScopedStat {
+//     pub stat: Box<Spanned<Stmt>>,
+//     pub symbol_table: todo!(),
+// }
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Param {
@@ -142,7 +148,7 @@ pub enum Param {
 #[derive(PartialEq, Clone, Debug)]
 pub struct Function {
     // ident
-    pub ident: Spanned<String>,
+    pub ident: Spanned<Ident>,
 
     // type
     pub return_type: Spanned<Type>,
@@ -151,11 +157,11 @@ pub struct Function {
     pub parameters: Vec<Spanned<Param>>,
 
     // body statement
-    pub body: Spanned<ReturningStmt>,
+    pub body: Spanned<Stmt>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Program {
     pub functions: Vec<Spanned<Function>>,
-    pub body: Spanned<ReturningStmt>,
+    pub body: Spanned<Stmt>,
 }
