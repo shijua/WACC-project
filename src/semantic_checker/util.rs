@@ -1,8 +1,10 @@
-use std::collections::HashMap;
-use crate::ast::{ArgList, ArrayElem, ArrayLiter, Expr, Function, Lvalue, PairElem, Param, Rvalue, Type};
-use crate::semantic_checker::symbol_table::SymbolTable;
+use crate::ast::{
+    ArgList, ArrayElem, ArrayLiter, Expr, Function, Lvalue, PairElem, Param, Rvalue, Type,
+};
 use crate::semantic_checker::type_checker::{binary_operator_check, unary_operator_check};
-use crate::{any_span, create_span, from_span, get_span, Span, span_cmp, Spanned};
+use crate::symbol_table::SymbolTable;
+use crate::{any_span, create_span, from_span, get_span, span_cmp, Span, Spanned};
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct Error {
@@ -12,9 +14,7 @@ pub struct Error {
 
 impl Error {
     pub fn new_error(span: Span, msg: String) -> Error {
-        Error {
-            span, msg
-        }
+        Error { span, msg }
     }
 
     pub fn extract_span(&self) -> Span {
@@ -29,11 +29,20 @@ impl Error {
 // check type2 (usually rvalue) is the same as type1 (usually lvalue) between char[] and string
 // we will convert type2 in to char of array in array_elem_to_type into string
 // so what we are doing now is to convert type1 to char of array and compare with type2
-pub fn type_check_array_elem(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Result<Spanned<Type>, Error> {
+pub fn type_check_array_elem(
+    type1: &Spanned<Type>,
+    type2: &Spanned<Type>,
+) -> Result<Spanned<Type>, Error> {
     if span_cmp(&char_to_string_conversion(type1), type2) {
         Ok(type1.clone())
     } else {
-        Err(Error::new_error(get_span(type2), format!("Type mismatch in checking <array-elem> {:?}", from_span(type2))))
+        Err(Error::new_error(
+            get_span(type2),
+            format!(
+                "Type mismatch in checking <array-elem> {:?}",
+                from_span(type2)
+            ),
+        ))
     }
 }
 
@@ -48,7 +57,7 @@ pub fn char_to_string_conversion(type1: &Spanned<Type>) -> Spanned<Type> {
                 type1.clone()
             }
         }
-        _ => type1.clone()
+        _ => type1.clone(),
     }
 }
 
@@ -59,75 +68,80 @@ pub fn type_check(type1: &Spanned<Type>, type2: &Spanned<Type>) -> Result<Spanne
     }
     match from_span(type2) {
         // check inside of pair type
-        Type::Pair(p1, p2) => {
-            match from_span(type1) {
-                Type::Pair(p3, p4) => {
-                    let p1_result = type_check(p1, p3);
-                    if p1_result.is_err() && !span_cmp(p1, p3) {
-                        let p1_result = type_check(p3, p1);
-                        if p1_result.is_err() {
-                            return p1_result;
-                        }
+        Type::Pair(p1, p2) => match from_span(type1) {
+            Type::Pair(p3, p4) => {
+                let p1_result = type_check(p1, p3);
+                if p1_result.is_err() && !span_cmp(p1, p3) {
+                    let p1_result = type_check(p3, p1);
+                    if p1_result.is_err() {
+                        return p1_result;
                     }
-                    let p2_result = type_check(p2, p4);
-                    if p2_result.is_err() && !span_cmp(p2, p4) {
-                        let p2_result = type_check(p4, p2);
-                        if p2_result.is_err() {
-                            return p2_result;
-                        }
-                    }
-                    Ok(any_span())
                 }
-                Type::NestedPair => Ok(any_span()),
-                _ => Err(Error::new_error(
-                    get_span(p1),
-                    format!("{}", "corresponding element is not legal pair type".to_string())
-                ))
+                let p2_result = type_check(p2, p4);
+                if p2_result.is_err() && !span_cmp(p2, p4) {
+                    let p2_result = type_check(p4, p2);
+                    if p2_result.is_err() {
+                        return p2_result;
+                    }
+                }
+                Ok(any_span())
             }
-        }
-        Type::NestedPair => {
-            match from_span(type1) {
-                Type::Pair(..) | Type::NestedPair => Ok(any_span()),
-                _ => Err(Error{
-                    span: get_span(type1),
-                    msg: "corresponding element is not legal pair type".to_string(),
-                })
-            }
-        }
+            Type::NestedPair => Ok(any_span()),
+            _ => Err(Error::new_error(
+                get_span(p1),
+                format!(
+                    "{}",
+                    "corresponding element is not legal pair type".to_string()
+                ),
+            )),
+        },
+        Type::NestedPair => match from_span(type1) {
+            Type::Pair(..) | Type::NestedPair => Ok(any_span()),
+            _ => Err(Error {
+                span: get_span(type1),
+                msg: "corresponding element is not legal pair type".to_string(),
+            }),
+        },
         // check inside of array type
-        Type::Array(inner) => {
-            match from_span(type1) {
-                Type::Array(inner1) => type_check(inner1, inner),
-                _ => Err(Error{
-                    span: get_span(type1),
-                    msg: "corresponding element is not array type".to_string(),
-                })
-            }
-        }
+        Type::Array(inner) => match from_span(type1) {
+            Type::Array(inner1) => type_check(inner1, inner),
+            _ => Err(Error {
+                span: get_span(type1),
+                msg: "corresponding element is not array type".to_string(),
+            }),
+        },
         // if rhs is any, then it is ok
-        Type::Any => {
-            Ok(any_span())
-        }
-        _ => Err(Error{
+        Type::Any => Ok(any_span()),
+        _ => Err(Error {
             span: get_span(type1),
-            msg: "corresponding element is not valid type".to_string()
+            msg: "corresponding element is not valid type".to_string(),
         }),
     }
 }
 
-pub fn get_type_from_table(ident: &Spanned<String>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, Error> {
+pub fn get_type_from_table(
+    ident: &Spanned<String>,
+    symbol_table: &SymbolTable,
+) -> Result<Spanned<Type>, Error> {
     let symbol = symbol_table.find_all(ident);
     if symbol.is_none() {
-        return Err(Error{
+        return Err(Error {
             span: get_span(ident),
             msg: "ident undefined in symbol table".to_string(),
         });
     }
     // set span as ident
-    Ok(create_span(from_span(&symbol.unwrap().symbol_type).clone(), get_span(ident)))
+    Ok(create_span(
+        from_span(&symbol.unwrap().symbol_type).clone(),
+        get_span(ident),
+    ))
 }
 
-pub fn pair_elem_to_type<T>(pair_elem: &Spanned<PairElem>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, Error> {
+pub fn pair_elem_to_type<T>(
+    pair_elem: &Spanned<PairElem>,
+    symbol_table: &SymbolTable,
+    span: &Spanned<T>,
+) -> Result<Spanned<Type>, Error> {
     match from_span(pair_elem) {
         PairElem::PairElemFst(lvalue) => {
             let type_result = lvalue_to_type(lvalue, symbol_table);
@@ -139,10 +153,10 @@ pub fn pair_elem_to_type<T>(pair_elem: &Spanned<PairElem>, symbol_table: &Symbol
             match from_span(&type_result) {
                 Type::Pair(inner1, _) => Ok(*inner1.clone()),
                 Type::NestedPair => Ok(create_span(Type::Any, get_span(&span))),
-                _ => Err(Error{
+                _ => Err(Error {
                     span: get_span(&type_result),
                     msg: "pair element type *invalid".to_string(),
-                })
+                }),
             }
         }
         PairElem::PairElemSnd(lvalue) => {
@@ -154,23 +168,29 @@ pub fn pair_elem_to_type<T>(pair_elem: &Spanned<PairElem>, symbol_table: &Symbol
             match from_span(&type_result) {
                 Type::Pair(_, inner2) => Ok(*inner2.clone()),
                 Type::NestedPair => Ok(create_span(Type::Any, get_span(&span))),
-                _ => Err(Error{
+                _ => Err(Error {
                     span: get_span(&type_result),
                     msg: "such elem is not a pair".to_string(),
-                })
+                }),
             }
         }
     }
 }
 
-pub fn array_elem_to_type<T>(array_elem: &Spanned<ArrayElem>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, Error> {
+pub fn array_elem_to_type<T>(
+    array_elem: &Spanned<ArrayElem>,
+    symbol_table: &SymbolTable,
+    span: &Spanned<T>,
+) -> Result<Spanned<Type>, Error> {
     // get type of indent
-    let array_elem_type = get_type_from_table(&create_span(from_span(&array_elem).ident.clone(), get_span(span)), symbol_table);
+    let array_elem_type = get_type_from_table(
+        &create_span(from_span(&array_elem).ident.clone(), get_span(span)),
+        symbol_table,
+    );
     if array_elem_type.is_err() {
         return array_elem_type;
     }
     let mut array_elem_type = array_elem_type.unwrap();
-
 
     for expr in from_span(array_elem).indices.clone() {
         // check expr hos type int
@@ -181,8 +201,12 @@ pub fn array_elem_to_type<T>(array_elem: &Spanned<ArrayElem>, symbol_table: &Sym
         let expr_type = expr_result.unwrap();
         if from_span(&expr_type) != &Type::IntType {
             return Err(Error::new_error(
-                get_span(&expr_type), format!("array index is not an int type: Expected Int, found {:?}", from_span(&expr_type))
-            ))
+                get_span(&expr_type),
+                format!(
+                    "array index is not an int type: Expected Int, found {:?}",
+                    from_span(&expr_type)
+                ),
+            ));
         }
 
         // unwrap one box each time
@@ -193,7 +217,10 @@ pub fn array_elem_to_type<T>(array_elem: &Spanned<ArrayElem>, symbol_table: &Sym
             _ => {
                 return Err(Error::new_error(
                     get_span(&array_elem),
-                    format!("{}", "There is more indices than the dimension of the array".to_string())
+                    format!(
+                        "{}",
+                        "There is more indices than the dimension of the array".to_string()
+                    ),
                 ))
             }
         }
@@ -201,30 +228,31 @@ pub fn array_elem_to_type<T>(array_elem: &Spanned<ArrayElem>, symbol_table: &Sym
     Ok(array_elem_type)
 }
 
-
-pub fn lvalue_to_type(lvalue: &Spanned<Lvalue>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, Error> {
+pub fn lvalue_to_type(
+    lvalue: &Spanned<Lvalue>,
+    symbol_table: &SymbolTable,
+) -> Result<Spanned<Type>, Error> {
     match from_span(lvalue) {
         Lvalue::LIdent(ident) => get_type_from_table(ident, symbol_table),
-        Lvalue::LArrElem(array) => {
-            array_elem_to_type(array, symbol_table, lvalue)
-        }
-        Lvalue::LPairElem(pair) => {
-            pair_elem_to_type(pair, symbol_table, lvalue)
-        }
+        Lvalue::LArrElem(array) => array_elem_to_type(array, symbol_table, lvalue),
+        Lvalue::LPairElem(pair) => pair_elem_to_type(pair, symbol_table, lvalue),
     }
 }
 
-pub fn expr_to_type(expr: &Spanned<Expr>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, Error> {
+pub fn expr_to_type(
+    expr: &Spanned<Expr>,
+    symbol_table: &SymbolTable,
+) -> Result<Spanned<Type>, Error> {
     match from_span(expr) {
         Expr::IntLiter(_) => Ok(create_span(Type::IntType, get_span(&expr))),
         Expr::BoolLiter(_) => Ok(create_span(Type::BoolType, get_span(&expr))),
         Expr::CharLiter(_) => Ok(create_span(Type::CharType, get_span(&expr))),
         Expr::StrLiter(_) => Ok(create_span(Type::StringType, get_span(&expr))),
         Expr::PairLiter => Ok(create_span(Type::Any, get_span(&expr))),
-        Expr::Ident(ident) => get_type_from_table(&create_span(ident.clone(), get_span(&expr)), symbol_table),
-        Expr::ArrayElem(array) => {
-            array_elem_to_type(array, symbol_table, expr)
+        Expr::Ident(ident) => {
+            get_type_from_table(&create_span(ident.clone(), get_span(&expr)), symbol_table)
         }
+        Expr::ArrayElem(array) => array_elem_to_type(array, symbol_table, expr),
         Expr::UnaryApp(operator, operand) => {
             unary_operator_check(operator, operand, symbol_table, expr)
         }
@@ -234,11 +262,17 @@ pub fn expr_to_type(expr: &Spanned<Expr>, symbol_table: &SymbolTable) -> Result<
     }
 }
 
-pub fn arr_lit_to_type(array: &Spanned<ArrayLiter>, symbol_table: &SymbolTable) -> Result<Spanned<Type>, Error> {
+pub fn arr_lit_to_type(
+    array: &Spanned<ArrayLiter>,
+    symbol_table: &SymbolTable,
+) -> Result<Spanned<Type>, Error> {
     // check if array is null
     let array_val = &from_span(array).val;
     if array_val.is_empty() {
-        return Ok(create_span(Type::Array(Box::from(any_span())), get_span(array)));
+        return Ok(create_span(
+            Type::Array(Box::from(any_span())),
+            get_span(array),
+        ));
     }
 
     let mut array_type = any_span();
@@ -248,23 +282,38 @@ pub fn arr_lit_to_type(array: &Spanned<ArrayLiter>, symbol_table: &SymbolTable) 
             return expr_type;
         }
         let expr_type = expr_type.unwrap();
-        if from_span(&array_type) == &Type::Any { // for first element
+        if from_span(&array_type) == &Type::Any {
+            // for first element
             array_type = char_to_string_conversion(&expr_type);
         } else {
             // need to check double side here for type_check_array_elem
-            if type_check(&array_type, &expr_type).is_err() && type_check_array_elem(&array_type, &expr_type).is_err()
-                && type_check_array_elem(&expr_type, &array_type).is_err() {
+            if type_check(&array_type, &expr_type).is_err()
+                && type_check_array_elem(&array_type, &expr_type).is_err()
+                && type_check_array_elem(&expr_type, &array_type).is_err()
+            {
                 return Err(Error::new_error(
                     get_span(&expr_type),
-                    format!("array elements are not the same type: Expected {:?}, found {:?}", from_span(&array_type), from_span(&expr_type))
-                ))
+                    format!(
+                        "array elements are not the same type: Expected {:?}, found {:?}",
+                        from_span(&array_type),
+                        from_span(&expr_type)
+                    ),
+                ));
             }
         }
     }
-    Ok(char_to_string_conversion(&create_span(Type::Array(Box::from(array_type)), get_span(array))))
+    Ok(char_to_string_conversion(&create_span(
+        Type::Array(Box::from(array_type)),
+        get_span(array),
+    )))
 }
 
-pub fn new_pair_to_type<T>(expr1: &Spanned<Expr>, expr2: &Spanned<Expr>, symbol_table: &SymbolTable, span: &Spanned<T>) -> Result<Spanned<Type>, Error> {
+pub fn new_pair_to_type<T>(
+    expr1: &Spanned<Expr>,
+    expr2: &Spanned<Expr>,
+    symbol_table: &SymbolTable,
+    span: &Spanned<T>,
+) -> Result<Spanned<Type>, Error> {
     let expr1_type = expr_to_type(expr1, symbol_table);
     if expr1_type.is_err() {
         return expr1_type;
@@ -273,15 +322,22 @@ pub fn new_pair_to_type<T>(expr1: &Spanned<Expr>, expr2: &Spanned<Expr>, symbol_
     if expr2_type.is_err() {
         return expr2_type;
     }
-    Ok(create_span(Type::Pair(Box::new(expr1_type.unwrap()), Box::new(expr2_type.unwrap())), get_span(span)))
+    Ok(create_span(
+        Type::Pair(Box::new(expr1_type.unwrap()), Box::new(expr2_type.unwrap())),
+        get_span(span),
+    ))
 }
 
-pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_table: &SymbolTable,
-                  function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, Error> {
+pub fn call_check(
+    ident: &Spanned<String>,
+    arg_list: &Spanned<ArgList>,
+    symbol_table: &SymbolTable,
+    function_table: &HashMap<String, Spanned<Function>>,
+) -> Result<Spanned<Type>, Error> {
     // check if function is in the function table
     let function = function_table.get(from_span(ident));
     if function.is_none() {
-        return Err(Error{
+        return Err(Error {
             span: get_span(ident),
             msg: "function not found".to_string(),
         });
@@ -294,8 +350,12 @@ pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_t
     if parameters.len() != args.len() {
         return Err(Error::new_error(
             get_span(arg_list),
-            format!("function call parameter length mismatch: expected {:?}, actual {:?}", parameters.len(), args.len())
-        ))
+            format!(
+                "function call parameter length mismatch: expected {:?}, actual {:?}",
+                parameters.len(),
+                args.len()
+            ),
+        ));
     }
 
     // check if each parameter has the same type as the argument
@@ -307,7 +367,7 @@ pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_t
         let arg_type = arg_type.unwrap();
         let Param::Parameter(param_type, _) = from_span(&parameters[ind]);
         if type_check(param_type, &arg_type).is_err() {
-            return Err(Error{
+            return Err(Error {
                 span: get_span(param_type),
                 msg: "function call parameter type mismatch".to_string(),
             });
@@ -316,24 +376,31 @@ pub fn call_check(ident: &Spanned<String>, arg_list: &Spanned<ArgList>, symbol_t
     Ok(from_span(function).return_type.clone())
 }
 
-pub fn rvalue_to_type(rvalue: &Spanned<Rvalue>, symbol_table: &SymbolTable,
-                      function_table: &HashMap<String, Spanned<Function>>) -> Result<Spanned<Type>, Error> {
+pub fn rvalue_to_type(
+    rvalue: &Spanned<Rvalue>,
+    symbol_table: &SymbolTable,
+    function_table: &HashMap<String, Spanned<Function>>,
+) -> Result<Spanned<Type>, Error> {
     match from_span(rvalue) {
         Rvalue::RExpr(expr) => expr_to_type(expr, symbol_table),
         Rvalue::RArrLit(array) => arr_lit_to_type(array, symbol_table),
         Rvalue::RNewPair(expr1, expr2) => new_pair_to_type(expr1, expr2, symbol_table, rvalue),
         Rvalue::RPairElem(pair) => pair_elem_to_type(pair, symbol_table, rvalue),
-        Rvalue::RCall(ident, arg_list) => call_check(ident, arg_list, symbol_table, function_table)
+        Rvalue::RCall(ident, arg_list) => call_check(ident, arg_list, symbol_table, function_table),
     }
 }
 
 #[cfg(test)]
 mod util_tests {
+    use crate::ast::{
+        ArgList, ArrayElem, ArrayLiter, Expr, Function, Lvalue, PairElem, Rvalue, Type,
+    };
+    use crate::semantic_checker::util::{
+        array_elem_to_type, expr_to_type, get_type_from_table, pair_elem_to_type, rvalue_to_type,
+    };
+    use crate::symbol_table::SymbolTable;
+    use crate::{create_span, empty_span, span_cmp, Spanned};
     use std::collections::HashMap;
-    use crate::ast::{ArgList, ArrayElem, ArrayLiter, Expr, Function, Lvalue, PairElem, Rvalue, Type};
-    use crate::semantic_checker::symbol_table::SymbolTable;
-    use crate::semantic_checker::util::{array_elem_to_type, expr_to_type, get_type_from_table, pair_elem_to_type, rvalue_to_type};
-    use crate::{create_span, span_cmp, empty_span, Spanned};
 
     fn create_empty_symbol_table() -> SymbolTable<'static> {
         SymbolTable::create(None, false, None)
@@ -353,8 +420,23 @@ mod util_tests {
         let d = create_span("d".to_string(), empty_span());
         let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
         let _test = symbol_table.add(&b, create_span(Type::CharType, empty_span()));
-        let _test = symbol_table.add(&c, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
-        let _test = symbol_table.add(&d, create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span()));
+        let _test = symbol_table.add(
+            &c,
+            create_span(
+                Type::Array(Box::new(create_span(Type::IntType, empty_span()))),
+                empty_span(),
+            ),
+        );
+        let _test = symbol_table.add(
+            &d,
+            create_span(
+                Type::Pair(
+                    Box::new(create_span(Type::IntType, empty_span())),
+                    Box::new(create_span(Type::CharType, empty_span())),
+                ),
+                empty_span(),
+            ),
+        );
         assert!(matches!(
             get_type_from_table(&create_span("a".to_string(), empty_span()), &symbol_table),
             Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
@@ -375,8 +457,23 @@ mod util_tests {
         let d = create_span("d".to_string(), empty_span());
         let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
         let _test = symbol_table.add(&b, create_span(Type::CharType, empty_span()));
-        let _test = symbol_table.add(&c, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
-        let _test = symbol_table.add(&d, create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span()));
+        let _test = symbol_table.add(
+            &c,
+            create_span(
+                Type::Array(Box::new(create_span(Type::IntType, empty_span()))),
+                empty_span(),
+            ),
+        );
+        let _test = symbol_table.add(
+            &d,
+            create_span(
+                Type::Pair(
+                    Box::new(create_span(Type::IntType, empty_span())),
+                    Box::new(create_span(Type::CharType, empty_span())),
+                ),
+                empty_span(),
+            ),
+        );
         assert!(matches!(
             pair_elem_to_type(&create_span(
                 PairElem::PairElemFst(Box::from(
@@ -405,8 +502,23 @@ mod util_tests {
         let d = create_span("d".to_string(), empty_span());
         let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
         let _test = symbol_table.add(&b, create_span(Type::CharType, empty_span()));
-        let _test = symbol_table.add(&c, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
-        let _test = symbol_table.add(&d, create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span()));
+        let _test = symbol_table.add(
+            &c,
+            create_span(
+                Type::Array(Box::new(create_span(Type::IntType, empty_span()))),
+                empty_span(),
+            ),
+        );
+        let _test = symbol_table.add(
+            &d,
+            create_span(
+                Type::Pair(
+                    Box::new(create_span(Type::IntType, empty_span())),
+                    Box::new(create_span(Type::CharType, empty_span())),
+                ),
+                empty_span(),
+            ),
+        );
         assert!(matches!(
             array_elem_to_type(&create_span(
                 ArrayElem {
@@ -424,7 +536,6 @@ mod util_tests {
                 }, empty_span()), &symbol_table, &create_span("c".to_string(), empty_span())),
             Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
         ));
-
     }
 
     #[test]
@@ -436,8 +547,23 @@ mod util_tests {
         let d = create_span("d".to_string(), empty_span());
         let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
         let _test = symbol_table.add(&b, create_span(Type::CharType, empty_span()));
-        let _test = symbol_table.add(&c, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
-        let _test = symbol_table.add(&d, create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span()));
+        let _test = symbol_table.add(
+            &c,
+            create_span(
+                Type::Array(Box::new(create_span(Type::IntType, empty_span()))),
+                empty_span(),
+            ),
+        );
+        let _test = symbol_table.add(
+            &d,
+            create_span(
+                Type::Pair(
+                    Box::new(create_span(Type::IntType, empty_span())),
+                    Box::new(create_span(Type::CharType, empty_span())),
+                ),
+                empty_span(),
+            ),
+        );
         assert!(matches!(
             expr_to_type(&create_span(Expr::IntLiter(1), empty_span()), &symbol_table),
             Ok(types) if span_cmp(&types, &create_span(Type::IntType, empty_span()))
@@ -473,8 +599,23 @@ mod util_tests {
         let d = create_span("d".to_string(), empty_span());
         let _test = symbol_table.add(&a, create_span(Type::IntType, empty_span()));
         let _test = symbol_table.add(&b, create_span(Type::CharType, empty_span()));
-        let _test = symbol_table.add(&c, create_span(Type::Array(Box::new(create_span(Type::IntType, empty_span()))), empty_span()));
-        let _test = symbol_table.add(&d, create_span(Type::Pair(Box::new(create_span(Type::IntType, empty_span())), Box::new(create_span(Type::CharType, empty_span()))), empty_span()));
+        let _test = symbol_table.add(
+            &c,
+            create_span(
+                Type::Array(Box::new(create_span(Type::IntType, empty_span()))),
+                empty_span(),
+            ),
+        );
+        let _test = symbol_table.add(
+            &d,
+            create_span(
+                Type::Pair(
+                    Box::new(create_span(Type::IntType, empty_span())),
+                    Box::new(create_span(Type::CharType, empty_span())),
+                ),
+                empty_span(),
+            ),
+        );
         let function_table = create_function_table();
         assert!(matches!(
             rvalue_to_type(&create_span(Rvalue::RExpr(Box::from(create_span(Expr::IntLiter(1), empty_span()))), empty_span()), &symbol_table, &function_table),
@@ -506,9 +647,18 @@ mod util_tests {
         ));
 
         assert!(matches!(
-            rvalue_to_type(&create_span(Rvalue::RCall(create_span("d".to_string(), empty_span()), create_span(ArgList::Arg(Vec::new()), empty_span())), empty_span()), &symbol_table, &function_table),
+            rvalue_to_type(
+                &create_span(
+                    Rvalue::RCall(
+                        create_span("d".to_string(), empty_span()),
+                        create_span(ArgList::Arg(Vec::new()), empty_span())
+                    ),
+                    empty_span()
+                ),
+                &symbol_table,
+                &function_table
+            ),
             Err(_)
         ));
-
     }
 }

@@ -1,3 +1,4 @@
+use crate::ast::Type;
 use crate::parser::lexer::lexer;
 use crate::parser::program::program;
 use crate::semantic_checker::function_checker::semantic_check_start;
@@ -8,11 +9,11 @@ use chumsky::prelude::SimpleSpan;
 use chumsky::Parser;
 use std::process::exit;
 use std::{env, fs};
-use crate::ast::Type;
 
 mod ast;
 mod parser;
 mod semantic_checker;
+mod symbol_table;
 
 const READ_ERROR: i32 = -1;
 const VALID_CODE: i32 = 0;
@@ -47,7 +48,6 @@ pub fn from_span<T>(type1: &Spanned<T>) -> &T {
 pub fn get_span<T>(type1: &Spanned<T>) -> Span {
     type1.1
 }
-
 
 fn main() {
     // collect environment arguments
