@@ -1,7 +1,7 @@
 use crate::ast::{Expr, Type, UnaryOperator};
-use crate::semantic_checker::util::SemanticType;
+use crate::semantic_checker::util::{match_given_type, SemanticType};
 use crate::symbol_table::ScopeInfo;
-use crate::{AriadneResult, MessageResult};
+use crate::{from_span, AriadneResult, MessageResult};
 
 // Expression Analysis starts here
 impl SemanticType for Expr {
@@ -13,15 +13,39 @@ impl SemanticType for Expr {
             Expr::StrLiter(_) => Type::StringType,
             Expr::PairLiter => Type::Any,
             Expr::Ident(id) => id.analyse(scope)?,
-            Expr::ArrayElem(_) => todo!(),
             Expr::UnaryApp(op, exp) => match op {
-                UnaryOperator::Ord => todo!(),
-                UnaryOperator::Chr => todo!(),
-                UnaryOperator::Bang => todo!(),
-                UnaryOperator::Negative => todo!(),
+                UnaryOperator::Ord => {
+                    match_given_type(scope, &Type::CharType, &mut exp.0)?;
+                    Type::IntType
+                }
+                UnaryOperator::Chr => {
+                    match_given_type(scope, &Type::IntType, &mut exp.0)?;
+                    Type::CharType
+                }
+                UnaryOperator::Bang => {
+                    match_given_type(scope, &Type::BoolType, &mut exp.0)?.clone()
+                }
+                UnaryOperator::Negative => {
+                    match_given_type(scope, &Type::IntType, &mut exp.0)?.clone()
+                }
                 UnaryOperator::Len => todo!(),
             },
             Expr::BinaryApp(_, _, _) => todo!(),
+            Expr::ArrayElem(_) => todo!(),
         })
+    }
+}
+
+#[cfg(test)]
+mod expr_semantic_tests {
+    use crate::ast::{Expr, Type};
+    use crate::semantic_checker::util::SemanticType;
+    use crate::symbol_table::{initialise, ScopeInfo, SymbolTable};
+
+    #[test]
+    fn literals() {
+        let mut symbol_table = SymbolTable::default();
+        let scope = &mut initialise(&mut symbol_table);
+        assert_eq!(Expr::IntLiter(5).analyse(scope), Ok(Type::IntType));
     }
 }

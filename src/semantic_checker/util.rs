@@ -1,4 +1,4 @@
-use crate::ast::{Ident, Type};
+use crate::ast::{ArrayElem, Ident, Type};
 use crate::symbol_table::ScopeInfo;
 use crate::{from_span, get_span, AriadneResult, MessageResult};
 
@@ -30,14 +30,26 @@ impl SemanticType for Ident {
     }
 }
 
+impl SemanticType for ArrayElem {
+    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
+        todo!()
+    }
+}
+
 pub fn match_given_type<'a, A: SemanticType>(
     scope: &mut ScopeInfo,
-    given_type: &'a Type,
+    expected_type: &'a Type,
     actual: &mut A,
-) {
-    // let actual_type = actual.analyse(scope)?;
+) -> MessageResult<Type> {
+    let actual_type = actual.analyse(scope)?;
 
-    todo!()
+    match expected_type.clone().unify(actual_type.clone()) {
+        Some(_) => Ok(expected_type.clone()),
+        None => Err(format!(
+            "Type Mismatch: Expecting {:?}, but actual {:?} \n",
+            expected_type, actual_type
+        )),
+    }
 }
 
 pub trait Compatible {
