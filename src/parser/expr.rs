@@ -1,5 +1,5 @@
 use crate::ast::{ArrayElem, BinaryOperator, Expr, UnaryOperator};
-use crate::parser::lexer::{lexer, ParserInput, Token};
+use crate::parser::lexer::{ParserInput, Token};
 use crate::{Span, Spanned};
 use chumsky::error::Rich;
 use chumsky::input::MapExtra;
@@ -173,7 +173,7 @@ pub fn expr<'tokens, 'src: 'tokens>() -> impl Parser<
 }
 
 #[cfg(test)]
-mod expr_tests {
+mod expr_parser_tests {
     use crate::parser::expr::expr;
     use crate::parser::lexer::lexer;
     use chumsky::input::Input;
