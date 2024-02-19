@@ -3,7 +3,10 @@ pub enum Reg {
     StackPointer, // rsp, callee-save
     BasePointer,  // rbp, callee-save
     Arg(ArgReg),
-    // R10-R15, RBX
+    // below are to mimic variables that have not actually been assigned registers.
+    Scratch(usize),
+    // ...and also overflowing function arguments
+    AllArgs(usize),
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Hash)]

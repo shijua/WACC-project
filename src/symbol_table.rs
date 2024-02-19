@@ -30,14 +30,20 @@ pub struct ScopeInfo<'a> {
     pub parent: Option<&'a ScopeInfo<'a>>,
     // counter for unique internal identifiers created
     pub cnt: u32,
+    // reference relative scratch registers
+    pub scratch_regs: &'a Cell<usize>,
 }
 
-pub fn create(symbol_table: &mut SymbolTable) -> ScopeInfo {
+pub fn create<'a>(
+    symbol_table: &'a mut SymbolTable,
+    scratch_regs: &'a Cell<usize>,
+) -> ScopeInfo<'a> {
     symbol_table.prefix = String::new();
     ScopeInfo {
         symbol_table,
         parent: None,
         cnt: 0,
+        scratch_regs,
     }
 }
 
@@ -68,6 +74,13 @@ impl ScopeInfo<'_> {
         }
     }
 
+    // Allocate new scratch register
+    pub fn get_scratch_regs(&mut self) -> Reg {
+        let new_reg = self.scratch_regs.get() + 1;
+        self.scratch_regs.set(new_reg);
+        Reg::Scratch(new_reg)
+    }
+
     // search the given variable in our current symbol table
     pub fn get_var(&self, ident: &mut Ident) -> Option<(Type, Reg)> {
         match self.get(ident)? {
@@ -81,6 +94,25 @@ impl ScopeInfo<'_> {
         match self.get(ident)? {
             IdentRecord::Label(t, label) => Some((t, label)),
             _ => None,
+        }
+    }
+
+    // generate a unique identifier for renaming
+    pub fn generate_unique(&mut self) -> Ident {
+        // increment unique counter
+        self.cnt += 1;
+        format!("#{}{}", self.symbol_table.prefix, self.cnt)
+    }
+
+    pub fn create_scope<'a>(&'a self, symbol_table: &'a mut SymbolTable) -> ScopeInfo<'a> {
+        /* Every time we enter a new scope, add another _ to all the variable names. */
+        symbol_table.prefix = format!("{}_", self.symbol_table.prefix);
+
+        ScopeInfo {
+            symbol_table,
+            parent: Some(self),
+            cnt: 0,
+            scratch_regs: self.scratch_regs,
         }
     }
 }
