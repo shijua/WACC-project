@@ -35,7 +35,8 @@ pub fn match_given_type<'a, A: SemanticType>(
     given_type: &'a Type,
     actual: &mut A,
 ) {
-    let actual_type = actual.analyse(scope)?;
+    // let actual_type = actual.analyse(scope)?;
+
     todo!()
 }
 
