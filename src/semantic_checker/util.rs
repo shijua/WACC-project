@@ -1,77 +1,56 @@
-use crate::ast::{ArrayElem, Type};
-use crate::symbol_table::IdentRecord;
+use crate::ast::Type;
 use crate::symbol_table::ScopeInfo;
-use crate::{AriadneResult, MessageResult};
+use crate::{from_span, get_span, AriadneResult, MessageResult};
 
-trait Semantic {
-    type Input: Default;
+pub trait SemanticType {
     type Output;
-    fn analyse(&mut self, scope: &mut ScopeInfo, aux: Self::Input) -> AriadneResult<Self::Output>;
+    fn analyse(&mut self, scope: &mut ScopeInfo) -> AriadneResult<Self::Output>;
 }
 
-impl<T: Semantic<Output = Type>> Semantic for &mut T {
-    type Input = <T as Semantic>::Input;
+impl<T: SemanticType<Output = Type>> SemanticType for &mut T {
     type Output = Type;
 
-    fn analyse(&mut self, scope: &mut ScopeInfo, input: Self::Input) -> AriadneResult<Type> {
-        (**self).analyse(scope, input)
+    fn analyse(&mut self, scope: &mut ScopeInfo) -> AriadneResult<Type> {
+        (**self).analyse(scope)
     }
 }
 
-impl<T: Semantic<Output = Type>> Semantic for Box<T> {
-    type Input = <T as Semantic>::Input;
+impl<T: SemanticType<Output = Type>> SemanticType for Box<T> {
     type Output = Type;
 
-    fn analyse(&mut self, scope: &mut ScopeInfo, input: Self::Input) -> AriadneResult<Type> {
-        (**self).analyse(scope, input)
+    fn analyse(&mut self, scope: &mut ScopeInfo) -> AriadneResult<Type> {
+        (**self).analyse(scope)
     }
 }
 
-#[derive(Clone)]
-pub enum Permissions {
-    Declare(Type), // able to declare this given variable (assign inclusive)
-    Assign,        // able to assign new values to this variable
-    Regular,       // no additional permission is given
+pub trait Compatible {
+    fn unify(self, t: Type) -> Option<Type>;
 }
 
-impl Default for Permissions {
-    fn default() -> Self {
-        Permissions::Regular
-    }
-}
-
-impl Permissions {
-    pub fn regular_only(&self) -> MessageResult<()> {
-        use Permissions::*;
-        match self {
-            Declare(_) => Err("Cannot perform declaration".to_string()),
-            Assign => Err("Cannot perform assigning".to_string()),
-            Regular => Ok(()),
+impl Compatible for Type {
+    fn unify(self, t: Type) -> Option<Type> {
+        match (self, t) {
+            (Type::Any, t) | (t, Type::Any) => Some(t),
+            (t1, t2) if t1 == t2 => Some(t1),
+            (Type::Pair(x1, x2), Type::Pair(y1, y2)) => {
+                let base_x1 = *x1;
+                let base_x2 = *x2;
+                let base_y1 = *y1;
+                let base_y2 = *y2;
+                Some(Type::Pair(
+                    Box::new((base_x1.clone().0.unify(base_y1.0)?, get_span(&base_x1))),
+                    Box::new((base_x2.clone().0.unify(base_y2.0)?, get_span(&base_x2))),
+                ))
+            }
+            (Type::Array(t1), Type::Array(t2)) => {
+                let base_t1 = *t1;
+                let base_t2 = *t2;
+                Some(Type::Array(Box::new((
+                    base_t1.clone().0.unify(base_t2.0)?,
+                    get_span(&base_t1),
+                ))))
+            }
+            _ => None,
         }
-    }
-
-    pub fn assign_only(&self) -> MessageResult<()> {
-        use Permissions::*;
-        match self {
-            Declare(_) => Err("Cannot perform declaration".to_string()),
-            _ => Ok(()),
-        }
-    }
-}
-
-pub fn analyse_ident(
-    ident: &mut String,
-    scope: &mut ScopeInfo,
-    status: Permissions,
-) -> MessageResult<Type> {
-    match status {
-        Permissions::Declare(type_) => {
-            scope.add(ident, type_.clone())?;
-            Ok(type_)
-        }
-        _ => match scope.get(ident) {
-            Some(IdentRecord::Var(t, _) | IdentRecord::Label(t, _)) => Ok(t.clone()),
-            _ => Err("Use of undeclared variable".to_string()),
-        },
     }
 }

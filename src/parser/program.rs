@@ -8,7 +8,6 @@ use chumsky::error::Rich;
 use chumsky::prelude::just;
 use chumsky::IterParser;
 use chumsky::{extra, Parser};
-use std::cell::Cell;
 
 // <param> ::= <type> <ident>
 fn param<'tokens, 'src: 'tokens>() -> impl Parser<
@@ -61,9 +60,6 @@ fn func_parser<'tokens, 'src: 'tokens>() -> impl Parser<
 
                 // function body's symbol table
                 body_symbol_table: SymbolTable::default(),
-
-                // used scratch registers
-                scratch_regs: Cell::new(0),
             };
 
             if from_span(&func_prototype.body).is_returning() == false {
@@ -94,7 +90,6 @@ pub fn program<'tokens, 'src: 'tokens>() -> impl Parser<
                 Program {
                     functions: func_list,
                     body: ScopedStmt::new(st),
-                    body_scratch_regs: Cell::new(0),
                     symbol_table: SymbolTable::default(),
                 },
                 e.span(),

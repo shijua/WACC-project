@@ -187,18 +187,12 @@ pub struct Function {
 
     // function body's symbol table
     pub body_symbol_table: SymbolTable,
-
-    // used scratch registers
-    pub scratch_regs: Cell<usize>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Program {
     pub functions: Vec<Spanned<Function>>,
     pub body: ScopedStmt,
-
-    // allocated scratch registers
-    pub body_scratch_regs: Cell<usize>,
 
     // root symbol table
     pub symbol_table: SymbolTable,
