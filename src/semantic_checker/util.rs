@@ -1,4 +1,4 @@
-use crate::ast::{ArrayElem, Ident, Type};
+use crate::ast::{ArrayElem, Ident, PairElem, Type};
 use crate::symbol_table::ScopeInfo;
 use crate::{from_span, get_span, AriadneResult, MessageResult};
 
@@ -48,6 +48,29 @@ impl SemanticType for ArrayElem {
         }
 
         Ok(array_elem_type)
+    }
+}
+
+impl SemanticType for PairElem {
+    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
+        Ok(match self {
+            PairElem::PairElemFst(lvalue) => {
+                let elem_type = lvalue.clone().0.analyse(scope)?;
+                match elem_type {
+                    Type::Pair(inner1, _) => inner1.0.clone(),
+                    Type::NestedPair => Type::Any,
+                    _ => return Err("pair element type is invalid".to_string()),
+                }
+            }
+            PairElem::PairElemSnd(lvalue) => {
+                let elem_type = lvalue.clone().0.analyse(scope)?;
+                match elem_type {
+                    Type::Pair(_, inner2) => inner2.0.clone(),
+                    Type::NestedPair => Type::Any,
+                    _ => return Err("pair element type is invalid".to_string()),
+                }
+            }
+        })
     }
 }
 
