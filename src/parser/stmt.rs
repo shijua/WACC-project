@@ -272,6 +272,7 @@ impl Stmt {
         use Stmt::*;
         match self {
             Return(_) | Exit(_) => true,
+            Scope(scoped) => scoped.stmt.0.is_returning(),
             Serial(_, st2) => st2.0.is_returning(),
             If(_, st1, st2) => st1.stmt.0.is_returning() && st2.stmt.0.is_returning(),
             _ => false,
