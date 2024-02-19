@@ -1,5 +1,6 @@
 use crate::ast::{Ident, Type};
 use crate::code_generator::asm::Reg;
+use crate::{any_span, from_span, get_span, AriadneResult, Error, MessageResult, Spanned};
 use std::cell::Cell;
 use std::collections::HashMap;
 
@@ -104,6 +105,7 @@ impl ScopeInfo<'_> {
         format!("#{}{}", self.symbol_table.prefix, self.cnt)
     }
 
+    // creates a scope that inherits from its parent scope
     pub fn create_scope<'a>(&'a self, symbol_table: &'a mut SymbolTable) -> ScopeInfo<'a> {
         /* Every time we enter a new scope, add another _ to all the variable names. */
         symbol_table.prefix = format!("{}_", self.symbol_table.prefix);
@@ -114,5 +116,28 @@ impl ScopeInfo<'_> {
             cnt: 0,
             scratch_regs: self.scratch_regs,
         }
+    }
+
+    // set information of ident to given_record.
+    pub fn insert_record(
+        &mut self,
+        ident: &String,
+        given_record: IdentRecord,
+    ) -> MessageResult<String> {
+        match self.symbol_table.table.insert(ident.clone(), given_record) {
+            Some(_) => Err("redefining type bindings within the same scope".to_string()),
+            None => Ok(ident.clone()),
+        }
+    }
+
+    // add a new ident to the symbol table, with relative renaming
+    pub fn add(&mut self, ident: &mut String, t: Type) -> MessageResult<()> {
+        let reg = self.get_scratch_regs();
+
+        self.insert_record(ident, IdentRecord::Var(t, reg))?;
+
+        *(ident) = format!("{}{:?}", self.symbol_table.prefix, reg);
+
+        Ok(())
     }
 }

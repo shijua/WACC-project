@@ -12,6 +12,7 @@ use std::{env, fs};
 mod ast;
 mod code_generator;
 mod parser;
+mod semantic_checker;
 mod symbol_table;
 
 const READ_ERROR: i32 = -1;
@@ -47,6 +48,29 @@ pub fn from_span<T>(type1: &Spanned<T>) -> &T {
 pub fn get_span<T>(type1: &Spanned<T>) -> Span {
     type1.1
 }
+
+#[derive(Debug)]
+pub struct Error {
+    span: Span,
+    msg: String,
+}
+
+impl Error {
+    pub fn new_error(span: Span, msg: String) -> Error {
+        Error { span, msg }
+    }
+
+    pub fn extract_span(&self) -> Span {
+        self.span
+    }
+
+    pub fn extract_msg(&self) -> String {
+        self.msg.clone()
+    }
+}
+
+type MessageResult<T> = Result<T, String>;
+type AriadneResult<T> = Result<T, Error>;
 
 fn main() {
     // collect environment arguments
