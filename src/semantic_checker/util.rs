@@ -1,26 +1,42 @@
-use crate::ast::Type;
+use crate::ast::{Ident, Type};
 use crate::symbol_table::ScopeInfo;
 use crate::{from_span, get_span, AriadneResult, MessageResult};
 
 pub trait SemanticType {
-    type Output;
-    fn analyse(&mut self, scope: &mut ScopeInfo) -> AriadneResult<Self::Output>;
+    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type>;
 }
 
-impl<T: SemanticType<Output = Type>> SemanticType for &mut T {
-    type Output = Type;
-
-    fn analyse(&mut self, scope: &mut ScopeInfo) -> AriadneResult<Type> {
+impl<T: SemanticType> SemanticType for &mut T {
+    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
         (**self).analyse(scope)
     }
 }
 
-impl<T: SemanticType<Output = Type>> SemanticType for Box<T> {
-    type Output = Type;
-
-    fn analyse(&mut self, scope: &mut ScopeInfo) -> AriadneResult<Type> {
+impl<T: SemanticType> SemanticType for Box<T> {
+    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
         (**self).analyse(scope)
     }
+}
+
+impl SemanticType for Ident {
+    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
+        match scope.get_type(self) {
+            Some((t, renamed_id)) => {
+                *self = renamed_id;
+                Ok(t.clone())
+            }
+            None => Err(format!("identifier {} undeclared", self)),
+        }
+    }
+}
+
+pub fn match_given_type<'a, A: SemanticType>(
+    scope: &mut ScopeInfo,
+    given_type: &'a Type,
+    actual: &mut A,
+) {
+    let actual_type = actual.analyse(scope)?;
+    todo!()
 }
 
 pub trait Compatible {

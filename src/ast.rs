@@ -109,7 +109,7 @@ pub enum PairElem {
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Lvalue {
-    LIdent(Spanned<String>),
+    LIdent(Spanned<Ident>),
     LArrElem(Spanned<ArrayElem>),
     LPairElem(Spanned<PairElem>),
 }
@@ -125,13 +125,13 @@ pub enum Rvalue {
     RArrLit(Box<Spanned<ArrayLiter>>),
     RNewPair(Box<Spanned<Expr>>, Box<Spanned<Expr>>),
     RPairElem(Box<Spanned<PairElem>>),
-    RCall(Spanned<String>, Spanned<ArgList>),
+    RCall(Spanned<Ident>, Spanned<ArgList>),
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Stmt {
     Skip,
-    Declare(Spanned<Type>, Spanned<String>, Spanned<Rvalue>),
+    Declare(Spanned<Type>, Spanned<Ident>, Spanned<Rvalue>),
     Assign(Type, Spanned<Lvalue>, Spanned<Rvalue>),
     Read(Type, Spanned<Lvalue>),
     Free(Type, Spanned<Expr>),
@@ -165,7 +165,7 @@ impl ScopedStmt {
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Param {
-    Parameter(Spanned<Type>, Spanned<String>),
+    Parameter(Spanned<Type>, Spanned<Ident>),
 }
 
 #[derive(PartialEq, Clone, Debug)]
