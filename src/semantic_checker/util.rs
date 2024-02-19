@@ -32,7 +32,22 @@ impl SemanticType for Ident {
 
 impl SemanticType for ArrayElem {
     fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
-        todo!()
+        for mut exp in self.indices.clone() {
+            match_given_type(scope, &Type::IntType, &mut exp.0)?;
+        }
+
+        let mut array_elem_type = self.ident.analyse(scope)?;
+
+        for _ in self.indices.clone() {
+            array_elem_type = match array_elem_type {
+                Type::Array(t) => t.0,
+                _ => {
+                    return Err("There is more indices than the dimension of the array".to_string())
+                }
+            }
+        }
+
+        Ok(array_elem_type)
     }
 }
 
@@ -49,6 +64,23 @@ pub fn match_given_type<'a, A: SemanticType>(
             "Type Mismatch: Expecting {:?}, but actual {:?} \n",
             expected_type, actual_type
         )),
+    }
+}
+
+pub fn same_type<L: SemanticType, R: SemanticType>(
+    scope: &mut ScopeInfo,
+    lhs: &mut L,
+    rhs: &mut R,
+) -> MessageResult<Type> {
+    let lhs_type = lhs.analyse(scope)?;
+    let rhs_type = rhs.analyse(scope)?;
+    if let Some(t) = lhs_type.clone().unify(rhs_type.clone()) {
+        Ok(t)
+    } else {
+        Err(format!(
+            "Type Mismatch between {:?} and {:?}",
+            lhs_type, rhs_type
+        ))
     }
 }
 

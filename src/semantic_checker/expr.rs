@@ -1,7 +1,7 @@
-use crate::ast::{Expr, Type, UnaryOperator};
-use crate::semantic_checker::util::{match_given_type, SemanticType};
+use crate::ast::{BinaryOperator, Expr, Type, UnaryOperator};
+use crate::semantic_checker::util::{match_given_type, same_type, SemanticType};
 use crate::symbol_table::ScopeInfo;
-use crate::{from_span, AriadneResult, MessageResult};
+use crate::MessageResult;
 
 // Expression Analysis starts here
 impl SemanticType for Expr {
@@ -13,6 +13,7 @@ impl SemanticType for Expr {
             Expr::StrLiter(_) => Type::StringType,
             Expr::PairLiter => Type::Any,
             Expr::Ident(id) => id.analyse(scope)?,
+            Expr::ArrayElem(arr_elem) => arr_elem.0.analyse(scope)?,
             Expr::UnaryApp(op, exp) => match op {
                 UnaryOperator::Ord => {
                     match_given_type(scope, &Type::CharType, &mut exp.0)?;
@@ -28,10 +29,38 @@ impl SemanticType for Expr {
                 UnaryOperator::Negative => {
                     match_given_type(scope, &Type::IntType, &mut exp.0)?.clone()
                 }
-                UnaryOperator::Len => todo!(),
+                UnaryOperator::Len => match exp.clone().0.analyse(scope)? {
+                    Type::Array(_) => Type::IntType,
+                    t => return Err(format!("Expected array type, found {:?}", t)),
+                },
             },
-            Expr::BinaryApp(_, _, _) => todo!(),
-            Expr::ArrayElem(_) => todo!(),
+            Expr::BinaryApp(exp1, op, exp2) => {
+                let expr_type = same_type(scope, &mut exp1.0, &mut exp2.0)?;
+
+                match op {
+                    // int op int
+                    BinaryOperator::Mul
+                    | BinaryOperator::Div
+                    | BinaryOperator::Modulo
+                    | BinaryOperator::Add
+                    | BinaryOperator::Sub => match expr_type {
+                        Type::IntType => Type::IntType,
+                        t => return Err(format!("Expected Int Types, Found {:?}\n", t)),
+                    },
+                    BinaryOperator::Gt
+                    | BinaryOperator::Gte
+                    | BinaryOperator::Lt
+                    | BinaryOperator::Lte => match expr_type {
+                        Type::IntType | Type::CharType => Type::BoolType,
+                        t => return Err(format!("Expected Int or Char Types, Found {:?}\n", t)),
+                    },
+                    BinaryOperator::Eq | BinaryOperator::Neq => Type::BoolType,
+                    BinaryOperator::And | BinaryOperator::Or => match expr_type {
+                        Type::BoolType => Type::BoolType,
+                        t => return Err(format!("Expected Boolean Types, Found {:?}\n", t)),
+                    },
+                }
+            }
         })
     }
 }
