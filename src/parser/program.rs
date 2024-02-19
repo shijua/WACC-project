@@ -3,7 +3,7 @@ use crate::parser::lexer::{ParserInput, Token};
 use crate::parser::stmt::{ident, stmt};
 use crate::parser::type_parser::type_parse;
 use crate::symbol_table::SymbolTable;
-use crate::{Span, Spanned};
+use crate::{from_span, Span, Spanned};
 use chumsky::error::Rich;
 use chumsky::prelude::just;
 use chumsky::IterParser;
@@ -43,31 +43,38 @@ fn func_parser<'tokens, 'src: 'tokens>() -> impl Parser<
         .then(just(Token::Keyword("is")))
         .then(stmt())
         .then(just(Token::Keyword("end")))
-        .map_with(|(((((((type_, id), _), params_list), _), _), st), _), e| {
-            (
-                Function {
-                    ident: id,
+        .try_map_with(|(((((((type_, id), _), params_list), _), _), st), _), e| {
+            let func_prototype = Function {
+                ident: id,
 
-                    // type
-                    return_type: type_,
+                // type
+                return_type: type_,
 
-                    // param-list
-                    parameters: params_list,
+                // param-list
+                parameters: params_list,
 
-                    // body statement
-                    body: st,
+                // body statement
+                body: st,
 
-                    // function symbol table for given parameters
-                    param_symbol_table: SymbolTable::default(),
+                // function symbol table for given parameters
+                param_symbol_table: SymbolTable::default(),
 
-                    // function body's symbol table
-                    body_symbol_table: SymbolTable::default(),
+                // function body's symbol table
+                body_symbol_table: SymbolTable::default(),
 
-                    // used scratch registers
-                    scratch_regs: Cell::new(0),
-                },
-                e.span(),
-            )
+                // used scratch registers
+                scratch_regs: Cell::new(0),
+            };
+
+            if from_span(&func_prototype.body).is_returning() == false {
+                // This is a non-returning function
+                return Err(Rich::custom(
+                    e.span(),
+                    "Function has no returning statement",
+                ));
+            };
+
+            Ok((func_prototype, e.span()))
         })
 }
 

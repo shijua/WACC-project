@@ -267,6 +267,18 @@ pub fn stmt<'tokens, 'src: 'tokens>() -> impl Parser<
     .labelled("statement")
 }
 
+impl Stmt {
+    pub fn is_returning(&self) -> bool {
+        use Stmt::*;
+        match self {
+            Return(_) | Exit(_) => true,
+            Serial(_, st2) => st2.0.is_returning(),
+            If(_, st1, st2) => st1.stmt.0.is_returning() && st2.stmt.0.is_returning(),
+            _ => false,
+        }
+    }
+}
+
 #[cfg(test)]
 mod stmt_parser_tests {
     use crate::ast::Stmt;
