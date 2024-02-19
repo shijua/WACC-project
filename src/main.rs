@@ -1,5 +1,6 @@
 use crate::ast::Type;
 use crate::parser::lexer::lexer;
+use crate::parser::program::program;
 use ariadne::{sources, CharSet, Config, Label, Report, ReportKind};
 use chumsky::error::Rich;
 use chumsky::input::Input;
@@ -68,7 +69,55 @@ fn main() {
 
     let src = src_content.unwrap();
 
-    let (_, _) = lexer().parse(src.as_str()).into_output_errors();
+    let (tokens, mut errs) = lexer().parse(src.as_str()).into_output_errors();
+
+    let (ast, parse_errs) = if let Some(tokens) = &tokens {
+        let (ast, parse_errs) = program()
+            .map_with(|ast, e| (ast, e.span()))
+            .parse(tokens.as_slice().spanned((src.len()..src.len()).into()))
+            .into_output_errors();
+
+        (ast, parse_errs)
+    } else {
+        (None, Vec::new())
+    };
+
+    let pretty_print = |error_type: &str, errs: &Vec<Rich<char>>| {
+        errs.clone()
+            .into_iter()
+            .map(|e| e.map_token(|c| c.to_string()))
+            .chain(
+                parse_errs
+                    .clone()
+                    .into_iter()
+                    .map(|e| e.map_token(|tok| tok.to_string())),
+            )
+            .for_each(|e| {
+                Report::build(ReportKind::Error, input_file.clone(), e.span().start)
+                    .with_message(format!("{}: {}", error_type, e.to_string()))
+                    .with_label(
+                        Label::new((input_file.clone(), e.span().into_range()))
+                            .with_message(e.reason().to_string()),
+                    )
+                    .with_labels(e.contexts().map(|(label, span)| {
+                        Label::new((input_file.clone(), span.into_range()))
+                            .with_message(format!("while parsing this {}", label))
+                    }))
+                    .with_config(
+                        Config::default()
+                            .with_char_set(CharSet::Ascii)
+                            .with_color(false),
+                    )
+                    .finish()
+                    .print(sources([(input_file.clone(), src.clone())]))
+                    .unwrap();
+            })
+    };
+
+    if !errs.clone().is_empty() || !parse_errs.clone().is_empty() {
+        pretty_print("Syntax Error", &errs);
+        exit(SYNTAX_ERROR_CODE);
+    }
 
     exit(VALID_CODE);
 }

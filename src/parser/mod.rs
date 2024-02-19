@@ -1,6 +1,5 @@
 mod expr;
 pub mod lexer;
-mod program;
-mod return_checker;
+pub mod program;
 mod stmt;
 mod type_parser;
