@@ -1,6 +1,8 @@
 use crate::from_span;
+use crate::symbol_table::SymbolTable;
 use crate::Spanned;
-use std::collections::HashMap;
+use std::cell::Cell;
+use std::fmt::Debug;
 
 pub type Ident = String;
 
@@ -61,7 +63,7 @@ pub enum Type {
     NestedPair,
     Any,
 }
-impl std::fmt::Debug for Type {
+impl Debug for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Type::IntType => write!(f, "Int"),
@@ -79,6 +81,18 @@ impl std::fmt::Debug for Type {
 impl Default for Type {
     fn default() -> Self {
         Type::Any
+    }
+}
+
+impl Type {
+    // size of a given type, in bytes
+    pub fn size(&self) -> u32 {
+        use Type::*;
+        match self {
+            BoolType | CharType => 1,
+            Any => panic!("Cannot evaluate size of an Any type"),
+            _ => 4,
+        }
     }
 }
 
@@ -129,16 +143,25 @@ pub enum Stmt {
 
     // Scoped Statements:
     // These statements by default can generate their own statement tables.
-    If(Spanned<Expr>, Box<Spanned<Stmt>>, Box<Spanned<Stmt>>),
-    While(Spanned<Expr>, Box<Spanned<Stmt>>),
-    Scope(Box<Spanned<Stmt>>),
+    If(Spanned<Expr>, ScopedStmt, ScopedStmt),
+    While(Spanned<Expr>, ScopedStmt),
+    Scope(ScopedStmt),
 }
 
-// #[derive(PartialEq, Clone, Debug)]
-// pub struct ScopedStat {
-//     pub stat: Box<Spanned<Stmt>>,
-//     pub symbol_table: todo!(),
-// }
+#[derive(PartialEq, Clone, Debug)]
+pub struct ScopedStmt {
+    pub stmt: Box<Spanned<Stmt>>,
+    pub symbol_table: SymbolTable,
+}
+
+impl ScopedStmt {
+    pub fn new(statement: Spanned<Stmt>) -> ScopedStmt {
+        ScopedStmt {
+            stmt: Box::new(statement),
+            symbol_table: SymbolTable::default(),
+        }
+    }
+}
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Param {
@@ -158,10 +181,25 @@ pub struct Function {
 
     // body statement
     pub body: Spanned<Stmt>,
+
+    // function symbol table for given parameters
+    pub param_symbol_table: SymbolTable,
+
+    // function body's symbol table
+    pub body_symbol_table: SymbolTable,
+
+    // used scratch registers
+    pub scratch_regs: Cell<usize>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Program {
     pub functions: Vec<Spanned<Function>>,
-    pub body: Spanned<Stmt>,
+    pub body: ScopedStmt,
+
+    // allocated scratch registers
+    pub body_scratch_regs: Cell<usize>,
+
+    // root symbol table
+    pub symbol_table: SymbolTable,
 }
