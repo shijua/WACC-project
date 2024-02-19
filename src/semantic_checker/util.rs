@@ -1,6 +1,6 @@
-use crate::ast::{ArrayElem, Ident, PairElem, Type};
+use crate::ast::{ArrayElem, ArrayLiter, Expr, Ident, PairElem, Type};
 use crate::symbol_table::ScopeInfo;
-use crate::{from_span, get_span, AriadneResult, MessageResult};
+use crate::{any_span, from_span, get_span, AriadneResult, MessageResult};
 
 pub trait SemanticType {
     fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type>;
@@ -71,6 +71,30 @@ impl SemanticType for PairElem {
                 }
             }
         })
+    }
+}
+
+impl SemanticType for ArrayLiter {
+    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
+        // assume the first element is the specified type of all
+        let mut array_type = Some(Type::Any);
+
+        let mut e = get_span(&any_span());
+
+        for element in self.clone().val {
+            let mut expr = element.clone().0;
+            e = element.clone().1;
+            if let Ok(expr_type) = expr.analyse(scope) {
+                if let Some(current_type) = array_type.clone() {
+                    array_type = current_type.unify(expr_type);
+                }
+            }
+        }
+
+        match array_type {
+            Some(type_) => Ok(Type::Array(Box::new((type_, e)))),
+            None => Err("Inconsistent type in array literal".to_string()),
+        }
     }
 }
 

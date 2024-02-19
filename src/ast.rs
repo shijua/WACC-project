@@ -1,7 +1,6 @@
 use crate::from_span;
 use crate::symbol_table::SymbolTable;
 use crate::Spanned;
-use std::cell::Cell;
 use std::fmt::Debug;
 
 pub type Ident = String;
@@ -53,6 +52,12 @@ pub enum BinaryOperator {
 }
 
 #[derive(PartialEq, Clone)]
+pub struct FuncSig {
+    pub return_type: Type,
+    pub parameters: Vec<(Type, Ident)>,
+}
+
+#[derive(PartialEq, Clone)]
 pub enum Type {
     IntType,
     BoolType,
@@ -62,6 +67,7 @@ pub enum Type {
     Pair(Box<Spanned<Type>>, Box<Spanned<Type>>),
     NestedPair,
     Any,
+    Func(Box<FuncSig>),
 }
 impl Debug for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -74,6 +80,7 @@ impl Debug for Type {
             Type::Pair(t1, t2) => write!(f, "Pair({:?}, {:?})", from_span(t1), from_span(t2)),
             Type::NestedPair => write!(f, "Pair"),
             Type::Any => write!(f, "Any"),
+            Type::Func(_) => write!(f, "Function"),
         }
     }
 }
