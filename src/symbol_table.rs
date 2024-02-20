@@ -50,6 +50,15 @@ impl ScopeInfo<'_> {
         }
     }
 
+    pub fn get_func(&self, ident: &Ident) -> Option<(&Type, Ident)> {
+        match self.parent {
+            /* Find the top level of symbol table */
+            Some(parent) => parent.get_func(ident),
+            /* When reaches top level */
+            None => self.get_type(&ident),
+        }
+    }
+
     pub fn get_offset(&self, ident: &Ident) -> Option<Offset> {
         match self.symbol_table.table.get(ident) {
             /* Identifier declared in this scope, return. */

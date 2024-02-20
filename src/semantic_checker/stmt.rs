@@ -45,7 +45,7 @@ impl SemanticType for Rvalue {
             Rvalue::RArrLit(arr_liter) => arr_liter.0.analyse(scope),
             Rvalue::RCall(fn_name, args) => {
                 let original_name = fn_name.clone();
-                match fn_name.0.analyse(scope)? {
+                match fn_name.0.func_analyse(scope)? {
                     Type::Func(boxed_sig) => {
                         *fn_name = original_name;
 
