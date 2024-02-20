@@ -124,7 +124,7 @@ pub fn stmt_check(scope: &mut ScopeInfo, statement: &mut Stmt) -> MessageResult<
         Stmt::Return(exp) => Ok(EndReturn(exp.0.analyse(scope)?)),
         Stmt::Exit(exp) => {
             match_given_type(scope, &Type::IntType, &mut exp.0)?;
-            Ok(EndReturn(Type::IntType))
+            Ok(EndReturn(Type::Any))
         }
         Stmt::Print(t, exp) | Stmt::Println(t, exp) => {
             *t = exp.0.analyse(scope)?;
@@ -163,13 +163,15 @@ pub fn stmt_check(scope: &mut ScopeInfo, statement: &mut Stmt) -> MessageResult<
         Stmt::Serial(st1, st2) => {
             let lhs = stmt_check(scope, &mut st1.0)?;
             let rhs = stmt_check(scope, &mut st2.0)?;
-            Ok(
-                if let (EndReturn(t) | PartialReturn(t), NoReturn) = (lhs, &rhs) {
-                    PartialReturn(t)
-                } else {
-                    rhs
-                },
-            )
+            match (lhs, rhs.clone()) {
+                (EndReturn(t1) | PartialReturn(t1), EndReturn(t2) | PartialReturn(t2))
+                    if t1.clone().unify(t2.clone()).is_none() =>
+                {
+                    Err(format!("Incoherent return types: {:?} and {:?}", t1, t2))
+                }
+                (EndReturn(t) | PartialReturn(t), NoReturn) => Ok(PartialReturn(t)),
+                _ => Ok(rhs.clone()),
+            }
         }
     }
 }

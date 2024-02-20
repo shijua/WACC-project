@@ -1,6 +1,7 @@
 use crate::ast::Type;
 use crate::parser::lexer::lexer;
 use crate::parser::program::program;
+use crate::semantic_checker::program::program_checker;
 use ariadne::{sources, CharSet, Config, Label, Report, ReportKind};
 use chumsky::error::Rich;
 use chumsky::input::Input;
@@ -141,6 +142,14 @@ fn main() {
     if !errs.clone().is_empty() || !parse_errs.clone().is_empty() {
         pretty_print("Syntax Error", &errs);
         exit(SYNTAX_ERROR_CODE);
+    }
+
+    let mut program = ast.unwrap().0 .0;
+
+    let result = program_checker(&mut program);
+
+    if result.is_err() {
+        exit(SEMANTIC_ERROR_CODE);
     }
 
     exit(VALID_CODE);
