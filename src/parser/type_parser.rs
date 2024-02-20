@@ -1,8 +1,8 @@
 use crate::ast::Type;
-use crate::parser::lexer::{lexer, ParserInput, Token};
+use crate::parser::lexer::{ParserInput, Token};
 use crate::{any_span, Span, Spanned};
 use chumsky::error::Rich;
-use chumsky::prelude::{just, Input};
+use chumsky::prelude::just;
 use chumsky::recursive::recursive;
 use chumsky::{extra, select, Parser};
 

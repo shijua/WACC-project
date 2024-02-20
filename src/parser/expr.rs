@@ -4,7 +4,7 @@ use crate::{Span, Spanned};
 use chumsky::error::Rich;
 use chumsky::input::MapExtra;
 use chumsky::pratt::{infix, left, non, prefix, right};
-use chumsky::prelude::{choice, just, recursive, Input};
+use chumsky::prelude::{choice, just, recursive};
 use chumsky::IterParser;
 use chumsky::{extra, select, Parser};
 

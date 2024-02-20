@@ -1,6 +1,6 @@
-use crate::ast::{ArrayElem, ArrayLiter, Expr, Ident, PairElem, Type};
+use crate::ast::{ArrayElem, ArrayLiter, Ident, PairElem, Type};
 use crate::symbol_table::ScopeInfo;
-use crate::{any_span, from_span, get_span, AriadneResult, MessageResult};
+use crate::{any_span, get_span, MessageResult};
 
 pub trait SemanticType {
     fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type>;

@@ -1,4 +1,5 @@
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Hash)]
+#[allow(dead_code)]
 pub enum Reg {
     StackPointer, // rsp, callee-save
     BasePointer,  // rbp, callee-save
@@ -10,6 +11,7 @@ pub enum Reg {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Hash)]
+#[allow(dead_code)]
 pub enum ArgReg {
     // In the order of 1st argument to 6th argument
     Rdi,

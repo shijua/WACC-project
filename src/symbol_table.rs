@@ -1,10 +1,9 @@
 use crate::ast::{Ident, Type};
-use crate::code_generator::asm::Reg;
-use crate::{any_span, from_span, get_span, AriadneResult, Error, MessageResult, Spanned};
-use std::cell::Cell;
+
+use crate::MessageResult;
 use std::collections::HashMap;
 
-pub type Label = String;
+// pub type Label = String;
 
 pub type Offset = u32;
 
@@ -50,6 +49,7 @@ impl ScopeInfo<'_> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_offset(&self, ident: &Ident) -> Option<Offset> {
         match self.symbol_table.table.get(ident) {
             /* Identifier declared in this scope, return. */

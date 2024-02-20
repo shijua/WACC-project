@@ -71,7 +71,7 @@ impl Error {
 }
 
 type MessageResult<T> = Result<T, String>;
-type AriadneResult<T> = Result<T, Error>;
+// type AriadneResult<T> = Result<T, Error>;
 
 fn main() {
     // collect environment arguments
@@ -94,7 +94,7 @@ fn main() {
 
     let src = src_content.unwrap();
 
-    let (tokens, mut errs) = lexer().parse(src.as_str()).into_output_errors();
+    let (tokens, errs) = lexer().parse(src.as_str()).into_output_errors();
 
     let (ast, parse_errs) = if let Some(tokens) = &tokens {
         let (ast, parse_errs) = program()
