@@ -4,7 +4,7 @@ use crate::ast::{Program, ScopedStmt};
 use crate::code_generator::asm::Instr::{Mov, Ret};
 use crate::code_generator::asm::{AsmLine, GeneratedCode, InstrOperand, RESULT_REG};
 use crate::code_generator::def_libary::Directives::{GlobalDeclare, Label};
-use crate::code_generator::def_libary::MAIN_FUNCTION_TITLE;
+use crate::code_generator::def_libary::{Directives, MAIN_FUNCTION_TITLE};
 
 pub const DEFAULT_EXIT_CODE: i32 = 0;
 
@@ -18,6 +18,10 @@ pub fn gen_main(_main_body: &ScopedStmt, code: &mut GeneratedCode) {
         .push(AsmLine::Directive(GlobalDeclare(String::from(
             MAIN_FUNCTION_TITLE,
         ))));
+    code.codes
+        .push(AsmLine::Directive(Directives::ReadOnlyStrings));
+    code.codes
+        .push(AsmLine::Directive(Directives::AssemblerText));
     code.codes
         .push(AsmLine::Directive(Label(String::from(MAIN_FUNCTION_TITLE))));
     code.codes.push(AsmLine::Instruction(Mov(
