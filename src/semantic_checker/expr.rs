@@ -1,7 +1,7 @@
 use crate::ast::{BinaryOperator, Expr, Type, UnaryOperator};
 use crate::semantic_checker::util::{match_given_type, same_type, SemanticType};
 use crate::symbol_table::ScopeInfo;
-use crate::MessageResult;
+use crate::{any_span, MessageResult};
 
 // Expression Analysis starts here
 impl SemanticType for Expr {
@@ -11,7 +11,7 @@ impl SemanticType for Expr {
             Expr::BoolLiter(_) => Type::BoolType,
             Expr::CharLiter(_) => Type::CharType,
             Expr::StrLiter(_) => Type::StringType,
-            Expr::PairLiter => Type::Any,
+            Expr::PairLiter => Type::Pair(Box::new(any_span()), Box::new(any_span())),
             Expr::Ident(id) => id.analyse(scope)?,
             Expr::ArrayElem(arr_elem) => arr_elem.0.analyse(scope)?,
             Expr::UnaryApp(op, exp) => match op {
@@ -69,7 +69,7 @@ impl SemanticType for Expr {
 mod expr_semantic_tests {
     use crate::ast::{Expr, Type};
     use crate::semantic_checker::util::SemanticType;
-    use crate::symbol_table::{initialise, ScopeInfo, SymbolTable};
+    use crate::symbol_table::{initialise, SymbolTable};
 
     #[test]
     fn literals() {

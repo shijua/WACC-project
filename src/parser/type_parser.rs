@@ -1,6 +1,6 @@
 use crate::ast::Type;
 use crate::parser::lexer::{lexer, ParserInput, Token};
-use crate::{Span, Spanned};
+use crate::{any_span, Span, Spanned};
 use chumsky::error::Rich;
 use chumsky::prelude::{just, Input};
 use chumsky::recursive::recursive;
@@ -31,7 +31,12 @@ pub fn type_parse<'tokens, 'src: 'tokens>() -> impl Parser<
             let pair_elem_type = type_parse
                 .clone()
                 .filter(|(x, _x_span)| !matches!(x, Type::Pair(_, _)))
-                .or(just(Token::Keyword("pair")).map_with(|_, e| (Type::NestedPair, e.span()))); //.and_is(base_type.not());
+                .or(just(Token::Keyword("pair")).map_with(|_, e| {
+                    (
+                        Type::Pair(Box::new(any_span()), Box::new(any_span())),
+                        e.span(),
+                    )
+                })); //.and_is(base_type.not());
 
             just(Token::Keyword("pair"))
                 .then(just(Token::Ctrl('(')))
