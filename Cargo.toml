@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 ariadne = { version = "0.4.0", features = [] }
 chumsky = { git = "https://github.com/YunkaiZhang233/chumsky.git", features = ["pratt", "label"] }
+lazy_static = "1.4.0"
