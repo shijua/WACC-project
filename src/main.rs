@@ -7,6 +7,7 @@ use chumsky::error::Rich;
 use chumsky::input::Input;
 use chumsky::prelude::SimpleSpan;
 use chumsky::Parser;
+use std::fmt::Write;
 use std::process::exit;
 use std::{env, fs};
 
@@ -151,6 +152,22 @@ fn main() {
     if result.is_err() {
         exit(SEMANTIC_ERROR_CODE);
     }
+
+    let code = code_generator::x86_generate::gen_x86_for_program(&program);
+
+    // now we need an output path
+    if args.len() < 3 {
+        println!("Error: expecting more arguments for output destination");
+        exit(READ_ERROR);
+    }
+
+    let destination_path = &args[2];
+
+    let mut asm_output = String::new();
+
+    write!(&mut asm_output, "{}", code).unwrap();
+
+    fs::write(destination_path, asm_output).unwrap();
 
     exit(VALID_CODE);
 }

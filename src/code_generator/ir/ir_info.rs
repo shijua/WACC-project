@@ -15,7 +15,7 @@ lazy_static! {
 
 // no need to handle push and pop as these would be handled by the 2nd pass
 #[derive(Debug, Clone, PartialEq)]
-pub enum IROperand {
+pub enum IROperator {
     Add,
     AddImm,
     Sub,
@@ -33,14 +33,14 @@ pub enum IROperand {
 // IR contains operands and relative register numbers.
 #[derive(Debug, Clone, PartialEq)]
 pub struct IR {
-    pub operand: IROperand,
+    pub operand: IROperator,
     // when unused: corresponding register goes to None
     pub source_reg: Option<usize>,
     pub dest_reg: Option<usize>,
 }
 
 impl IR {
-    fn new(operand: IROperand, source_reg: Option<usize>, dest_reg: Option<usize>) -> Self {
+    fn new(operand: IROperator, source_reg: Option<usize>, dest_reg: Option<usize>) -> Self {
         Self {
             operand,
             source_reg,
@@ -49,17 +49,17 @@ impl IR {
     }
 }
 
-pub fn add_ir(op: IROperand, source_reg: Option<usize>, dest_reg: Option<usize>) {
+pub fn add_ir(op: IROperator, source_reg: Option<usize>, dest_reg: Option<usize>) {
     let new_ir = IR::new(op, source_reg, dest_reg);
     CODE.lock().unwrap().push(new_ir.clone());
 }
 
 // Use of a certain register for some certain variable is finished
 pub fn kill(r: Option<usize>) {
-    add_ir(IROperand::Kill, r, None);
+    add_ir(IROperator::Kill, r, None);
 }
 
 // call a certain label
 pub fn label(x: Option<usize>) {
-    add_ir(IROperand::Label, x, None);
+    add_ir(IROperator::Label, x, None);
 }
