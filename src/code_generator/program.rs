@@ -1,13 +1,13 @@
 use crate::ast::{Function, Program, Type};
 use crate::code_generator::asm::Instr::Mov;
 use crate::code_generator::asm::{
-    AsmLine, GeneratedCode, Instr, InstrOperand, Register, RESULT_REG,
+    AsmLine, GeneratedCode, Instr, InstrOperand, InstrScale, Register, RESULT_REG,
 };
 use crate::code_generator::def_libary::{Directives, MAIN_FUNCTION_TITLE};
 use crate::code_generator::x86_generate::{Generator, DEFAULT_EXIT_CODE};
 use crate::new_spanned;
 use crate::symbol_table::ScopeTranslator;
-use std::fmt::{format, Debug};
+use std::fmt::Debug;
 
 impl Generator for Function {
     // Input used to indicate whether it is the main function
@@ -31,8 +31,10 @@ impl Generator for Function {
             .push(AsmLine::Directive(Directives::Label(function_label_string)));
 
         // push RBP and allocate stack frame
-        code.codes
-            .push(AsmLine::Instruction(Instr::Push(Register::Rbp)));
+        code.codes.push(AsmLine::Instruction(Instr::Push(
+            InstrScale::default(),
+            Register::Rbp,
+        )));
 
         let body_allocated_size = self.body_symbol_table.size;
 
@@ -58,14 +60,17 @@ impl Generator for Function {
         if is_main {
             // deallocate stack for main function
             code.codes.push(AsmLine::Instruction(Mov(
+                InstrScale::default(),
                 InstrOperand::Imm(DEFAULT_EXIT_CODE),
                 InstrOperand::Reg(RESULT_REG),
             )));
         }
 
         // pop RBP
-        code.codes
-            .push(AsmLine::Instruction(Instr::Pop(Register::Rbp)));
+        code.codes.push(AsmLine::Instruction(Instr::Pop(
+            InstrScale::default(),
+            Register::Rbp,
+        )));
 
         // return
         code.codes.push(AsmLine::Instruction(Instr::Ret));
@@ -81,8 +86,19 @@ impl Generator for Program {
         _scope: &ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &[Register],
-        aux: Self::Input,
+        _aux: Self::Input,
     ) -> Self::Output {
+        // todo: text directive and global main
+        // push global main directive
+        code.pre_defined
+            .push(AsmLine::Directive(Directives::GlobalDeclare(
+                MAIN_FUNCTION_TITLE.to_string(),
+            )));
+        code.pre_defined
+            .push(AsmLine::Directive(Directives::ReadOnlyStrings));
+        code.pre_defined
+            .push(AsmLine::Directive(Directives::AssemblerText));
+
         let scope = &ScopeTranslator::new(&self.symbol_table);
 
         // todo: generate assembly for the functions

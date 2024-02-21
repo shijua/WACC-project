@@ -5,8 +5,6 @@ use crate::code_generator::asm::Instr::{Mov, Ret};
 use crate::code_generator::asm::{
     AsmLine, GeneratedCode, InstrOperand, Register, GENERAL_REGS, RESULT_REG,
 };
-use crate::code_generator::def_libary::Directives::{GlobalDeclare, Label};
-use crate::code_generator::def_libary::{Directives, MAIN_FUNCTION_TITLE};
 use crate::symbol_table::{ScopeInfo, ScopeTranslator, SymbolTable};
 use std::fmt::Debug;
 

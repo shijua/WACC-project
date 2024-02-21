@@ -106,6 +106,22 @@ pub enum InstrScale {
     Quad, // 8 bytes
 }
 
+impl Default for InstrScale {
+    fn default() -> Self {
+        InstrScale::Quad
+    }
+}
+
+pub type Scaled<T> = (T, InstrScale);
+
+pub fn from_scale<T>(scaled: Scaled<T>) -> T {
+    scaled.0
+}
+
+pub fn get_scale<T>(scaled: Scaled<T>) -> InstrScale {
+    scaled.1
+}
+
 fn from_size(n: i32) -> InstrScale {
     match n {
         1 => InstrScale::Byte,
@@ -124,12 +140,6 @@ impl InstrScale {
             InstrScale::Long => 4,
             InstrScale::Quad => 8,
         }
-    }
-}
-
-impl Default for InstrScale {
-    fn default() -> Self {
-        InstrScale::Quad
     }
 }
 
@@ -184,12 +194,12 @@ pub enum InstrOperand {
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Instr {
-    Push(Register),
-    Pop(Register),
-    Mov(InstrOperand, InstrOperand),
-    Lea(InstrOperand, InstrOperand),
-    Add(InstrOperand, InstrOperand),
-    Sub(InstrOperand, InstrOperand),
+    Push(InstrScale, Register),
+    Pop(InstrScale, Register),
+    Mov(InstrScale, InstrOperand, InstrOperand),
+    Lea(InstrScale, InstrOperand, InstrOperand),
+    Add(InstrScale, InstrOperand, InstrOperand),
+    Sub(InstrScale, InstrOperand, InstrOperand),
     Ret,
 }
 
@@ -230,7 +240,7 @@ impl GeneratedCode {
 impl Default for GeneratedCode {
     fn default() -> Self {
         Self {
-            pre_defined: vec![AsmLine::Directive(Directives::IntelSyntax)],
+            pre_defined: vec![],
             codes: vec![],
             required_clib: Vec::new(),
         }

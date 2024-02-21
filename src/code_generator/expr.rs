@@ -1,6 +1,6 @@
 use crate::ast::Expr;
 use crate::code_generator::asm::Instr::Mov;
-use crate::code_generator::asm::{AsmLine, GeneratedCode, InstrOperand, Register};
+use crate::code_generator::asm::{AsmLine, GeneratedCode, InstrOperand, InstrScale, Register};
 use crate::code_generator::x86_generate::Generator;
 use crate::symbol_table::ScopeTranslator;
 
@@ -26,6 +26,7 @@ impl Generator for Expr {
 
 fn generate_int_liter(code: &mut GeneratedCode, general_regs: &[Register], int_val: &i32) {
     code.codes.push(AsmLine::Instruction(Mov(
+        InstrScale::default(),
         InstrOperand::Imm(*int_val),
         InstrOperand::Reg(general_regs[0].clone()),
     )))
@@ -37,6 +38,7 @@ fn generate_bool_liter(code: &mut GeneratedCode, general_regs: &[Register], bool
         false => 0,
     };
     code.codes.push(AsmLine::Instruction(Mov(
+        InstrScale::default(),
         InstrOperand::Imm(move_val),
         InstrOperand::Reg(general_regs[0].clone()),
     )))
@@ -46,6 +48,7 @@ fn generate_char_liter(code: &mut GeneratedCode, general_regs: &[Register], char
     let char_imm = *char_val as u8;
 
     code.codes.push(AsmLine::Instruction(Mov(
+        InstrScale::default(),
         InstrOperand::Imm(char_imm as i32),
         InstrOperand::Reg(general_regs[0].clone()),
     )))
