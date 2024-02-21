@@ -8,6 +8,7 @@ use chumsky::input::Input;
 use chumsky::prelude::SimpleSpan;
 use chumsky::Parser;
 use std::fmt::Write;
+use std::path::Path;
 use std::process::exit;
 use std::{env, fs};
 
@@ -90,6 +91,16 @@ fn main() {
 
     let input_file = &args[1];
 
+    let is_wacc_file = input_file.clone().ends_with(".wacc");
+
+    // must be of type "*.wacc"
+    if !is_wacc_file {
+        println!("Error: Input File is not a valid *.wacc file");
+        exit(READ_ERROR);
+    }
+
+    let input_path = Path::new(input_file).file_name().unwrap();
+
     let src_content = fs::read_to_string(input_file);
 
     if src_content.is_err() {
@@ -159,19 +170,25 @@ fn main() {
 
     let code = code_generator::x86_generate::gen_x86_for_program(&program);
 
-    // now we need an output path
-    if args.len() < 3 {
-        println!("Error: expecting more arguments for output destination");
-        exit(READ_ERROR);
-    }
-
-    let destination_path = &args[2];
-
     let mut asm_output = String::new();
 
     write!(&mut asm_output, "{}", code).unwrap();
 
-    fs::write(destination_path, asm_output).unwrap();
+    // now we need an output path
+    if args.len() < 3 {
+        // we do not have extra output,
+        // therefore the output should be written to stdout
+        // default path = file name prefix of the input wacc file + .s
+        let mut output_assembly =
+            String::from(input_path.to_str().unwrap().strip_suffix(".wacc").unwrap());
+        output_assembly.push_str(".s");
+        fs::write(&output_assembly, asm_output).unwrap();
+    } else {
+        // we have an output path
+        let destination_path = &args[2];
+
+        fs::write(destination_path, asm_output).unwrap();
+    }
 
     exit(VALID_CODE);
 }
