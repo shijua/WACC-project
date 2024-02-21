@@ -2,11 +2,27 @@
 
 use crate::ast::{Program, ScopedStmt};
 use crate::code_generator::asm::Instr::{Mov, Ret};
-use crate::code_generator::asm::{AsmLine, GeneratedCode, InstrOperand, RESULT_REG};
+use crate::code_generator::asm::{AsmLine, GeneratedCode, InstrOperand, Register, RESULT_REG};
 use crate::code_generator::def_libary::Directives::{GlobalDeclare, Label};
 use crate::code_generator::def_libary::{Directives, MAIN_FUNCTION_TITLE};
+use crate::symbol_table::ScopeTranslator;
+use std::fmt::Debug;
 
 pub const DEFAULT_EXIT_CODE: i32 = 0;
+
+pub trait Generator: Debug {
+    type Input;
+
+    type Output;
+
+    fn generate(
+        &self,
+        _scope: &ScopeTranslator,
+        code: &mut GeneratedCode,
+        regs: &[Register],
+        aux: Self::Input,
+    ) -> Self::Output;
+}
 
 pub trait AssembleX86 {
     fn generate(code: &mut GeneratedCode);
