@@ -76,7 +76,7 @@ const ARG_REGS: [Register; ARG_REGS_N] = [
 // const ARG_REGS8: [&str; ARG_REGS_N] = ["dil", "sil", "dl", "cl", "r8b", "r9b"];
 // const ARG_REGS32: [&str; ARG_REGS_N] = ["edi", "esi", "edx", "ecx", "r8d", "r9d"];
 
-const REGS: [Register; REGS_N] = [
+pub const GENERAL_REGS: [Register; REGS_N] = [
     Register::R10,
     Register::R11,
     Register::Rbx,
@@ -188,6 +188,8 @@ pub enum Instr {
     Pop(Register),
     Mov(InstrOperand, InstrOperand),
     Lea(InstrOperand, InstrOperand),
+    Add(InstrOperand, InstrOperand),
+    Sub(InstrOperand, InstrOperand),
     Ret,
 }
 

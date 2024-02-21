@@ -1,14 +1,37 @@
+use crate::ast::Expr;
 use crate::code_generator::asm::Instr::Mov;
 use crate::code_generator::asm::{AsmLine, GeneratedCode, InstrOperand, Register};
+use crate::code_generator::x86_generate::Generator;
+use crate::symbol_table::ScopeTranslator;
 
-fn generate_int_liter(code: &mut GeneratedCode, general_regs: &[Register], int_val: i32) {
+impl Generator for Expr {
+    type Input = ();
+    type Output = ();
+
+    fn generate(
+        &self,
+        _scope: &ScopeTranslator,
+        code: &mut GeneratedCode,
+        regs: &[Register],
+        _aux: Self::Input,
+    ) -> Self::Output {
+        match self {
+            Expr::IntLiter(int_val) => generate_int_liter(code, regs, int_val),
+            Expr::BoolLiter(bool_val) => generate_bool_liter(code, regs, bool_val),
+            Expr::CharLiter(char_val) => generate_char_liter(code, regs, char_val),
+            _ => todo!(),
+        }
+    }
+}
+
+fn generate_int_liter(code: &mut GeneratedCode, general_regs: &[Register], int_val: &i32) {
     code.codes.push(AsmLine::Instruction(Mov(
-        InstrOperand::Imm(int_val),
+        InstrOperand::Imm(*int_val),
         InstrOperand::Reg(general_regs[0].clone()),
     )))
 }
 
-fn generate_bool_liter(code: &mut GeneratedCode, general_regs: &[Register], bool_val: bool) {
+fn generate_bool_liter(code: &mut GeneratedCode, general_regs: &[Register], bool_val: &bool) {
     let move_val = match bool_val {
         true => 1,
         false => 0,
@@ -19,8 +42,8 @@ fn generate_bool_liter(code: &mut GeneratedCode, general_regs: &[Register], bool
     )))
 }
 
-fn generate_char_liter(code: &mut GeneratedCode, general_regs: &[Register], char_val: char) {
-    let char_imm = char_val as u8;
+fn generate_char_liter(code: &mut GeneratedCode, general_regs: &[Register], char_val: &char) {
+    let char_imm = *char_val as u8;
 
     code.codes.push(AsmLine::Instruction(Mov(
         InstrOperand::Imm(char_imm as i32),

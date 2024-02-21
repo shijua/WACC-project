@@ -42,6 +42,8 @@ impl Display for Instr {
             Instr::Mov(src, dst) => write!(f, "mov {}, {}", src, dst),
             Instr::Ret => write!(f, "ret"),
             Instr::Lea(src, dst) => write!(f, "lea {}, {}", src, dst),
+            Instr::Add(src, dst) => write!(f, "add {}, {}", src, dst),
+            Instr::Sub(src, dst) => write!(f, "sub {}, {}", src, dst),
         }
     }
 }

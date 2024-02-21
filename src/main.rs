@@ -35,6 +35,10 @@ pub fn any_span() -> Spanned<Type> {
     create_span(Type::Any, empty_span())
 }
 
+pub fn new_spanned<T>(elem: T) -> Spanned<T> {
+    create_span(elem, empty_span())
+}
+
 pub fn empty_span() -> Span {
     Span::new(0, 0)
 }
