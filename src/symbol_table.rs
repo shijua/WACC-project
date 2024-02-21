@@ -167,7 +167,7 @@ impl ScopeTranslator<'_> {
             0
         } else {
             /* Otherwise, add the size of this scope and all the above scopes. */
-            self.symbol_table.size + self.symbol_table.unwrap().get_total_offset()
+            self.symbol_table.size + self.parent.unwrap().get_total_offset()
         }
     }
 
