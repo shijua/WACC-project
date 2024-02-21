@@ -1,31 +1,48 @@
 from os import listdir, system
-from os.path import exists, isdir
+from os.path import exists, isdir, basename  
 import sys
 import subprocess
+import platform
 
 # constant definition
 WACC_PATH: str = "target/debug/wacc_36"
 TEST_PATH: str = "wacc-examples-36"
 REF_PATH: str = "wacc-examples-36/refCompile"
+OUT_PATH: str = "out"
 
 
 # type definition
+class Result:
+    def __init__(self) -> None:
+        self.exit_code: int = 0
+        self.output: str = ""
+
+    def __str__(self) -> str:
+        return f"exit code: \"{self.exit_code}\", output: \"{self.output}\""
+
+    def output_cmp(self, this: str, other: str) -> bool:
+        countself: int = 0
+        countother: int = 0
+        while len(this) != countself and len(other) != countother:
+            if other[countother:countother+7] == '#addrs#':
+                countother += 7
+                countself += 14
+                continue
+            if this[countself] != other[countother]:
+                return False
+            countself += 1
+            countother += 1
+        return len(this) == countself and len(other) == countother
+
+    def __eq__(self, other) -> bool:
+        return self.exit_code == other.exit_code and self.output_cmp(self.output, other.output)
+        
+
 class incorrect_test():
-    def __init__(self, path: str, our_message: int, ref_message: int) -> None:
+    def __init__(self, path: str, our_message: Result, ref_message: Result) -> None:
         self.path: str = path
-        self.our_message: str = self.translate_message(our_message)
-        self.ref_message: str = self.translate_message(ref_message)
-
-    def translate_message(self, message: int) -> str:
-        if message == 0:
-            return "PASS"
-        elif message == 100:
-            return "SYNTAX ERROR"
-        elif message == 200:
-            return "SEMANTIC ERROR"
-        else:
-            return "UNKNOWN ERROR"
-
+        self.our_message: Result = our_message
+        self.ref_message: Result = ref_message
 
 # variable defined for result output
 run_test_cases: int = 0
@@ -35,6 +52,42 @@ expected_syntax_error_test_cases: int = 0
 expected_semantic_error_test_cases: int = 0
 incorrect_list: list[incorrect_test] = []
 
+
+# only return bool if it is x86-64 linux
+def check_systyem() -> bool:
+    return platform.system() == "Linux" and platform.machine() != "arm"
+
+def get_file_content(path: str) -> str:
+    with open(path, "r") as file:
+        return file.read()
+
+def get_input_content(path: str) -> list[str]:
+    content = get_file_content(path)
+    index = content.find("Input:")
+    if index == -1:
+        return []
+    return content[index + 7:].split("\n")[0].split()
+
+def get_output_content(path: str) -> str:
+    content = get_file_content(path)
+    index = content.find("Output:")
+    index_end = content.find("Program:")
+    index_end_if_exit = content.find("Exit")
+    if index == -1:
+        return ""
+    # if there is an exit statement, we only want to get the output before the exit statement
+    if index_end_if_exit != -1 and index_end_if_exit < index_end:
+        index_end = index_end_if_exit
+    output = content[index + 7:index_end].replace("\n# ", "\n").replace("\n#", "\n").strip()
+    return output
+
+def get_exit_code(path: str) -> int:
+    content = get_file_content(path)
+    index = content.find("Exit:")
+    if index == -1:
+        return 0
+    index_end = content.find("Program:")
+    return int(content[index + 5:index_end].replace("\n# ", "").strip())
 
 def get_total_test_cases(path: str = TEST_PATH) -> int:
     total_test_cases: int = 0
@@ -47,59 +100,70 @@ def get_total_test_cases(path: str = TEST_PATH) -> int:
     return total_test_cases
 
 
-def running_our_single_test_cases(path: str) -> int:
+def running_our_single_test_cases(path: str) -> Result:
     global run_test_cases, actual_syntax_error_test_cases, actual_semantic_error_test_cases
-    result: int = subprocess.run([WACC_PATH, path], stdout=subprocess.PIPE).returncode
+    result: Result = Result()
+    outputwacc: str = f"{OUT_PATH}/{basename(path)}"
+    output: str = outputwacc[:outputwacc.find(".wacc")]
+
+    subprocess.run([WACC_PATH, path, f"{output}.s"] + get_input_content(path), stdout=subprocess.PIPE)
+    subprocess.run(["gcc", f"{output}.s", "-o", output, "-z", "noexecstack"], stdout=subprocess.PIPE)
+    res = subprocess.run([f"./{output}"], stdout=subprocess.PIPE)
+    
+    result.exit_code = res.returncode
+    result.output = res.stdout.decode("utf-8").strip()
+
     print(f"running {path} in our compiler: ", end="")
     run_test_cases += 1
-    if result == 0:
-        print("PASS")
-    elif result == 100:
+    if result.exit_code == 100:
         print("SYNTAX ERROR")
         actual_syntax_error_test_cases += 1
-    elif result == 200:
+    elif result.exit_code == 200:
         print("SEMANTIC ERROR")
         actual_semantic_error_test_cases += 1
     else:
-        print("UNKNOWN ERROR")
-        exit(1)
-    return result
-
-
-def running_ref_single_test_cases(path: str) -> int:
-    global expected_syntax_error_test_cases, expected_semantic_error_test_cases
-    output: str = subprocess.run([REF_PATH, "-s", path], stdout=subprocess.PIPE).stdout.decode("utf-8")
-    print(f"running {path} in reference compiler: ", end="")
-    result: int = 0
-    if output.find("Errors detected during compilation! Exit code 100 returned.") != -1:
-        result = 100
-        expected_syntax_error_test_cases += 1
-        print("SYNTAX ERROR")
-    elif output.find("Errors detected during compilation! Exit code 200 returned.") != -1:
-        result = 200
-        expected_semantic_error_test_cases += 1
-        print("SEMANTIC ERROR")
-    else:
         print("PASS")
     return result
 
 
+def running_ref_single_test_cases(path: str) -> Result:
+    global expected_syntax_error_test_cases, expected_semantic_error_test_cases
+    output: str = subprocess.run([REF_PATH, "-s", path], stdout=subprocess.PIPE).stdout.decode("utf-8")
+    print(f"running {path} in reference compiler: ", end="")
+    result: Result = Result()
+    if output.find("Errors detected during compilation! Exit code 100 returned.") != -1:
+        result.exit_code = 100
+        expected_syntax_error_test_cases += 1
+        print("SYNTAX ERROR")
+    elif output.find("Errors detected during compilation! Exit code 200 returned.") != -1:
+        result.exit_code = 200
+        expected_semantic_error_test_cases += 1
+        print("SEMANTIC ERROR")
+    else:
+        result.exit_code = get_exit_code(path)
+        result.output = get_output_content(path)
+        print("PASS")
+    return result
+
+def run_each_test_case(path: str) -> None:
+    print("============================================================")
+    our_result: Result = running_our_single_test_cases(path)
+    ref_result: Result = running_ref_single_test_cases(path)
+    # print(our_result, ref_result)
+    if our_result != ref_result:
+        incorrect_list.append(incorrect_test(path, our_result, ref_result))
+        print("result not match")
+
 def running_test_cases(path: str) -> None:
     if path.endswith("wacc"):
-        running_our_single_test_cases(path)
-        running_ref_single_test_cases(path)
+        run_each_test_case(path)
         return
     for test_case in listdir(path):
         new_path = f"{path}/{test_case}"
         if isdir(new_path):
             running_test_cases(new_path)
         elif new_path.endswith(".wacc"):
-            print("============================================================")
-            our_result = running_our_single_test_cases(new_path)
-            ref_result = running_ref_single_test_cases(new_path)
-            if our_result != ref_result:
-                incorrect_list.append(incorrect_test(new_path, our_result, ref_result))
-                print("result not match")
+            run_each_test_case(new_path)
 
 
 # accepting arguments as the path of the test directory (can be single file)
@@ -112,6 +176,9 @@ if __name__ == "__main__":
     if not exists(WACC_PATH):
         print("running cargo build")
         system("cargo build")
+
+    if not exists(OUT_PATH):
+        system(f"mkdir {OUT_PATH}")
 
     # ensure that the test directory exists
     assert exists(TEST_PATH), "test directory does not exist"
@@ -140,7 +207,7 @@ if __name__ == "__main__":
     print(f"expected syntax error test cases: {expected_syntax_error_test_cases}")
     print(f"actual semantic error test cases: {actual_semantic_error_test_cases}")
     print(f"expected semantic error test cases: {expected_semantic_error_test_cases}")
-    print(f"remaining test cases: {get_total_test_cases() - run_test_cases}")
+    print(f"remaining test cases: {total_test - run_test_cases}")
     print("============================================================")
     incorrect_number = len(incorrect_list)
     print(f"incorrect tests: {incorrect_number} OUT OF {run_test_cases}")

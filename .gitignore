@@ -12,3 +12,4 @@ wacc-compiler
 # Added by cargo
 
 /target
+out/
