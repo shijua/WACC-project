@@ -1,5 +1,6 @@
-use crate::code_generator::def_libary::Directives::GlobalDeclare;
-use std::fmt::{write, Display, Formatter};
+use lazy_static::lazy_static;
+use std::fmt::Display;
+use std::sync::Mutex;
 
 pub const MAIN_FUNCTION_TITLE: &str = "main";
 
@@ -9,5 +10,8 @@ pub enum Directives {
     GlobalDeclare(String),
     AssemblerText,
     Label(String),
+    AsciiStringText(String),
     ReadOnlyStrings,
+    IntLabel(usize),
+    Comment(String),
 }
