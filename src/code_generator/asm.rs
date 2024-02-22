@@ -38,7 +38,7 @@ fn revert_escape_string(str: &str) -> String {
     s
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Register {
     Rax,
     Rbx,

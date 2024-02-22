@@ -1,5 +1,10 @@
-use crate::ast::Stmt;
-use crate::code_generator::asm::{GeneratedCode, Register};
+use crate::ast::{Stmt, Type};
+use crate::code_generator::asm::AsmLine::Instruction;
+use crate::code_generator::asm::Register::Rdi;
+use crate::code_generator::asm::{
+    CLibFunctions, GeneratedCode, Instr, InstrOperand, Register, Scale,
+};
+use crate::code_generator::clib_functions::PRINT_LABEL_FOR_STRING;
 use crate::code_generator::x86_generate::Generator;
 use crate::symbol_table::ScopeTranslator;
 
@@ -9,13 +14,38 @@ impl Generator for Stmt {
 
     fn generate(
         &self,
-        _scope: &ScopeTranslator,
+        scope: &ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &[Register],
-        _aux: Self::Input,
+        aux: Self::Input,
     ) -> Self::Output {
         match self {
             Stmt::Skip => (),
+            Stmt::Print(print_type, (exp, _)) => {
+                let next_reg = regs[0].clone();
+                exp.generate(scope, code, regs, aux);
+                match print_type {
+                    Type::StringType => code.required_clib.insert(CLibFunctions::PrintString),
+                    _ => todo!(),
+                };
+                // todo:
+                // Does we need to push and pop rdi? Don't quite know for know
+                // now we'll just use a placeholder, direct move
+                // this is just a temporary placeholder for carrot marks!
+                code.codes.push(Instruction(Instr::Mov(
+                    Scale::default(),
+                    InstrOperand::Reg(next_reg),
+                    InstrOperand::Reg(Rdi),
+                )));
+
+                // call relevant print statements
+                let print_label = match print_type {
+                    Type::StringType => PRINT_LABEL_FOR_STRING,
+                    _ => todo!(),
+                };
+                code.codes
+                    .push(Instruction(Instr::Call(String::from(print_label))));
+            }
             _ => todo!(),
         }
     }

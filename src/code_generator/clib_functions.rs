@@ -9,14 +9,14 @@ use crate::code_generator::def_libary::{Directives, FormatLabel};
 use crate::code_generator::x86_generate::Generator;
 use crate::symbol_table::ScopeTranslator;
 
-const PRINT_STRING_LABEL: &str = ".L._prints_str0";
-const PRINT_S_LABEL: &str = "_prints";
+pub const PRINT_STRING_LABEL: &str = ".L._prints_str0";
+pub const PRINT_LABEL_FOR_STRING: &str = "_prints";
 
-const CONTENT_STRING_LITERAL: &str = "%.*s";
+pub const CONTENT_STRING_LITERAL: &str = "%.*s";
 
-const PRINTF_PLT: &str = "printf@plt";
+pub const PRINTF_PLT: &str = "printf@plt";
 
-const F_FLUSH_PLT: &str = "fflush@plt";
+pub const F_FLUSH_PLT: &str = "fflush@plt";
 
 impl Generator for CLibFunctions {
     type Input = ();
@@ -31,23 +31,30 @@ impl Generator for CLibFunctions {
     ) -> Self::Output {
         match self {
             CLibFunctions::PrintString => {
+                // .section .rodata
                 code.lib_functions
                     .push(Directive(Directives::ReadOnlyStrings));
+                // .int 4, length of formatter string
                 code.lib_functions.push(Directive(Directives::IntLabel(4)));
+                // .L._prints_str0:
                 code.lib_functions
                     .push(Directive(Directives::Label(String::from(
                         PRINT_STRING_LABEL,
                     ))));
+                // .asciz "%.*s"
                 code.lib_functions
                     .push(Directive(Directives::FormattedString(
                         FormatLabel::AsciiZ,
                         String::from(CONTENT_STRING_LITERAL),
                     )));
+                // .text
                 code.lib_functions
                     .push(Directive(Directives::AssemblerText));
                 // _prints:
                 code.lib_functions
-                    .push(Directive(Directives::Label(String::from(PRINT_S_LABEL))));
+                    .push(Directive(Directives::Label(String::from(
+                        PRINT_LABEL_FOR_STRING,
+                    ))));
                 // 		pushq %rbp
                 code.lib_functions
                     .push(Instruction(Instr::Push(Scale::default(), Rbp)));
