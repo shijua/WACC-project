@@ -1,7 +1,7 @@
 use crate::ast::{Function, Program, Type};
 use crate::code_generator::asm::Instr::Mov;
 use crate::code_generator::asm::{
-    AsmLine, GeneratedCode, Instr, InstrOperand, InstrScale, Register, RESULT_REG,
+    AsmLine, GeneratedCode, Instr, InstrOperand, Register, Scale, RESULT_REG,
 };
 use crate::code_generator::def_libary::{Directives, MAIN_FUNCTION_TITLE};
 use crate::code_generator::x86_generate::{Generator, DEFAULT_EXIT_CODE};
@@ -32,7 +32,7 @@ impl Generator for Function {
 
         // push RBP and allocate stack frame
         code.codes.push(AsmLine::Instruction(Instr::Push(
-            InstrScale::default(),
+            Scale::default(),
             Register::Rbp,
         )));
 
@@ -60,7 +60,7 @@ impl Generator for Function {
         if is_main {
             // deallocate stack for main function
             code.codes.push(AsmLine::Instruction(Mov(
-                InstrScale::default(),
+                Scale::default(),
                 InstrOperand::Imm(DEFAULT_EXIT_CODE),
                 InstrOperand::Reg(RESULT_REG),
             )));
@@ -68,7 +68,7 @@ impl Generator for Function {
 
         // pop RBP
         code.codes.push(AsmLine::Instruction(Instr::Pop(
-            InstrScale::default(),
+            Scale::default(),
             Register::Rbp,
         )));
 

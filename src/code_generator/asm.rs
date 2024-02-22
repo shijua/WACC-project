@@ -1,5 +1,6 @@
 use crate::code_generator::def_libary::Directives;
 use lazy_static::lazy_static;
+use std::collections::HashSet;
 use std::sync::Mutex;
 
 lazy_static! {
@@ -88,118 +89,128 @@ pub const GENERAL_REGS: [Register; REGS_N] = [
 // const REGS8: [&str; REGS_N] = ["r10b", "r11b", "bl", "r12b", "r13b", "r14b", "r15b"];
 // const REGS32: [&str; REGS_N] = ["r10d", "r11d", "ebx", "r12d", "r13d", "r14d", "r15d"];
 
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Debug, Clone, Copy, Hash, Eq)]
 pub enum CLibFunctions {
-    PrintInt,
-    PrintBool,
+    // PrintInt,
+    // PrintBool,
     PrintString,
-    Println,
-    ReadInt,
-    ReadChar,
+    // Println,
+    // ReadInt,
+    // ReadChar,
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum InstrScale {
+pub enum Scale {
     Byte, // 1 byte
     Word, // 2 bytes
     Long, // 4 bytes
     Quad, // 8 bytes
 }
 
-impl Default for InstrScale {
+impl Default for Scale {
     fn default() -> Self {
-        InstrScale::Quad
+        Scale::Quad
     }
 }
 
-pub type Scaled<T> = (T, InstrScale);
+pub type Scaled<T> = (T, Scale);
 
 pub fn from_scale<T>(scaled: Scaled<T>) -> T {
     scaled.0
 }
 
-pub fn get_scale<T>(scaled: Scaled<T>) -> InstrScale {
+pub fn get_scale<T>(scaled: Scaled<T>) -> Scale {
     scaled.1
 }
 
-fn from_size(n: i32) -> InstrScale {
+fn from_size(n: i32) -> Scale {
     match n {
-        1 => InstrScale::Byte,
-        2 => InstrScale::Word,
-        4 => InstrScale::Long,
-        8 => InstrScale::Quad,
+        1 => Scale::Byte,
+        2 => Scale::Word,
+        4 => Scale::Long,
+        8 => Scale::Quad,
         _ => unreachable!("Invalid scale argument"),
     }
 }
 
-impl InstrScale {
+impl Scale {
     fn size(&self) -> i32 {
         match self {
-            InstrScale::Byte => 1,
-            InstrScale::Word => 2,
-            InstrScale::Long => 4,
-            InstrScale::Quad => 8,
+            Scale::Byte => 1,
+            Scale::Word => 2,
+            Scale::Long => 4,
+            Scale::Quad => 8,
         }
+    }
+}
+
+// Memory Addressing Mode:
+// Imm(r_b, r_i, s) => Memory [Imm + R[r_b] + R[r_i] * s]
+// somehow from the WACC code we know that Imm can be numbers OR labels
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum MemoryReferenceImmediate {
+    OffsetImm(i32),
+    LabelledImm(Label),
+}
+
+impl Default for MemoryReferenceImmediate {
+    fn default() -> Self {
+        MemoryReferenceImmediate::OffsetImm(0)
     }
 }
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct MemoryReference {
-    pub base_reg: Register,
-    pub shift_reg: Option<Register>,
-    pub scale: Option<InstrScale>,
-    pub displacement: i32,
+    pub imm: Option<MemoryReferenceImmediate>,
+    // rb
+    pub base_reg: Option<Register>,
+    // ri
+    pub shift_unit_reg: Option<Register>,
+    // s
+    pub shift_cnt: Option<i32>,
 }
 
 impl MemoryReference {
-    pub fn normal(&self, register: Register) -> Self {
-        Self {
-            base_reg: register.clone(),
-            shift_reg: None,
-            scale: None,
-            displacement: 0,
-        }
-    }
-    pub fn displaced(&self, register: Register, displacement: i32) -> Self {
-        Self {
-            base_reg: register.clone(),
-            shift_reg: None,
-            scale: None,
-            displacement,
-        }
-    }
-
-    pub fn indexed(
-        &self,
-        register: Register,
-        shift_register: Register,
-        scale_given: InstrScale,
-        displacement: i32,
+    pub fn new(
+        imm: Option<MemoryReferenceImmediate>,
+        base_reg: Option<Register>,
+        shift_unit_reg: Option<Register>,
+        shift_cnt: Option<i32>,
     ) -> Self {
         Self {
-            base_reg: register.clone(),
-            shift_reg: Some(shift_register.clone()),
-            scale: Some(scale_given.clone()),
-            displacement,
+            imm,
+            base_reg,
+            shift_unit_reg,
+            shift_cnt,
         }
     }
 }
 
 #[derive(PartialEq, Debug, Clone)]
+pub struct ScaledRegister {
+    pub reg: Register,
+    pub scale: Scale,
+}
+
+#[derive(PartialEq, Debug, Clone)]
 pub enum InstrOperand {
     Reg(Register),
+    RegVariant(Register, Scale),
     Imm(i32),
     Reference(MemoryReference),
 }
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Instr {
-    Push(InstrScale, Register),
-    Pop(InstrScale, Register),
-    Mov(InstrScale, InstrOperand, InstrOperand),
-    Lea(InstrScale, InstrOperand, InstrOperand),
-    Add(InstrScale, InstrOperand, InstrOperand),
-    Sub(InstrScale, InstrOperand, InstrOperand),
+    Push(Scale, Register),
+    Pop(Scale, Register),
+    Mov(Scale, InstrOperand, InstrOperand),
+    Lea(Scale, InstrOperand, InstrOperand),
+    Add(Scale, InstrOperand, InstrOperand),
+    Sub(Scale, InstrOperand, InstrOperand),
+    And(Scale, InstrOperand, InstrOperand),
+    Call(String),
     Ret,
 }
 
@@ -213,7 +224,8 @@ pub enum AsmLine {
 pub struct GeneratedCode {
     pub pre_defined: Vec<AsmLine>,
     pub codes: Vec<AsmLine>,
-    pub required_clib: Vec<CLibFunctions>,
+    pub required_clib: HashSet<CLibFunctions>,
+    pub lib_functions: Vec<AsmLine>,
 }
 
 impl GeneratedCode {
@@ -240,9 +252,10 @@ impl GeneratedCode {
 impl Default for GeneratedCode {
     fn default() -> Self {
         Self {
-            pre_defined: vec![],
-            codes: vec![],
-            required_clib: Vec::new(),
+            pre_defined: Vec::new(),
+            codes: Vec::new(),
+            required_clib: HashSet::new(),
+            lib_functions: Vec::new(),
         }
     }
 }

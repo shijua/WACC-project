@@ -1,6 +1,7 @@
 pub mod asm;
 mod def_libary;
 
+mod clib_functions;
 mod display;
 mod expr;
 mod ir;

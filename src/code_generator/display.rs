@@ -1,8 +1,9 @@
 use crate::code_generator::asm::{
-    AsmLine, GeneratedCode, Instr, InstrOperand, InstrScale, Register,
+    AsmLine, GeneratedCode, Instr, InstrOperand, Register, Scale, ScaledRegister,
 };
-use crate::code_generator::def_libary::Directives;
-use std::fmt::{Display, Formatter};
+use crate::code_generator::def_libary::{Directives, FormatLabel};
+use crate::code_generator::x86_generate::Generator;
+use std::fmt::{write, Display, Formatter};
 
 impl Display for GeneratedCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -10,10 +11,18 @@ impl Display for GeneratedCode {
             .iter()
             .try_for_each(|asm| writeln!(f, "{}", asm))?;
         writeln!(f)?;
+
+        // main function codes
         self.codes
             .iter()
             .try_for_each(|asm| writeln!(f, "{}", asm))?;
-        // todo: implement output clib dependencies & ascii text prefixes
+        writeln!(f)?;
+
+        // output code lib dependencies & ascii text prefixes
+        self.lib_functions
+            .iter()
+            .try_for_each(|asm| writeln!(f, "{}", asm))?;
+
         Ok(())
     }
 }
@@ -23,6 +32,14 @@ impl Display for AsmLine {
         match self {
             AsmLine::Directive(dir) => write!(f, "{}", dir),
             AsmLine::Instruction(ins) => write!(f, "{}", ins),
+        }
+    }
+}
+
+impl Display for FormatLabel {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FormatLabel::AsciiZ => write!(f, ".asciz"),
         }
     }
 }
@@ -37,17 +54,20 @@ impl Display for Directives {
             Directives::AsciiStringText(string_text) => write!(f, "\t .asciz\"{}\" ", string_text),
             Directives::IntLabel(x) => write!(f, "\t.int {}", x),
             Directives::Comment(comment) => write!(f, "# {}", comment),
+            Directives::FormattedString(format_string, content) => {
+                write!(f, "\t.{} \"{}\"", format_string, content)
+            }
         }
     }
 }
 
-impl Display for InstrScale {
+impl Display for Scale {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            InstrScale::Byte => write!(f, "b"),
-            InstrScale::Word => write!(f, "w"),
-            InstrScale::Long => write!(f, "l"),
-            InstrScale::Quad => write!(f, "q"),
+            Scale::Byte => write!(f, "b"),
+            Scale::Word => write!(f, "w"),
+            Scale::Long => write!(f, "l"),
+            Scale::Quad => write!(f, "q"),
         }
     }
 }
@@ -62,6 +82,8 @@ impl Display for Instr {
             Instr::Lea(scale, src, dst) => write!(f, "lea{} {}, {}", scale, src, dst),
             Instr::Add(scale, src, dst) => write!(f, "add{} {}, {}", scale, src, dst),
             Instr::Sub(scale, src, dst) => write!(f, "sub{} {}, {}", scale, src, dst),
+            Instr::And(scale, src, dst) => write!(f, "and{} {}, {}", scale, src, dst),
+            Instr::Call(callee) => write!(f, "{}", callee),
             Instr::Ret => write!(f, "ret"),
         }
     }
@@ -74,6 +96,14 @@ impl Display for InstrOperand {
             InstrOperand::Imm(immediate) => write!(f, "${}", immediate),
             // todo: reference formatting
             InstrOperand::Reference(reference) => write!(f, "{:?}", reference),
+            InstrOperand::RegVariant(reg, scale) => write!(
+                f,
+                "{}",
+                ScaledRegister {
+                    reg: reg.clone(),
+                    scale: scale.clone()
+                }
+            ),
         }
     }
 }
@@ -99,6 +129,21 @@ impl Display for Register {
             Register::R14 => write!(f, "r14"),
             Register::R15 => write!(f, "r15"),
             Register::Rip => write!(f, "rip"),
+        }
+    }
+}
+
+impl Display for ScaledRegister {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use crate::code_generator::asm::Register::*;
+        match self.reg {
+            Rax => match self.scale {
+                Scale::Byte => write!(f, "al"),
+                Scale::Word => write!(f, "ax"),
+                Scale::Long => write!(f, "eax"),
+                Scale::Quad => write!(f, "{}", self.reg),
+            },
+            _ => todo!(),
         }
     }
 }
