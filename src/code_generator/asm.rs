@@ -95,7 +95,7 @@ pub enum CLibFunctions {
     // PrintBool,
     PrintString,
     // Println,
-    // ReadInt,
+    ReadInt,
     // ReadChar,
 }
 
