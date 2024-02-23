@@ -25,11 +25,17 @@ create-docker-image:
 	docker rmi assembler || true
 	docker build --platform linux/x86_64 -t assembler .
 
-integration-test:
+assemble-local:
 	docker stop assembler || true
 	docker rm assembler || true
 	# docker run -it --name assembler -v ${PWD}:/project assembler  bash -c 'cd project && make whack && python3 integration_test.py wacc-examples-36'
 	docker run -it --platform=linux/x86_64 --name assembler -v ${PWD}:/project assembler bash
+
+integration-test-local:
+	docker stop assembler || true
+	docker rm assembler || true
+	docker run -it --name assembler -v ${PWD}:/project assembler  bash -c 'cd project && make whack && python3 integration_test.py wacc-examples-36/valid/basic/exit/exitBasic.wacc'
+
 
 
 
