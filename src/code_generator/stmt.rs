@@ -1,8 +1,8 @@
-use crate::ast::{Stmt, Type};
+use crate::ast::{Expr, Stmt, Type};
 use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::Register::Rdi;
 use crate::code_generator::asm::{
-    CLibFunctions, GeneratedCode, Instr, InstrOperand, Register, Scale,
+    AsmLine, CLibFunctions, GeneratedCode, Instr, InstrOperand, Register, Scale,
 };
 use crate::code_generator::clib_functions::PRINT_LABEL_FOR_STRING;
 use crate::code_generator::x86_generate::Generator;
@@ -49,4 +49,17 @@ impl Generator for Stmt {
             _ => todo!(),
         }
     }
+}
+
+fn generate_stat_exit(
+    scope: &ScopeTranslator,
+    code: &mut GeneratedCode,
+    regs: &[Register],
+    exp: &Expr,
+) {
+    // reg[0] = exit_value
+    exp.generate(scope, code, regs, ());
+
+    // move result into the rax register
+    // code.codes.push(AsmLine::Instruction(Instr::Mov()));
 }

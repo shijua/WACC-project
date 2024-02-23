@@ -222,7 +222,7 @@ pub enum AsmLine {
 
 #[derive(PartialEq, Debug)]
 pub struct GeneratedCode {
-    pub pre_defined: Vec<AsmLine>,
+    pub pre_defined: Vec<AsmLine>, // read-only data
     pub codes: Vec<AsmLine>,
     pub required_clib: HashSet<CLibFunctions>,
     pub lib_functions: Vec<AsmLine>,
