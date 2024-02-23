@@ -125,6 +125,23 @@ def running_our_single_test_cases(path: str) -> Result:
         print("PASS")
     return result
 
+def reduce_line_breaks(content: str) -> str:
+    separator = "==========================================================="
+    content = content[content.find(separator) + len(separator):]
+    content = content[:content.find(separator)]
+    # replace "num content" to "content" where num is integer
+    count: int = 0
+    while content.find(f"\n{count}\t") != -1:
+        content = content.replace(f"\n{count}\t", "\n")
+        count += 1
+    return content[1:]
+
+def get_all_assembly_code(path: str) -> int:
+    output: str = subprocess.run([REF_PATH, "-t", "x86-64", "-a", path], stdout=subprocess.PIPE).stdout.decode("utf-8")
+    print(f"running {path} in reference compiler: ", end="")
+    with open(f"{OUT_PATH}/{basename(path)}.s", "w") as file:
+        file.write(reduce_line_breaks(output))
+
 
 def running_ref_single_test_cases(path: str) -> Result:
     global expected_syntax_error_test_cases, expected_semantic_error_test_cases
@@ -147,6 +164,7 @@ def running_ref_single_test_cases(path: str) -> Result:
 
 def run_each_test_case(path: str) -> None:
     print("============================================================")
+    # get_all_assembly_code(path)
     our_result: Result = running_our_single_test_cases(path)
     ref_result: Result = running_ref_single_test_cases(path)
     # print(our_result, ref_result)
