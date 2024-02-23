@@ -86,7 +86,10 @@ def get_exit_code(path: str) -> int:
     index = content.find("Exit:")
     if index == -1:
         return 0
-    index_end = content.find("Program:")
+    index_end = content.find("begin") # as some program does not contain program: at the start
+    index_end_if_program = content.find("Program:")
+    if index_end_if_program != -1 and index_end_if_program < index_end:
+        index_end = index_end_if_program
     return int(content[index + 5:index_end].replace("\n# ", "").strip())
 
 def get_total_test_cases(path: str = TEST_PATH) -> int:
@@ -106,23 +109,25 @@ def running_our_single_test_cases(path: str) -> Result:
     outputwacc: str = f"{OUT_PATH}/{basename(path)}"
     output: str = outputwacc[:outputwacc.find(".wacc")]
 
-    subprocess.run([WACC_PATH, path, f"{output}.s"] + get_input_content(path), stdout=subprocess.PIPE)
-    subprocess.run(["gcc", f"{output}.s", "-o", output, "-z", "noexecstack"], stdout=subprocess.PIPE)
-    res = subprocess.run([f"./{output}"], stdout=subprocess.PIPE)
-    
-    result.exit_code = res.returncode
-    result.output = res.stdout.decode("utf-8").strip()
+    compiler_res: int = subprocess.run([WACC_PATH, path, f"{output}.s"], stdout=subprocess.PIPE).returncode
 
     print(f"running {path} in our compiler: ", end="")
     run_test_cases += 1
-    if result.exit_code == 100:
+    if compiler_res == 100:
         print("SYNTAX ERROR")
+        result.exit_code = compiler_res
         actual_syntax_error_test_cases += 1
-    elif result.exit_code == 200:
+    elif compiler_res == 200:
         print("SEMANTIC ERROR")
+        result.exit_code = compiler_res
         actual_semantic_error_test_cases += 1
     else:
         print("PASS")
+        if exists(f"{output}.s"):
+            subprocess.run(["gcc", f"{output}.s", "-o", output, "-z", "noexecstack"], stdout=subprocess.PIPE)
+            res = subprocess.run([f"./{output}"] + get_input_content(path), stdout=subprocess.PIPE)
+            result.exit_code = res.returncode
+            result.output = res.stdout.decode("utf-8").strip()
     return result
 
 def reduce_line_breaks(content: str) -> str:
@@ -145,14 +150,14 @@ def get_all_assembly_code(path: str) -> int:
 
 def running_ref_single_test_cases(path: str) -> Result:
     global expected_syntax_error_test_cases, expected_semantic_error_test_cases
-    output: str = subprocess.run([REF_PATH, "-s", path], stdout=subprocess.PIPE).stdout.decode("utf-8")
+    # output: str = subprocess.run([REF_PATH, "-s", path], stdout=subprocess.PIPE).stdout.decode("utf-8")
     print(f"running {path} in reference compiler: ", end="")
     result: Result = Result()
-    if output.find("Errors detected during compilation! Exit code 100 returned.") != -1:
+    if path.find("syntaxErr") != -1:
         result.exit_code = 100
         expected_syntax_error_test_cases += 1
         print("SYNTAX ERROR")
-    elif output.find("Errors detected during compilation! Exit code 200 returned.") != -1:
+    elif path.find("semanticErr") != -1:
         result.exit_code = 200
         expected_semantic_error_test_cases += 1
         print("SEMANTIC ERROR")
