@@ -1,7 +1,7 @@
 use crate::ast::{Function, Program, Type};
 use crate::code_generator::asm::Instr::Mov;
 use crate::code_generator::asm::{
-    AsmLine, GeneratedCode, Instr, InstrOperand, InstrScale, Register, RESULT_REG,
+    AsmLine, GeneratedCode, Instr, InstrOperand, Register, Scale, RESULT_REG,
 };
 use crate::code_generator::def_libary::{Directives, MAIN_FUNCTION_TITLE};
 use crate::code_generator::x86_generate::{Generator, DEFAULT_EXIT_CODE};
@@ -16,7 +16,7 @@ impl Generator for Function {
 
     fn generate(
         &self,
-        _scope: &ScopeTranslator,
+        scope: &ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &[Register],
         is_main: bool,
@@ -32,7 +32,7 @@ impl Generator for Function {
 
         // push RBP and allocate stack frame
         code.codes.push(AsmLine::Instruction(Instr::Push(
-            InstrScale::default(),
+            Scale::default(),
             Register::Rbp,
         )));
 
@@ -54,13 +54,14 @@ impl Generator for Function {
 
         // reserve some space for the link register
 
-        // make body statements
+        // todo: make body statements
+        self.body.0.generate(scope, code, regs, ());
 
         // main function will exit by exit-code 0, (or does it involve manipulating exit?)
         if is_main {
             // deallocate stack for main function
             code.codes.push(AsmLine::Instruction(Mov(
-                InstrScale::default(),
+                Scale::default(),
                 InstrOperand::Imm(DEFAULT_EXIT_CODE),
                 InstrOperand::Reg(RESULT_REG),
             )));
@@ -68,7 +69,7 @@ impl Generator for Function {
 
         // pop RBP
         code.codes.push(AsmLine::Instruction(Instr::Pop(
-            InstrScale::default(),
+            Scale::default(),
             Register::Rbp,
         )));
 
@@ -96,23 +97,16 @@ impl Generator for Program {
             )));
         code.pre_defined
             .push(AsmLine::Directive(Directives::ReadOnlyStrings));
-        code.pre_defined
-            .push(AsmLine::Directive(Directives::AssemblerText));
 
         let scope = &ScopeTranslator::new(&self.symbol_table);
 
         // todo: generate assembly for the functions
 
         // todo: generate assembly for main
+        code.codes
+            .push(AsmLine::Directive(Directives::AssemblerText));
         Function {
             ident: new_spanned(MAIN_FUNCTION_TITLE.to_string()),
-            // signature: FuncSig {
-            //     params: Vec::new(),
-            //     return_type: Type::Int,
-            // },
-            // body: *self.statement.1.clone(),
-            // params_st: SymbolTable::default(),
-            // body_st: self.statement.0.clone(),
             return_type: new_spanned(Type::IntType),
             parameters: Vec::new(),
             body: *self.body.stmt.clone(),

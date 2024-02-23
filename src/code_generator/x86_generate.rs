@@ -33,5 +33,9 @@ pub fn gen_x86_for_program(ast: &Program) -> GeneratedCode {
     let regs = &GENERAL_REGS;
 
     ast.generate(&base_scope, &mut asm, regs, ());
+    asm.required_clib
+        .clone()
+        .iter()
+        .for_each(|clib_func| clib_func.generate(&base_scope, &mut asm, regs, ()));
     asm
 }

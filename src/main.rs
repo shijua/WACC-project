@@ -182,6 +182,7 @@ fn main() {
         let mut output_assembly =
             String::from(input_path.to_str().unwrap().strip_suffix(".wacc").unwrap());
         output_assembly.push_str(".s");
+        /// skip.s
         fs::write(&output_assembly, asm_output).unwrap();
     } else {
         // we have an output path
@@ -192,3 +193,6 @@ fn main() {
 
     exit(VALID_CODE);
 }
+
+// valid/basic/skip.wacc
+// skip.s
