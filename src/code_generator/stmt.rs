@@ -1,8 +1,9 @@
 use crate::ast::{Expr, Stmt, Type};
 use crate::code_generator::asm::AsmLine::Instruction;
+use crate::code_generator::asm::InstrOperand::Reg;
 use crate::code_generator::asm::Register::Rdi;
 use crate::code_generator::asm::{
-    AsmLine, CLibFunctions, GeneratedCode, Instr, InstrOperand, Register, Scale,
+    AsmLine, CLibFunctions, GeneratedCode, Instr, InstrOperand, Register, Scale, RESULT_REG,
 };
 use crate::code_generator::clib_functions::PRINT_LABEL_FOR_STRING;
 use crate::code_generator::x86_generate::Generator;
@@ -61,5 +62,11 @@ fn generate_stat_exit(
     exp.generate(scope, code, regs, ());
 
     // move result into the rax register
-    // code.codes.push(AsmLine::Instruction(Instr::Mov()));
+    code.codes.push(AsmLine::Instruction(Instr::Mov(
+        Scale::default(),
+        Reg(regs[0]),
+        Reg(RESULT_REG),
+    )));
+
+    // todo: call predefined exit
 }

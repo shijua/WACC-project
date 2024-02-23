@@ -97,6 +97,7 @@ pub enum CLibFunctions {
     // Println,
     ReadInt,
     // ReadChar,
+    SystemExit,
 }
 
 #[derive(PartialEq, Debug, Clone)]
