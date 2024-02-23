@@ -3,9 +3,10 @@ use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::InstrOperand::Reg;
 use crate::code_generator::asm::Register::Rdi;
 use crate::code_generator::asm::{
-    AsmLine, CLibFunctions, GeneratedCode, Instr, InstrOperand, Register, Scale, RESULT_REG,
+    AsmLine, CLibFunctions, GeneratedCode, Instr, InstrOperand, Register, Scale, ARG_REGS,
+    RESULT_REG,
 };
-use crate::code_generator::clib_functions::PRINT_LABEL_FOR_STRING;
+use crate::code_generator::clib_functions::{PRINT_LABEL_FOR_STRING, SYS_EXIT_LABEL};
 use crate::code_generator::x86_generate::Generator;
 use crate::symbol_table::ScopeTranslator;
 
@@ -47,6 +48,7 @@ impl Generator for Stmt {
                 code.codes
                     .push(Instruction(Instr::Call(String::from(print_label))));
             }
+            Stmt::Exit((exit_val, _)) => generate_stat_exit(scope, code, regs, exit_val),
             _ => todo!(),
         }
     }
@@ -62,11 +64,16 @@ fn generate_stat_exit(
     exp.generate(scope, code, regs, ());
 
     // move result into the rax register
-    code.codes.push(AsmLine::Instruction(Instr::Mov(
+    code.codes.push(Instruction(Instr::Mov(
         Scale::default(),
         Reg(regs[0]),
-        Reg(RESULT_REG),
+        Reg(ARG_REGS[0]),
     )));
 
-    // todo: call predefined exit
+    // call predefined exit
+    code.required_clib.insert(CLibFunctions::SystemExit);
+
+    // add instruction dependency: system exit
+    code.codes
+        .push(Instruction(Instr::Call(String::from(SYS_EXIT_LABEL))));
 }

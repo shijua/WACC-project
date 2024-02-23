@@ -15,6 +15,8 @@ pub const PRINT_LABEL_FOR_STRING: &str = "_prints";
 pub const READ_INT_LABEL: &str = ".L._readi_str0";
 pub const READ_LABEL_FOR_INT: &str = "_readi";
 
+pub const SYS_EXIT_LABEL: &str = "_exit";
+
 pub const CONTENT_STRING_LITERAL: &str = "%.*s";
 pub const CONTENT_INT_LITERAL: &str = "%d";
 
@@ -23,6 +25,8 @@ pub const PRINTF_PLT: &str = "printf@plt";
 pub const SCANF_PLT: &str = "scanf@plt";
 
 pub const F_FLUSH_PLT: &str = "fflush@plt";
+
+pub const SYS_EXIT_PLT: &str = "exit@plt";
 
 impl Generator for CLibFunctions {
     type Input = ();
@@ -44,7 +48,7 @@ impl Generator for CLibFunctions {
                 Self::generate_read_int(code);
             }
             CLibFunctions::SystemExit => {
-                todo!()
+                Self::generate_sys_exit(code);
             }
         }
     }
@@ -236,6 +240,42 @@ impl CLibFunctions {
         code.lib_functions
             .push(Instruction(Instr::Pop(Scale::default(), Rbp)));
         // 		ret
+        code.lib_functions.push(Instruction(Instr::Ret));
+    }
+
+    fn generate_sys_exit(code: &mut GeneratedCode) {
+        // _exit:
+        code.lib_functions
+            .push(Directive(Directives::Label(String::from(SYS_EXIT_LABEL))));
+        // pushq %rbp
+        code.lib_functions
+            .push(Instruction(Instr::Push(Scale::default(), Rbp)));
+        // movq %rsp, %rbp
+        code.lib_functions.push(Instruction(Instr::Mov(
+            Scale::default(),
+            InstrOperand::Reg(Rsp),
+            InstrOperand::Reg(Rbp),
+        )));
+        // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        // andq $-16, %rsp
+        code.lib_functions.push(Instruction(Instr::And(
+            Scale::default(),
+            InstrOperand::Imm(-16),
+            InstrOperand::Reg(Rsp),
+        )));
+        // call exit@plt
+        code.lib_functions
+            .push(Instruction(Instr::Call(String::from(SYS_EXIT_PLT))));
+        // movq %rbp, %rsp
+        code.lib_functions.push(Instruction(Instr::Mov(
+            Scale::default(),
+            InstrOperand::Reg(Rbp),
+            InstrOperand::Reg(Rsp),
+        )));
+        // popq %rbp
+        code.lib_functions
+            .push(Instruction(Instr::Pop(Scale::default(), Rbp)));
+        // ret
         code.lib_functions.push(Instruction(Instr::Ret));
     }
 }

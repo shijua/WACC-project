@@ -1,3 +1,4 @@
+use crate::code_generator::asm::Register::Rip;
 use crate::code_generator::def_libary::Directives;
 use lazy_static::lazy_static;
 use std::collections::HashSet;
@@ -64,7 +65,7 @@ const REGS_N: usize = 7;
 
 pub const RESULT_REG: Register = Register::Rax;
 
-const ARG_REGS: [Register; ARG_REGS_N] = [
+pub const ARG_REGS: [Register; ARG_REGS_N] = [
     Register::Rdi,
     Register::Rsi,
     Register::Rdx,
