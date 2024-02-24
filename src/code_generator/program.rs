@@ -37,6 +37,16 @@ impl Generator for Function {
         )));
 
         let body_allocated_size = self.body_symbol_table.size;
+        code.codes.push(AsmLine::Instruction(Instr::Sub(
+            Scale::default(),
+            InstrOperand::Imm(body_allocated_size),
+            InstrOperand::Reg(Register::Rsp),
+        )));
+
+        // process parameter scope
+        let scope = &scope.make_scope(&self.param_symbol_table);
+
+        let scope = &scope.make_scope(&self.body_symbol_table);
 
         // move down rsp
         // dest = dest - src
@@ -52,9 +62,7 @@ impl Generator for Function {
         //     InstrOperand::Reg(Register::Rsp),
         // )));
 
-        // reserve some space for the link register
-
-        // todo: make body statements
+        // make body statements
         self.body.0.generate(scope, code, regs, ());
 
         // main function will exit by exit-code 0, (or does it involve manipulating exit?)

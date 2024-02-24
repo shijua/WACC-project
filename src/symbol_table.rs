@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 // pub type Label = String;
 
-pub type Offset = u32;
+pub type Offset = i32;
 
 #[derive(PartialEq, Clone, Debug, Default)]
 pub struct SymbolTable {
@@ -70,7 +70,7 @@ impl ScopeInfo<'_> {
 
     pub fn add(&mut self, ident: &Ident, type_: Type) -> MessageResult<Ident> {
         // increase the space needed by the stack frame by the size of the given type
-        self.symbol_table.size += type_.size() as u32;
+        self.symbol_table.size += type_.size();
 
         // manage new offset of the given variable
         let offset = self.symbol_table.size;

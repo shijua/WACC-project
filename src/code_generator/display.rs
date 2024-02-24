@@ -10,13 +10,13 @@ impl Display for GeneratedCode {
         self.pre_defined
             .iter()
             .try_for_each(|asm| writeln!(f, "{}", asm))?;
-        writeln!(f)?;
+        // writeln!(f)?;
 
         // main function codes
         self.codes
             .iter()
             .try_for_each(|asm| writeln!(f, "{}", asm))?;
-        writeln!(f)?;
+        // writeln!(f)?;
 
         // output code lib dependencies & ascii text prefixes
         self.lib_functions

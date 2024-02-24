@@ -1,9 +1,11 @@
 use crate::ast::{Expr, Lvalue, Rvalue, ScopedStmt, Stmt, Type};
 use crate::code_generator::asm::AsmLine::Instruction;
+use crate::code_generator::asm::InstrOperand::Reg;
+use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rdi, Rsp};
 use crate::code_generator::asm::{
-    AsmLine, CLibFunctions, GeneratedCode, Instr, InstrOperand, Register, Scale, ARG_REGS,
-    RESULT_REG,
+    AsmLine, CLibFunctions, GeneratedCode, Instr, InstrOperand, MemoryReference, Register, Scale,
+    ARG_REGS, RESULT_REG,
 };
 use crate::code_generator::clib_functions::{PRINT_LABEL_FOR_STRING, SYS_EXIT_LABEL};
 use crate::code_generator::x86_generate::Generator;
@@ -26,7 +28,7 @@ impl Generator for ScopedStmt {
         let new_offset = self.symbol_table.size;
         code.codes.push(Instruction(Instr::Sub(
             Scale::default(),
-            InstrOperand::Imm(new_offset as i32),
+            InstrOperand::Imm(new_offset),
             InstrOperand::Reg(Rsp),
         )));
 
@@ -38,7 +40,7 @@ impl Generator for ScopedStmt {
         // set back stack pointer
         code.codes.push(Instruction(Instr::Add(
             Scale::default(),
-            InstrOperand::Imm(new_offset as i32),
+            InstrOperand::Imm(new_offset),
             InstrOperand::Reg(Rsp),
         )));
     }
@@ -57,7 +59,7 @@ impl Generator for Lvalue {
     ) -> Self::Output {
         match self {
             Lvalue::LIdent((id, _)) => (
-                Register::Rsp,
+                Rsp,
                 scope.get_offset(id).unwrap(),
                 Scale::from_size(t.size()),
             ),
@@ -124,10 +126,19 @@ impl Generator for Stmt {
                 rvalue.generate(scope, code, regs, aux);
 
                 // store value in regs[0] to that of lvalue
-                // let (target_reg, offset, scale) =
-                //     lvalue.generate(scope, code, &regs[1..], type_.clone());
+                let (target_reg, offset, scale) =
+                    lvalue.generate(scope, code, &regs[1..], type_.clone());
 
-                //code.codes.push(Instruction());
+                code.codes.push(Instruction(Instr::Mov(
+                    scale,
+                    Reg(regs[0]),
+                    InstrOperand::Reference(MemoryReference {
+                        imm: Some(OffsetImm(offset)),
+                        base_reg: Some(target_reg),
+                        shift_unit_reg: None,
+                        shift_cnt: None,
+                    }),
+                )));
             }
             _ => todo!(),
         }
