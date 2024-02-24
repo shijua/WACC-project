@@ -35,7 +35,7 @@ impl Generator for ScopedStmt {
         )));
 
         // enter the new scope
-        let new_scope = scope.make_scope(&self.symbol_table);
+        let scope = scope.make_scope(&self.symbol_table);
 
         self.stmt.0.generate(&scope, code, regs, aux);
 

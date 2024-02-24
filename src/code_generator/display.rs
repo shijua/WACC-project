@@ -193,7 +193,31 @@ impl Display for ScaledRegister {
                 Scale::Long => write!(f, "r10d"),
                 Scale::Quad => write!(f, "r10"),
             },
-            _ => todo!(),
+
+            Rbx => match self.scale {
+                Scale::Byte => write!(f, "bl"),
+                Scale::Word => write!(f, "bx"),
+                Scale::Long => write!(f, "ebx"),
+                Scale::Quad => write!(f, "rbx"),
+            },
+            Rcx => todo!(),
+            Rdx => todo!(),
+            Rdi => todo!(),
+            Rbp => todo!(),
+            Rsp => match self.scale {
+                Scale::Byte => write!(f, "spl"),
+                Scale::Word => write!(f, "sp"),
+                Scale::Long => write!(f, "esp"),
+                Scale::Quad => write!(f, "rsp"),
+            },
+            R8 => todo!(),
+            R9 => todo!(),
+            R11 => todo!(),
+            R12 => todo!(),
+            R13 => todo!(),
+            R14 => todo!(),
+            R15 => todo!(),
+            Rip => todo!(),
         }
     }
 }

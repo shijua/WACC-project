@@ -50,31 +50,21 @@ impl Generator for Function {
 
         let scope = &scope.make_scope(&self.body_symbol_table);
 
-        // move down rsp
-        // dest = dest - src
-        // code.codes.push(AsmLine::Instruction(Instr::Sub(
-        //     InstrOperand::Imm(body_allocated_size as i32),
-        //     InstrOperand::Reg(Register::Rsp),
-        // )));
-
-        // move up rsp
-        // dest = dest + src
-        // code.codes.push(AsmLine::Instruction(Instr::Add(
-        //     InstrOperand::Imm(body_allocated_size as i32),
-        //     InstrOperand::Reg(Register::Rsp),
-        // )));
-
         // make body statements
         self.body.0.generate(scope, code, regs, ());
 
         // main function will exit by exit-code 0, (or does it involve manipulating exit?)
         if is_main {
             // deallocate stack for main function
-            // code.codes.push(AsmLine::Instruction(Mov(
-            //     Scale::default(),
-            //     InstrOperand::Imm(DEFAULT_EXIT_CODE),
-            //     InstrOperand::Reg(RESULT_REG),
-            // )));
+            code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Add,
+                    Scale::default(),
+                    InstrOperand::Imm(body_allocated_size),
+                    InstrOperand::Reg(Register::Rsp),
+                ),
+            )));
+
             code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
                     InstrType::Mov,
