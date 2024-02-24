@@ -125,23 +125,23 @@ pub fn get_scale<T>(scaled: Scaled<T>) -> Scale {
     scaled.1
 }
 
-fn from_size(n: i32) -> Scale {
-    match n {
-        1 => Scale::Byte,
-        2 => Scale::Word,
-        4 => Scale::Long,
-        8 => Scale::Quad,
-        _ => unreachable!("Invalid scale argument"),
-    }
-}
-
 impl Scale {
-    fn size(&self) -> i32 {
+    pub fn size(&self) -> i32 {
         match self {
             Scale::Byte => 1,
             Scale::Word => 2,
             Scale::Long => 4,
             Scale::Quad => 8,
+        }
+    }
+
+    pub fn from_size(n: i32) -> Self {
+        match n {
+            1 => Scale::Byte,
+            2 => Scale::Word,
+            4 => Scale::Long,
+            8 => Scale::Quad,
+            _ => unreachable!("Invalid scale argument"),
         }
     }
 }

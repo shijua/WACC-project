@@ -93,12 +93,20 @@ impl Default for Type {
 
 impl Type {
     // size of a given type, in bytes
-    pub fn size(&self) -> u32 {
+    pub fn size(&self) -> i32 {
         use Type::*;
         match self {
             BoolType | CharType => 1,
             Any => panic!("Cannot evaluate size of an Any type"),
             _ => 4,
+        }
+    }
+
+    pub fn is_basic(&self) -> bool {
+        use crate::Type::*;
+        match self {
+            IntType | BoolType | CharType => true,
+            _ => false,
         }
     }
 }
