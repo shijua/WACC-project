@@ -1,7 +1,8 @@
 use crate::ast::{Function, Program, Type};
-use crate::code_generator::asm::Instr::Mov;
+use crate::code_generator::asm::Register::Rdi;
 use crate::code_generator::asm::{
-    AsmLine, GeneratedCode, Instr, InstrOperand, Register, Scale, RESULT_REG,
+    AsmLine, BinaryInstruction, GeneratedCode, Instr, InstrOperand, InstrType, Register, Scale,
+    RESULT_REG,
 };
 use crate::code_generator::def_libary::{Directives, MAIN_FUNCTION_TITLE};
 use crate::code_generator::x86_generate::{Generator, DEFAULT_EXIT_CODE};
@@ -60,10 +61,18 @@ impl Generator for Function {
         // main function will exit by exit-code 0, (or does it involve manipulating exit?)
         if is_main {
             // deallocate stack for main function
-            code.codes.push(AsmLine::Instruction(Mov(
-                Scale::default(),
-                InstrOperand::Imm(DEFAULT_EXIT_CODE),
-                InstrOperand::Reg(RESULT_REG),
+            // code.codes.push(AsmLine::Instruction(Mov(
+            //     Scale::default(),
+            //     InstrOperand::Imm(DEFAULT_EXIT_CODE),
+            //     InstrOperand::Reg(RESULT_REG),
+            // )));
+            code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Mov,
+                    Scale::default(),
+                    InstrOperand::Imm(DEFAULT_EXIT_CODE),
+                    InstrOperand::Reg(RESULT_REG),
+                ),
             )));
         }
 

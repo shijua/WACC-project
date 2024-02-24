@@ -1,9 +1,10 @@
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
+use crate::code_generator::asm::MemoryReferenceImmediate::LabelledImm;
 use crate::code_generator::asm::Register::*;
-use crate::code_generator::asm::Scale::Long;
+use crate::code_generator::asm::Scale::{Long, Quad};
 use crate::code_generator::asm::{
-    AsmLine, CLibFunctions, GeneratedCode, Instr, InstrOperand, MemoryReference,
-    MemoryReferenceImmediate, Register, Scale,
+    AsmLine, BinaryInstruction, CLibFunctions, GeneratedCode, Instr, InstrOperand, InstrType,
+    MemoryReference, MemoryReferenceImmediate, Register, Scale,
 };
 use crate::code_generator::def_libary::{Directives, FormatLabel};
 use crate::code_generator::x86_generate::Generator;
@@ -94,14 +95,13 @@ impl Generator for CLibFunctions {
 */
 
 impl CLibFunctions {
-
     /*
-        ==========================================================
-        ==========================================================
-                                 Basic
-        ==========================================================
-        ==========================================================
-     */
+       ==========================================================
+       ==========================================================
+                                Basic
+       ==========================================================
+       ==========================================================
+    */
 
     // .section .rodata
     fn read_only_strings(code: &mut GeneratedCode) {
@@ -111,7 +111,8 @@ impl CLibFunctions {
 
     // .int 4, length of formatter string
     fn length_of_formatter_string(code: &mut GeneratedCode, length: i32) {
-        code.lib_functions.push(Directive(Directives::IntLabel(length as usize)));
+        code.lib_functions
+            .push(Directive(Directives::IntLabel(length as usize)));
     }
 
     // .L._prints_str0:
@@ -122,10 +123,11 @@ impl CLibFunctions {
 
     // .asciz "%.*s"
     fn print_ascii_string(code: &mut GeneratedCode, content: &str) {
-        code.lib_functions.push(Directive(Directives::FormattedString(
-            FormatLabel::AsciiZ,
-            String::from(content),
-        )));
+        code.lib_functions
+            .push(Directive(Directives::FormattedString(
+                FormatLabel::AsciiZ,
+                String::from(content),
+            )));
     }
 
     // .text
@@ -137,17 +139,18 @@ impl CLibFunctions {
     // _readi:
     fn readi_label(code: &mut GeneratedCode) {
         code.lib_functions
-            .push(Directive(Directives::Label(String::from(READ_LABEL_FOR_INT))));
+            .push(Directive(Directives::Label(String::from(
+                READ_LABEL_FOR_INT,
+            ))));
     }
 
-
     /*
-        ==========================================================
-        ==========================================================
-                                 Push
-        ==========================================================
-        ==========================================================
-     */
+       ==========================================================
+       ==========================================================
+                                Push
+       ==========================================================
+       ==========================================================
+    */
 
     // pushq &rbp
     fn pushq_rbp(code: &mut GeneratedCode) {
@@ -156,158 +159,232 @@ impl CLibFunctions {
     }
 
     /*
-        ==========================================================
-        ==========================================================
-                                  Mov
-        ==========================================================
-        ==========================================================
-     */
+       ==========================================================
+       ==========================================================
+                                 Mov
+       ==========================================================
+       ==========================================================
+    */
 
     // movq %rsp, %rbp
     fn movq_rbp_rsp(code: &mut GeneratedCode) {
-        code.lib_functions.push(Instruction(Instr::Mov(
-            Scale::default(),
-            InstrOperand::Reg(Rsp),
-            InstrOperand::Reg(Rbp),
-        )));
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Mov,
+                    Scale::default(),
+                    InstrOperand::Reg(Rsp),
+                    InstrOperand::Reg(Rbp),
+                ),
+            )));
     }
 
     // movq %rdi, %rdx
     fn movq_rdx_rdi(code: &mut GeneratedCode) {
-        code.lib_functions.push(Instruction(Instr::Mov(
-            Scale::default(),
-            InstrOperand::Reg(Rdi),
-            InstrOperand::Reg(Rdx),
-        )))
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Mov,
+                    Scale::default(),
+                    InstrOperand::Reg(Rdi),
+                    InstrOperand::Reg(Rdx),
+                ),
+            )));
     }
 
     // movl -4(%rdi), %esi
     fn movl_esi_rdi(code: &mut GeneratedCode, offset: i32) {
-        code.lib_functions.push(Instruction(Instr::Mov(
-            Long,
-            InstrOperand::Reference(MemoryReference::new(
-                Some(MemoryReferenceImmediate::OffsetImm(offset)),
-                Some(Rdi),
-                None,
-                None,
-            )),
-            InstrOperand::RegVariant(Rsi, Long),
-        )))
+        code.lib_functions.push(Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Long,
+                InstrOperand::Reference(MemoryReference::new(
+                    Some(MemoryReferenceImmediate::OffsetImm(offset)),
+                    Some(Rdi),
+                    None,
+                    None,
+                )),
+                InstrOperand::Reg(Rsi),
+            ),
+        )));
     }
 
     // movb $0, %al
     fn movb_rax(code: &mut GeneratedCode, offset: i32) {
-        code.lib_functions.push(Instruction(Instr::Mov(
-            Scale::Byte,
-            InstrOperand::Imm(offset),
-            InstrOperand::RegVariant(Rax, Scale::Byte),
-        )));
+        // code.lib_functions.push(Instruction(Instr::Mov(
+        //     Scale::Byte,
+        //     InstrOperand::Imm(offset),
+        //     InstrOperand::RegVariant(Rax, Scale::Byte),
+        // )));
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Mov,
+                    Scale::Byte,
+                    InstrOperand::Imm(offset),
+                    InstrOperand::Reg(Rax),
+                ),
+            )));
     }
 
     // movq $offset, %rdi
     fn movq_rdi(code: &mut GeneratedCode, offset: i32) {
-        code.lib_functions.push(Instruction(Instr::Mov(
-            Scale::default(),
-            InstrOperand::Imm(offset),
-            InstrOperand::Reg(Rdi),
-        )));
+        // code.lib_functions.push(Instruction(Instr::Mov(
+        //     Scale::default(),
+        //     InstrOperand::Imm(offset),
+        //     InstrOperand::Reg(Rdi),
+        // )));
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Mov,
+                    Scale::default(),
+                    InstrOperand::Imm(offset),
+                    InstrOperand::Reg(Rdi),
+                ),
+            )));
     }
 
     // movq %rbp, %rsp
     fn movq_rsp_rbp(code: &mut GeneratedCode) {
-        code.lib_functions.push(Instruction(Instr::Mov(
-            Scale::default(),
-            InstrOperand::Reg(Rbp),
-            InstrOperand::Reg(Rsp),
-        )));
+        // code.lib_functions.push(Instruction(Instr::Mov(
+        //     Scale::default(),
+        //     InstrOperand::Reg(Rbp),
+        //     InstrOperand::Reg(Rsp),
+        // )));
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Mov,
+                    Scale::default(),
+                    InstrOperand::Reg(Rbp),
+                    InstrOperand::Reg(Rsp),
+                ),
+            )));
     }
 
     // 	movl %rdi, %rdx
     fn movl_rdi_rdx(code: &mut GeneratedCode) {
-        code.lib_functions.push(Instruction(Instr::Mov(
-            Long,
-            InstrOperand::Reg(Rdi),
-            InstrOperand::Reg(Rdx),
-        )));
+        // code.lib_functions.push(Instruction(Instr::Mov(
+        //     Long,
+        //     InstrOperand::Reg(Rdi),
+        //     InstrOperand::Reg(Rdx),
+        // )));
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Mov,
+                    Scale::default(),
+                    InstrOperand::Reg(Rdi),
+                    InstrOperand::Reg(Rdx),
+                ),
+            )));
     }
 
     // movslq (%rsp), %rax
     fn movslq_rax_rsp(code: &mut GeneratedCode) {
-        code.lib_functions.push(Instruction(Instr::MovS(
-            Scale::Long,
-            Scale::Long,
-            InstrOperand::Reference(MemoryReference::new(
-                None,
-                Some(Rsp),
-                None,
-                None,
-            )),
-            InstrOperand::RegVariant(Rax, Scale::Long),
-        )));
+        // code.lib_functions.push(Instruction(Instr::MovS(
+        //     Scale::Long,
+        //     Scale::Long,
+        //     InstrOperand::Reference(MemoryReference::new(None, Some(Rsp), None, None)),
+        //     InstrOperand::RegVariant(Rax, Scale::Long),
+        // )));
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_double_scale(
+                    InstrType::Mov,
+                    Scale::Long,
+                    InstrOperand::Reference(MemoryReference::new(None, Some(Rsp), None, None)),
+                    Scale::Long,
+                    InstrOperand::Reg(Rax),
+                ),
+            )));
     }
 
     /*
-        ==========================================================
-        ==========================================================
-                                  And
-        ==========================================================
-        ==========================================================
-     */
+       ==========================================================
+       ==========================================================
+                                 And
+       ==========================================================
+       ==========================================================
+    */
 
     // andq $-16, %rsp
     fn andq_rsp(code: &mut GeneratedCode) {
-        code.lib_functions.push(Instruction(Instr::And(
-            Scale::default(),
-            InstrOperand::Imm(-16),
-            InstrOperand::Reg(Rsp),
-        )));
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::And,
+                    Scale::default(),
+                    InstrOperand::Imm(-16),
+                    InstrOperand::Reg(Rsp),
+                ),
+            )));
     }
 
     /*
-        ==========================================================
-        ==========================================================
-                                  Lea
-        ==========================================================
-        ==========================================================
-     */
+       ==========================================================
+       ==========================================================
+                                 Lea
+       ==========================================================
+       ==========================================================
+    */
 
     // leaq .L._prints_str0(%rip), %rdi
     fn leaq_rdi_rip(code: &mut GeneratedCode) {
-        code.lib_functions.push(Instruction(Instr::Lea(
-            Scale::Quad,
-            InstrOperand::Reference(MemoryReference::new(
-                Some(MemoryReferenceImmediate::LabelledImm(String::from(
-                    PRINT_STRING_LABEL,
-                ))),
-                Some(Rsp),
-                None,
-                None,
-            )),
-            InstrOperand::Reg(Rdi),
+        // code.lib_functions.push(Instruction(Instr::Lea(
+        //     Scale::Quad,
+        //     InstrOperand::Reference(MemoryReference::new(
+        //         Some(MemoryReferenceImmediate::LabelledImm(String::from(
+        //             PRINT_STRING_LABEL,
+        //         ))),
+        //         Some(Rsp),
+        //         None,
+        //         None,
+        //     )),
+        //     InstrOperand::Reg(Rdi),
+        // )));
+        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Lea,
+                Quad,
+                InstrOperand::Reference(MemoryReference::new(
+                    Some(MemoryReferenceImmediate::LabelledImm(String::from(
+                        PRINT_STRING_LABEL,
+                    ))),
+                    Some(Rsp),
+                    None,
+                    None,
+                )),
+                InstrOperand::Reg(Rdi),
+            ),
         )));
     }
 
     // 	leaq (%rsp), %rsi
     fn leaq_rsi_rsp(code: &mut GeneratedCode) {
-        code.lib_functions.push(Instruction(Instr::Lea(
-            Scale::default(),
-            InstrOperand::Reference(MemoryReference::new(
-                None,
-                Some(Rsp),
-                None,
-                None,
-            )),
-            InstrOperand::Reg(Rsi),
+        // code.lib_functions.push(Instruction(Instr::Lea(
+        //     Scale::default(),
+        //     InstrOperand::Reference(MemoryReference::new(None, Some(Rsp), None, None)),
+        //     InstrOperand::Reg(Rsi),
+        // )));
+        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Lea,
+                Scale::default(),
+                InstrOperand::Reference(MemoryReference::new(None, Some(Rsp), None, None)),
+                InstrOperand::Reg(Rsi),
+            ),
         )));
     }
 
     /*
-        ==========================================================
-        ==========================================================
-                                  Call
-        ==========================================================
-        ==========================================================
-     */
+       ==========================================================
+       ==========================================================
+                                 Call
+       ==========================================================
+       ==========================================================
+    */
 
     // call printf@plt
     fn call_printf(code: &mut GeneratedCode) {
@@ -328,12 +405,12 @@ impl CLibFunctions {
     }
 
     /*
-        ==========================================================
-        ==========================================================
-                                  Pop
-        ==========================================================
-        ==========================================================
-     */
+       ==========================================================
+       ==========================================================
+                                 Pop
+       ==========================================================
+       ==========================================================
+    */
 
     // popq %rbp
     fn popq_rbp(code: &mut GeneratedCode) {
@@ -341,7 +418,7 @@ impl CLibFunctions {
             .push(Instruction(Instr::Pop(Scale::default(), Rbp)));
     }
 
-   /*
+    /*
         ==========================================================
         ==========================================================
                                   Ret
@@ -363,11 +440,20 @@ impl CLibFunctions {
 
     // addq $16, %rsp
     fn addq_rsp(code: &mut GeneratedCode) {
-        code.lib_functions.push(Instruction(Instr::Add(
-            Scale::default(),
-            InstrOperand::Imm(16),
-            InstrOperand::Reg(Rsp),
-        )));
+        // code.lib_functions.push(Instruction(Instr::Add(
+        //     Scale::default(),
+        //     InstrOperand::Imm(16),
+        //     InstrOperand::Reg(Rsp),
+        // )));
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Add,
+                    Scale::default(),
+                    InstrOperand::Imm(16),
+                    InstrOperand::Reg(Rsp),
+                ),
+            )));
     }
 
     /*
@@ -379,20 +465,29 @@ impl CLibFunctions {
     */
 
     fn subq_rsp(code: &mut GeneratedCode) {
-        code.lib_functions.push(Instruction(Instr::Sub(
-            Scale::default(),
-            InstrOperand::Imm(16),
-            InstrOperand::Reg(Rsp),
-        )));
+        // code.lib_functions.push(Instruction(Instr::Sub(
+        //     Scale::default(),
+        //     InstrOperand::Imm(16),
+        //     InstrOperand::Reg(Rsp),
+        // )));
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Sub,
+                    Scale::default(),
+                    InstrOperand::Imm(16),
+                    InstrOperand::Reg(Rsp),
+                ),
+            )));
     }
 
     /*
-        ==========================================================
-        ==========================================================
-                          Generate Print String
-        ==========================================================
-        ==========================================================
-     */
+       ==========================================================
+       ==========================================================
+                         Generate Print String
+       ==========================================================
+       ==========================================================
+    */
 
     fn generate_print_string(code: &mut GeneratedCode) {
         //  .section .rodata
@@ -456,36 +551,36 @@ impl CLibFunctions {
     }
 
     /*
-        ==========================================================
-        ==========================================================
-                            Generate Print Line
-        ==========================================================
-        ==========================================================
-     */
+       ==========================================================
+       ==========================================================
+                           Generate Print Line
+       ==========================================================
+       ==========================================================
+    */
 
     fn generate_print_ln(code: &mut GeneratedCode) {
         // todo
     }
 
     /*
-        ==========================================================
-        ==========================================================
-                            Generate Print Int
-        ==========================================================
-        ==========================================================
-     */
+       ==========================================================
+       ==========================================================
+                           Generate Print Int
+       ==========================================================
+       ==========================================================
+    */
 
     fn generate_print_int(code: &mut GeneratedCode) {
         // todo
     }
 
     /*
-        ==========================================================
-        ==========================================================
-                            Generate Read Int
-        ==========================================================
-        ==========================================================
-     */
+       ==========================================================
+       ==========================================================
+                           Generate Read Int
+       ==========================================================
+       ==========================================================
+    */
 
     fn generate_read_int(code: &mut GeneratedCode) {
         // .section .rodata

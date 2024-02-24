@@ -1,7 +1,7 @@
 // The main scope should be identified as function "main".
 
 use crate::ast::{Program, ScopedStmt};
-use crate::code_generator::asm::Instr::{Mov, Ret};
+use crate::code_generator::asm::Instr::Ret;
 use crate::code_generator::asm::{
     AsmLine, GeneratedCode, InstrOperand, Register, GENERAL_REGS, RESULT_REG,
 };

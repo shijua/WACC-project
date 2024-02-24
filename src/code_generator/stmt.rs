@@ -3,7 +3,8 @@ use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::InstrOperand::Reg;
 use crate::code_generator::asm::Register::Rdi;
 use crate::code_generator::asm::{
-    AsmLine, CLibFunctions, GeneratedCode, Instr, InstrOperand, Register, Scale, RESULT_REG,
+    AsmLine, BinaryInstruction, CLibFunctions, GeneratedCode, Instr, InstrOperand, InstrType,
+    Register, Scale, RESULT_REG,
 };
 use crate::code_generator::clib_functions::PRINT_LABEL_FOR_STRING;
 use crate::code_generator::x86_generate::Generator;
@@ -33,10 +34,13 @@ impl Generator for Stmt {
                 // Does we need to push and pop rdi? Don't quite know for know
                 // now we'll just use a placeholder, direct move
                 // this is just a temporary placeholder for carrot marks!
-                code.codes.push(Instruction(Instr::Mov(
-                    Scale::default(),
-                    InstrOperand::Reg(next_reg),
-                    InstrOperand::Reg(Rdi),
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Scale::default(),
+                        Reg(next_reg),
+                        Reg(Rdi),
+                    ),
                 )));
 
                 // call relevant print statements
@@ -62,10 +66,13 @@ fn generate_stat_exit(
     exp.generate(scope, code, regs, ());
 
     // move result into the rax register
-    code.codes.push(AsmLine::Instruction(Instr::Mov(
-        Scale::default(),
-        Reg(regs[0]),
-        Reg(RESULT_REG),
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            Scale::default(),
+            Reg(regs[0]),
+            Reg(RESULT_REG),
+        ),
     )));
 
     // todo: call predefined exit

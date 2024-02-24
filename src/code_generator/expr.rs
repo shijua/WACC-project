@@ -1,9 +1,9 @@
 use crate::ast::Expr;
-use crate::code_generator::asm::Instr::Mov;
 use crate::code_generator::asm::MemoryReferenceImmediate::LabelledImm;
 use crate::code_generator::asm::Scale::Quad;
 use crate::code_generator::asm::{
-    AsmLine, GeneratedCode, Instr, InstrOperand, MemoryReference, Register, Scale,
+    AsmLine, BinaryInstruction, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference,
+    Register, Scale,
 };
 use crate::code_generator::x86_generate::Generator;
 use crate::symbol_table::ScopeTranslator;
@@ -30,10 +30,13 @@ impl Generator for Expr {
 }
 
 fn generate_int_liter(code: &mut GeneratedCode, general_regs: &[Register], int_val: &i32) {
-    code.codes.push(AsmLine::Instruction(Mov(
-        Scale::default(),
-        InstrOperand::Imm(*int_val),
-        InstrOperand::Reg(general_regs[0].clone()),
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            Scale::default(),
+            InstrOperand::Imm(*int_val),
+            InstrOperand::Reg(general_regs[0].clone()),
+        ),
     )))
 }
 
@@ -42,36 +45,44 @@ fn generate_bool_liter(code: &mut GeneratedCode, general_regs: &[Register], bool
         true => 1,
         false => 0,
     };
-    code.codes.push(AsmLine::Instruction(Mov(
-        Scale::default(),
-        InstrOperand::Imm(move_val),
-        InstrOperand::Reg(general_regs[0].clone()),
-    )))
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            Scale::default(),
+            InstrOperand::Imm(move_val),
+            InstrOperand::Reg(general_regs[0].clone()),
+        ),
+    )));
 }
 
 fn generate_char_liter(code: &mut GeneratedCode, general_regs: &[Register], char_val: &char) {
     let char_imm = *char_val as u8;
 
-    code.codes.push(AsmLine::Instruction(Mov(
-        Scale::default(),
-        InstrOperand::Imm(char_imm as i32),
-        InstrOperand::Reg(general_regs[0].clone()),
-    )))
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            Scale::default(),
+            InstrOperand::Imm(char_imm as i32),
+            InstrOperand::Reg(general_regs[0].clone()),
+        ),
+    )));
 }
 
 fn generate_string_liter(code: &mut GeneratedCode, general_regs: &[Register], str_val: String) {
     // string must be referred to as a global dereference
     let str_label = code.get_next_string_label(&str_val);
 
-    // code.codes.push()
-    code.codes.push(AsmLine::Instruction(Instr::Lea(
-        Quad,
-        InstrOperand::Reference(MemoryReference::new(
-            Some(LabelledImm(str_label)),
-            Some(Register::Rip),
-            None,
-            None,
-        )),
-        InstrOperand::Reg(general_regs[0]),
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Lea,
+            Quad,
+            InstrOperand::Reference(MemoryReference::new(
+                Some(LabelledImm(str_label)),
+                Some(Register::Rip),
+                None,
+                None,
+            )),
+            InstrOperand::Reg(general_regs[0]),
+        ),
     )));
 }
