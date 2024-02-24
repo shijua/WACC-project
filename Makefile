@@ -17,6 +17,7 @@ test:
 
 clean:
 	cargo clean
+	rm -f draft draft.s
 
 
 create-docker-image:
