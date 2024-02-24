@@ -91,10 +91,13 @@ pub const GENERAL_REGS: [Register; REGS_N] = [
 
 #[derive(PartialEq, Debug, Clone, Copy, Hash, Eq)]
 pub enum CLibFunctions {
+
+    PrintString, // done
+    PrintLn,
+
     // PrintInt,
     // PrintBool,
-    PrintString,
-    // Println,
+
     ReadInt,
     // ReadChar,
     SystemExit,
