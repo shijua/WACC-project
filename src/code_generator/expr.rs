@@ -33,7 +33,7 @@ fn generate_int_liter(code: &mut GeneratedCode, general_regs: &[Register], int_v
     code.codes.push(AsmLine::Instruction(Mov(
         Scale::default(),
         InstrOperand::Imm(*int_val),
-        InstrOperand::Reg(general_regs[0].clone()),
+        InstrOperand::Reg(general_regs[0]),
     )))
 }
 
