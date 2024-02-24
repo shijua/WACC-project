@@ -1,4 +1,5 @@
 use crate::ast::{Function, Program, Type};
+use crate::code_generator::asm::Register::{Rbp, Rsp};
 use crate::code_generator::asm::{
     AsmLine, BinaryInstruction, GeneratedCode, Instr, InstrOperand, InstrType, Register, Scale,
     RESULT_REG,
@@ -29,12 +30,22 @@ impl Generator for Function {
         code.codes
             .push(AsmLine::Directive(Directives::Label(function_label_string)));
 
-        // push RBP and allocate stack frame
+        // push RBP and link RBP with RSP
         code.codes.push(AsmLine::Instruction(Instr::Push(
             Scale::default(),
             Register::Rbp,
         )));
 
+        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Scale::default(),
+                InstrOperand::Reg(Rsp),
+                InstrOperand::Reg(Rbp),
+            ),
+        )));
+
+        // allocate stack frame
         let body_allocated_size = self.body_symbol_table.size;
         code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
