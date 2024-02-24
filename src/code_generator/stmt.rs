@@ -4,14 +4,13 @@ use crate::code_generator::asm::InstrOperand::Reg;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rdi, Rsp};
 use crate::code_generator::asm::{
-    AsmLine, CLibFunctions, GeneratedCode, Instr, InstrOperand, MemoryReference, Register, Scale,
-    ARG_REGS, RESULT_REG,
+    AsmLine, BinaryInstruction, CLibFunctions, GeneratedCode, Instr, InstrOperand, InstrType,
+    MemoryReference, Register, Scale, RESULT_REG,
 };
 use crate::code_generator::clib_functions::{PRINT_LABEL_FOR_STRING, SYS_EXIT_LABEL};
 use crate::code_generator::x86_generate::Generator;
 use crate::new_spanned;
 use crate::symbol_table::{Offset, ScopeTranslator};
-use std::process::Output;
 
 impl Generator for ScopedStmt {
     type Input = ();
@@ -26,10 +25,13 @@ impl Generator for ScopedStmt {
     ) -> Self::Output {
         // Allocate relevant space onto the stack for new variables declared within the scope
         let new_offset = self.symbol_table.size;
-        code.codes.push(Instruction(Instr::Sub(
-            Scale::default(),
-            InstrOperand::Imm(new_offset),
-            InstrOperand::Reg(Rsp),
+        code.codes.push(Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Sub,
+                Scale::default(),
+                InstrOperand::Imm(new_offset),
+                InstrOperand::Reg(Rsp),
+            ),
         )));
 
         // enter the new scope
@@ -37,11 +39,13 @@ impl Generator for ScopedStmt {
 
         self.stmt.0.generate(&scope, code, regs, aux);
 
-        // set back stack pointer
-        code.codes.push(Instruction(Instr::Add(
-            Scale::default(),
-            InstrOperand::Imm(new_offset),
-            InstrOperand::Reg(Rsp),
+        code.codes.push(Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Add,
+                Scale::default(),
+                InstrOperand::Imm(new_offset),
+                InstrOperand::Reg(Rsp),
+            ),
         )));
     }
 }
@@ -107,7 +111,7 @@ impl Generator for Stmt {
                 Self::generate_stmt_print(scope, code, regs, aux, print_type, exp)
             }
             Stmt::Exit((exit_val, _)) => generate_stat_exit(scope, code, regs, exit_val),
-            Stmt::Serial((statement1), statement2) => {
+            Stmt::Serial(statement1, statement2) => {
                 statement1.0.generate(scope, code, regs, aux);
                 statement2.0.generate(scope, code, regs, aux);
             }
@@ -129,15 +133,18 @@ impl Generator for Stmt {
                 let (target_reg, offset, scale) =
                     lvalue.generate(scope, code, &regs[1..], type_.clone());
 
-                code.codes.push(Instruction(Instr::Mov(
-                    scale,
-                    Reg(regs[0]),
-                    InstrOperand::Reference(MemoryReference {
-                        imm: Some(OffsetImm(offset)),
-                        base_reg: Some(target_reg),
-                        shift_unit_reg: None,
-                        shift_cnt: None,
-                    }),
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        scale,
+                        Reg(regs[0]),
+                        InstrOperand::Reference(MemoryReference {
+                            imm: Some(OffsetImm(offset)),
+                            base_reg: Some(target_reg),
+                            shift_unit_reg: None,
+                            shift_cnt: None,
+                        }),
+                    ),
                 )));
             }
             _ => todo!(),
@@ -164,10 +171,13 @@ impl Stmt {
         // Does we need to push and pop rdi? Don't quite know for know
         // now we'll just use a placeholder, direct move
         // this is just a temporary placeholder for carrot marks!
-        code.codes.push(Instruction(Instr::Mov(
-            Scale::default(),
-            InstrOperand::Reg(next_reg),
-            InstrOperand::Reg(Rdi),
+        code.codes.push(Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Scale::default(),
+                InstrOperand::Reg(next_reg),
+                InstrOperand::Reg(Rdi),
+            ),
         )));
 
         // call relevant print statements
@@ -190,10 +200,13 @@ fn generate_stat_exit(
     exp.generate(scope, code, regs, ());
 
     // move result into the rax register
-    code.codes.push(Instruction(Instr::Mov(
-        Scale::default(),
-        InstrOperand::Reg(regs[0]),
-        InstrOperand::Reg(ARG_REGS[0]),
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            Scale::default(),
+            Reg(regs[0]),
+            Reg(RESULT_REG),
+        ),
     )));
 
     // call predefined exit

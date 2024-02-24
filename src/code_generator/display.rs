@@ -1,9 +1,9 @@
 use crate::code_generator::asm::{
-    AsmLine, GeneratedCode, Instr, InstrOperand, MemoryReference, MemoryReferenceImmediate,
-    Register, Scale, ScaledRegister,
+    AsmLine, BinaryInstruction, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference,
+    MemoryReferenceImmediate, Register, Scale, ScaledRegister,
 };
 use crate::code_generator::def_libary::{Directives, FormatLabel};
-use std::fmt::{write, Display, Formatter};
+use std::fmt::{Display, Formatter};
 
 impl Display for GeneratedCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -72,19 +72,56 @@ impl Display for Scale {
     }
 }
 
+impl Display for InstrType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InstrType::Push => write!(f, "push"),
+            InstrType::Pop => write!(f, "pop"),
+            InstrType::Mov => write!(f, "mov"),
+            InstrType::MovS => write!(f, "movs"),
+            InstrType::Lea => write!(f, "lea"),
+            InstrType::Add => write!(f, "add"),
+            InstrType::Sub => write!(f, "sub"),
+            InstrType::And => write!(f, "and"),
+            InstrType::Call => write!(f, "call"),
+            InstrType::Ret => write!(f, "ret"),
+        }
+    }
+}
+
+impl Display for BinaryInstruction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.dst_scale.clone() {
+            None => write!(
+                f,
+                "{}{} {}, {}",
+                self.instr_type,
+                self.src_scale.clone(),
+                self.src_operand.combine_scale(self.src_scale.clone()),
+                self.dst_operand.combine_scale(self.src_scale.clone())
+            ),
+            Some(dst_scale_) => write!(
+                f,
+                "{}{}{} {}, {}",
+                self.instr_type,
+                self.src_scale,
+                dst_scale_.clone(),
+                self.src_operand.combine_scale(self.src_scale.clone()),
+                self.dst_operand.combine_scale(dst_scale_.clone())
+            ),
+        }
+    }
+}
+
 impl Display for Instr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "\t")?;
         match self {
             Instr::Push(scale, reg) => write!(f, "push{} {}", scale, reg),
             Instr::Pop(scale, reg) => write!(f, "pop{} {}", scale, reg),
-            Instr::Mov(scale, src, dst) => write!(f, "mov{} {}, {}", scale, src, dst),
-            Instr::Lea(scale, src, dst) => write!(f, "lea{} {}, {}", scale, src, dst),
-            Instr::Add(scale, src, dst) => write!(f, "add{} {}, {}", scale, src, dst),
-            Instr::Sub(scale, src, dst) => write!(f, "sub{} {}, {}", scale, src, dst),
-            Instr::And(scale, src, dst) => write!(f, "and{} {}, {}", scale, src, dst),
             Instr::Call(callee) => write!(f, "call {}", callee),
             Instr::Ret => write!(f, "ret"),
+            Instr::BinaryInstr(bin_ins) => write!(f, "{}", bin_ins),
         }
     }
 }

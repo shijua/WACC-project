@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 pub const MAIN_FUNCTION_TITLE: &str = "main";
 
 #[derive(PartialEq, Debug, Clone)]

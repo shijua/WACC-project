@@ -1,11 +1,8 @@
 // The main scope should be identified as function "main".
 
-use crate::ast::{Program, ScopedStmt};
-use crate::code_generator::asm::Instr::{Mov, Ret};
-use crate::code_generator::asm::{
-    AsmLine, GeneratedCode, InstrOperand, Register, GENERAL_REGS, RESULT_REG,
-};
-use crate::symbol_table::{ScopeInfo, ScopeTranslator, SymbolTable};
+use crate::ast::Program;
+use crate::code_generator::asm::{GeneratedCode, Register, GENERAL_REGS};
+use crate::symbol_table::{ScopeTranslator, SymbolTable};
 use std::fmt::Debug;
 
 pub const DEFAULT_EXIT_CODE: i32 = 0;

@@ -1,4 +1,3 @@
-use crate::code_generator::asm::Register::Rip;
 use crate::code_generator::def_libary::Directives;
 use lazy_static::lazy_static;
 use std::collections::HashSet;
@@ -92,13 +91,32 @@ pub const GENERAL_REGS: [Register; REGS_N] = [
 
 #[derive(PartialEq, Debug, Clone, Copy, Hash, Eq)]
 pub enum CLibFunctions {
+    PrintString, // done
+    PrintLn,
+
     // PrintInt,
     // PrintBool,
-    PrintString,
-    // Println,
     ReadInt,
     // ReadChar,
     SystemExit,
+    // PrintInt,
+    // PrintString,
+    // PrintBool,
+    // PrintRefs,
+
+    // PrintLn,
+
+    // ReadChar,
+    // ReadInt,
+    // RuntimeError,
+    // OverflowError,
+    // DivideByZeroError,
+    // ArrayBoundsError,
+    // CheckNullPointer,
+
+    // FreePair -> Unsure
+    // FreeArray -> Unsure
+    // Malloc -> Unsure
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -203,15 +221,76 @@ pub enum InstrOperand {
     Reference(MemoryReference),
 }
 
+impl InstrOperand {
+    pub fn combine_scale(&self, scale: Scale) -> Self {
+        match self {
+            InstrOperand::Reg(register) => InstrOperand::RegVariant(register.clone(), scale),
+            other_case => other_case.clone(),
+        }
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum InstrType {
+    Push,
+    Pop,
+    Mov,
+    MovS,
+    Lea,
+    Add,
+    Sub,
+    And,
+    Call,
+    Ret,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct BinaryInstruction {
+    pub instr_type: InstrType,
+    pub src_scale: Scale,
+    pub src_operand: InstrOperand,
+    pub dst_scale: Option<Scale>,
+    pub dst_operand: InstrOperand,
+}
+
+impl BinaryInstruction {
+    pub fn new_single_scale(
+        instr_type: InstrType,
+        scale: Scale,
+        src_operand: InstrOperand,
+        dst_operand: InstrOperand,
+    ) -> Self {
+        Self {
+            instr_type,
+            src_scale: scale.clone(),
+            src_operand,
+            dst_scale: None,
+            dst_operand,
+        }
+    }
+
+    pub fn new_double_scale(
+        instr_type: InstrType,
+        src_scale: Scale,
+        src_operand: InstrOperand,
+        dst_scale: Scale,
+        dst_operand: InstrOperand,
+    ) -> Self {
+        Self {
+            instr_type,
+            src_scale,
+            src_operand,
+            dst_scale: Some(dst_scale),
+            dst_operand,
+        }
+    }
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub enum Instr {
     Push(Scale, Register),
     Pop(Scale, Register),
-    Mov(Scale, InstrOperand, InstrOperand),
-    Lea(Scale, InstrOperand, InstrOperand),
-    Add(Scale, InstrOperand, InstrOperand),
-    Sub(Scale, InstrOperand, InstrOperand),
-    And(Scale, InstrOperand, InstrOperand),
+    BinaryInstr(BinaryInstruction),
     Call(String),
     Ret,
 }

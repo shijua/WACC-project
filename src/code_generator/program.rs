@@ -1,13 +1,12 @@
 use crate::ast::{Function, Program, Type};
-use crate::code_generator::asm::Instr::Mov;
 use crate::code_generator::asm::{
-    AsmLine, GeneratedCode, Instr, InstrOperand, Register, Scale, RESULT_REG,
+    AsmLine, BinaryInstruction, GeneratedCode, Instr, InstrOperand, InstrType, Register, Scale,
+    RESULT_REG,
 };
 use crate::code_generator::def_libary::{Directives, MAIN_FUNCTION_TITLE};
 use crate::code_generator::x86_generate::{Generator, DEFAULT_EXIT_CODE};
 use crate::new_spanned;
 use crate::symbol_table::ScopeTranslator;
-use std::fmt::Debug;
 
 impl Generator for Function {
     // Input used to indicate whether it is the main function
@@ -37,10 +36,13 @@ impl Generator for Function {
         )));
 
         let body_allocated_size = self.body_symbol_table.size;
-        code.codes.push(AsmLine::Instruction(Instr::Sub(
-            Scale::default(),
-            InstrOperand::Imm(body_allocated_size),
-            InstrOperand::Reg(Register::Rsp),
+        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Sub,
+                Scale::default(),
+                InstrOperand::Imm(body_allocated_size),
+                InstrOperand::Reg(Register::Rsp),
+            ),
         )));
 
         // process parameter scope
@@ -68,10 +70,18 @@ impl Generator for Function {
         // main function will exit by exit-code 0, (or does it involve manipulating exit?)
         if is_main {
             // deallocate stack for main function
-            code.codes.push(AsmLine::Instruction(Mov(
-                Scale::default(),
-                InstrOperand::Imm(DEFAULT_EXIT_CODE),
-                InstrOperand::Reg(RESULT_REG),
+            // code.codes.push(AsmLine::Instruction(Mov(
+            //     Scale::default(),
+            //     InstrOperand::Imm(DEFAULT_EXIT_CODE),
+            //     InstrOperand::Reg(RESULT_REG),
+            // )));
+            code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Mov,
+                    Scale::default(),
+                    InstrOperand::Imm(DEFAULT_EXIT_CODE),
+                    InstrOperand::Reg(RESULT_REG),
+                ),
             )));
         }
 
