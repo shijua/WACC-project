@@ -3,7 +3,7 @@ use crate::code_generator::asm::{
     Register, Scale, ScaledRegister,
 };
 use crate::code_generator::def_libary::{Directives, FormatLabel};
-use std::fmt::{write, Display, Formatter};
+use std::fmt::{Display, Formatter};
 
 impl Display for GeneratedCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -79,6 +79,7 @@ impl Display for Instr {
             Instr::Push(scale, reg) => write!(f, "push{} {}", scale, reg),
             Instr::Pop(scale, reg) => write!(f, "pop{} {}", scale, reg),
             Instr::Mov(scale, src, dst) => write!(f, "mov{} {}, {}", scale, src, dst),
+            Instr::MovS(src_scale, dst_scale, src, dst) => write!(f, "movs{} {}, {}, {}", src_scale, dst_scale, src, dst),
             Instr::Lea(scale, src, dst) => write!(f, "lea{} {}, {}", scale, src, dst),
             Instr::Add(scale, src, dst) => write!(f, "add{} {}, {}", scale, src, dst),
             Instr::Sub(scale, src, dst) => write!(f, "sub{} {}, {}", scale, src, dst),

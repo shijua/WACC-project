@@ -98,6 +98,25 @@ pub enum CLibFunctions {
     ReadInt,
     // ReadChar,
     SystemExit,
+
+    // PrintInt,
+    // PrintString,
+    // PrintBool,
+    // PrintRefs,
+
+    // PrintLn,
+
+    // ReadChar,
+    // ReadInt,
+    // RuntimeError,
+    // OverflowError,
+    // DivideByZeroError,
+    // ArrayBoundsError,
+    // CheckNullPointer,
+
+    // FreePair -> Unsure
+    // FreeArray -> Unsure
+    // Malloc -> Unsure
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -207,6 +226,7 @@ pub enum Instr {
     Push(Scale, Register),
     Pop(Scale, Register),
     Mov(Scale, InstrOperand, InstrOperand),
+    MovS(Scale, Scale, InstrOperand, InstrOperand),
     Lea(Scale, InstrOperand, InstrOperand),
     Add(Scale, InstrOperand, InstrOperand),
     Sub(Scale, InstrOperand, InstrOperand),

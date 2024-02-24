@@ -50,110 +50,333 @@ impl Generator for CLibFunctions {
     }
 }
 
+/*
+ Overall Functions inside clib_functions.rs:
+ - § 1. Basic functions:
+     § 1.1 read_only_strings() <.section .rodata>
+     § 1.2 length_of_formatter_string() <.int 4, length of formatter string>
+     § 1.3 print_string_label() <.L._prints_str0:>
+     § 1.4 print_ascii_string() <.asciz "%.*s">
+     § 1.5 assembler_text() <.text>
+
+ - § 2. Push functions:
+     § 2.1 pushq_rbp() <pushq &rbp>
+
+ - § 3. Mov functions:
+     § 3.1 movq_rbp_rsp() <movq %rsp, %rbp>
+     § 3.2 movq_rdx_rdi() <movq %rdi, %rdx>
+     § 3.3 movl_esi_rdi() <movl -4(%rdi), %esi>
+     § 3.4 movb_esi_rdi() <movb $0, %al>
+     § 3.5 movq_rdi() <movq $offset, %rdi>
+     § 3.6 movq_rsp_rbp() <movq %rbp, %rsp>
+
+
+ - § 4. And functions:
+     § 4.1 andq_rsp() <andq $-16, %rsp>
+
+ - § 5. Lea functions:
+     § 5.1 leaq_rdi_rip() <leaq .L._prints_str0(%rip), %rdi>
+
+ - § 6. Call functions:
+     § 6.1 call_printf() <call printf@plt>
+     § 6.2 call_fflush() <call fflush@plt>
+
+ - § 7. Pop functions:
+     § 7.1 popq_rbp() <popq %rbp>
+
+ - § 8. Ret functions:
+     § 8.1 ret() <ret>
+*/
+
 impl CLibFunctions {
-    fn generate_print_string(code: &mut GeneratedCode) {
-        // .section .rodata
+
+    /*
+        ==========================================================
+        ==========================================================
+                                 Basic
+        ==========================================================
+        ==========================================================
+     */
+
+    // .section .rodata
+    fn read_only_strings(code: &mut GeneratedCode) {
         code.lib_functions
             .push(Directive(Directives::ReadOnlyStrings));
-        // .int 4, length of formatter string
-        code.lib_functions.push(Directive(Directives::IntLabel(4)));
-        // .L._prints_str0:
+    }
+
+    // .int 4, length of formatter string
+    fn length_of_formatter_string(code: &mut GeneratedCode, length: i32) {
+        code.lib_functions.push(Directive(Directives::IntLabel(length as usize)));
+    }
+
+    // .L._prints_str0:
+    fn print_string_label(code: &mut GeneratedCode, label: &str) {
         code.lib_functions
-            .push(Directive(Directives::Label(String::from(
-                PRINT_STRING_LABEL,
-            ))));
-        // .asciz "%.*s"
-        code.lib_functions
-            .push(Directive(Directives::FormattedString(
-                FormatLabel::AsciiZ,
-                String::from(CONTENT_STRING_LITERAL),
-            )));
-        // .text
+            .push(Directive(Directives::Label(String::from(label))));
+    }
+
+    // .asciz "%.*s"
+    fn print_ascii_string(code: &mut GeneratedCode, content: &str) {
+        code.lib_functions.push(Directive(Directives::FormattedString(
+            FormatLabel::AsciiZ,
+            String::from(content),
+        )));
+    }
+
+    // .text
+    fn assembler_text(code: &mut GeneratedCode) {
         code.lib_functions
             .push(Directive(Directives::AssemblerText));
-        // _prints:
-        code.lib_functions
-            .push(Directive(Directives::Label(String::from(
-                PRINT_LABEL_FOR_STRING,
-            ))));
-        // 		pushq %rbp
+    }
+
+    /*
+        ==========================================================
+        ==========================================================
+                                 Push
+        ==========================================================
+        ==========================================================
+     */
+
+    // pushq &rbp
+    fn pushq_rbp(code: &mut GeneratedCode) {
         code.lib_functions
             .push(Instruction(Instr::Push(Scale::default(), Rbp)));
-        // 		movq %rsp, %rbp
+    }
+
+    /*
+        ==========================================================
+        ==========================================================
+                                  Mov
+        ==========================================================
+        ==========================================================
+     */
+
+    // movq %rsp, %rbp
+    fn movq_rbp_rsp(code: &mut GeneratedCode) {
         code.lib_functions.push(Instruction(Instr::Mov(
             Scale::default(),
             InstrOperand::Reg(Rsp),
             InstrOperand::Reg(Rbp),
         )));
-        // 		# external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
-        // 		andq $-16, %rsp
-        code.lib_functions.push(Instruction(Instr::And(
-            Scale::default(),
-            InstrOperand::Imm(-16),
-            InstrOperand::Reg(Rsp),
-        )));
-        // 		movq %rdi, %rdx
+    }
+
+    // movq %rdi, %rdx
+    fn movq_rdx_rdi(code: &mut GeneratedCode) {
         code.lib_functions.push(Instruction(Instr::Mov(
             Scale::default(),
             InstrOperand::Reg(Rdi),
             InstrOperand::Reg(Rdx),
-        )));
-        // 		movl -4(%rdi), %esi
+        )))
+    }
+
+    // movl -4(%rdi), %esi
+    fn movl_esi_rdi(code: &mut GeneratedCode, offset: i32) {
         code.lib_functions.push(Instruction(Instr::Mov(
             Long,
             InstrOperand::Reference(MemoryReference::new(
-                Some(MemoryReferenceImmediate::OffsetImm(-4)),
+                Some(MemoryReferenceImmediate::OffsetImm(offset)),
                 Some(Rdi),
                 None,
                 None,
             )),
             InstrOperand::RegVariant(Rsi, Long),
+        )))
+    }
+
+    // movb $0, %al
+    fn movb_rax(code: &mut GeneratedCode, offset: i32) {
+        code.lib_functions.push(Instruction(Instr::Mov(
+            Scale::Byte,
+            InstrOperand::Imm(offset),
+            InstrOperand::RegVariant(Rax, Scale::Byte),
         )));
-        // 		leaq .L._prints_str0(%rip), %rdi
+    }
+
+    // movq $offset, %rdi
+    fn movq_rdi(code: &mut GeneratedCode, offset: i32) {
+        code.lib_functions.push(Instruction(Instr::Mov(
+            Scale::default(),
+            InstrOperand::Imm(offset),
+            InstrOperand::Reg(Rdi),
+        )));
+    }
+
+    // movq %rbp, %rsp
+    fn movq_rsp_rbp(code: &mut GeneratedCode) {
+        code.lib_functions.push(Instruction(Instr::Mov(
+            Scale::default(),
+            InstrOperand::Reg(Rbp),
+            InstrOperand::Reg(Rsp),
+        )));
+    }
+
+    /*
+        ==========================================================
+        ==========================================================
+                                  And
+        ==========================================================
+        ==========================================================
+     */
+
+    // andq $-16, %rsp
+    fn andq_rsp(code: &mut GeneratedCode) {
+        code.lib_functions.push(Instruction(Instr::And(
+            Scale::default(),
+            InstrOperand::Imm(-16),
+            InstrOperand::Reg(Rsp),
+        )));
+    }
+
+    /*
+        ==========================================================
+        ==========================================================
+                                  Lea
+        ==========================================================
+        ==========================================================
+     */
+
+    // leaq .L._prints_str0(%rip), %rdi
+    fn leaq_rdi_rip(code: &mut GeneratedCode) {
         code.lib_functions.push(Instruction(Instr::Lea(
             Scale::Quad,
             InstrOperand::Reference(MemoryReference::new(
                 Some(MemoryReferenceImmediate::LabelledImm(String::from(
                     PRINT_STRING_LABEL,
                 ))),
-                Some(Rip),
+                Some(Rsp),
                 None,
                 None,
             )),
             InstrOperand::Reg(Rdi),
         )));
-        // 		# on x86, al represents the number of SIMD registers used as variadic arguments
-        // 		movb $0, %al
-        code.lib_functions.push(Instruction(Instr::Mov(
-            Scale::Byte,
-            InstrOperand::Imm(0),
-            InstrOperand::RegVariant(Rax, Scale::Byte),
-        )));
-        // 		call printf@plt
+    }
+
+    /*
+        ==========================================================
+        ==========================================================
+                                  Call
+        ==========================================================
+        ==========================================================
+     */
+
+    // call printf@plt
+    fn call_printf(code: &mut GeneratedCode) {
         code.lib_functions
             .push(Instruction(Instr::Call(String::from(PRINTF_PLT))));
+    }
 
-        // 		movq $0, %rdi
-        code.lib_functions.push(Instruction(Instr::Mov(
-            Scale::default(),
-            InstrOperand::Imm(0),
-            InstrOperand::Reg(Rdi),
-        )));
-        // 		call fflush@plt
+    // call fflush@plt
+    fn call_fflush(code: &mut GeneratedCode) {
         code.lib_functions
             .push(Instruction(Instr::Call(String::from(F_FLUSH_PLT))));
+    }
 
-        // 		movq %rbp, %rsp
-        code.lib_functions.push(Instruction(Instr::Mov(
-            Scale::default(),
-            InstrOperand::Reg(Rbp),
-            InstrOperand::Reg(Rsp),
-        )));
-        // 		popq %rbp
+    /*
+        ==========================================================
+        ==========================================================
+                                  Pop
+        ==========================================================
+        ==========================================================
+     */
+
+    // popq %rbp
+    fn popq_rbp(code: &mut GeneratedCode) {
         code.lib_functions
             .push(Instruction(Instr::Pop(Scale::default(), Rbp)));
-        // 		ret
+    }
+
+   /*
+        ==========================================================
+        ==========================================================
+                                  Ret
+        ==========================================================
+        ==========================================================
+    */
+
+    fn ret(code: &mut GeneratedCode) {
         code.lib_functions.push(Instruction(Instr::Ret));
+    }
+
+    /*
+        ==========================================================
+        ==========================================================
+                          Generate Print String
+        ==========================================================
+        ==========================================================
+     */
+
+    fn generate_print_string(code: &mut GeneratedCode) {
+        //  .section .rodata
+        Self::read_only_strings(code);
+
+        //  .int 4, length of formatter string
+        Self::length_of_formatter_string(code, 4);
+
+        //  .L._prints_str0:
+        Self::print_string_label(code, PRINT_STRING_LABEL);
+
+        //  .asciz "%.*s"
+        Self::print_ascii_string(code, CONTENT_STRING_LITERAL);
+
+        //  .text
+        Self::assembler_text(code);
+
+        //  _prints:
+        Self::print_string_label(code, PRINT_LABEL_FOR_STRING);
+
+        // 	pushq %rbp
+        Self::pushq_rbp(code);
+
+        // 	movq %rsp, %rbp
+        Self::movq_rbp_rsp(code);
+
+        // 	# external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        // 	andq $-16, %rsp
+        Self::andq_rsp(code);
+
+        // 	movq %rdi, %rdx
+        Self::movq_rdx_rdi(code);
+
+        // 	movl -4(%rdi), %esi
+        Self::movl_esi_rdi(code, -4);
+
+        // 	leaq .L._prints_str0(%rip), %rdi
+        Self::leaq_rdi_rip(code);
+
+        // 	# on x86, al represents the number of SIMD registers used as variadic arguments
+        // 	movb $0, %al
+        Self::movb_rax(code, 0);
+
+        // 	call printf@plt
+        Self::call_printf(code);
+
+        // 	movq $0, %rdi
+        Self::movq_rdi(code, 0);
+
+        // 	call fflush@plt
+        Self::call_fflush(code);
+
+        // 	movq %rbp, %rsp
+        Self::movq_rsp_rbp(code);
+
+        // 	popq %rbp
+        Self::popq_rbp(code);
+
+        // 	ret
+        Self::ret(code);
+    }
+
+
+    /*
+        ==========================================================
+        ==========================================================
+                            Generate Print Int
+        ==========================================================
+        ==========================================================
+     */
+
+    fn generate_print_int(code: &mut GeneratedCode) {
+        // todo
     }
 
     fn generate_read_int(code: &mut GeneratedCode) {
@@ -179,26 +402,46 @@ impl CLibFunctions {
             .push(Directive(Directives::Label(String::from(
                 READ_LABEL_FOR_INT,
             ))));
-        // 		pushq %rbp
+        // 	pushq %rbp
         code.lib_functions
             .push(Instruction(Instr::Push(Scale::default(), Rbp)));
-        // 		movq %rsp, %rbp
+        // 	movq %rsp, %rbp
         code.lib_functions.push(Instruction(Instr::Mov(
             Scale::default(),
             InstrOperand::Reg(Rsp),
             InstrOperand::Reg(Rbp),
         )));
-        // 		# external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
-        // 		andq $-16, %rsp
+        // 	# external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        // 	andq $-16, %rsp
         code.lib_functions.push(Instruction(Instr::And(
             Scale::default(),
             InstrOperand::Imm(-16),
             InstrOperand::Reg(Rsp),
         )));
-        // todo: subq $16, %rsp
-        // 		movl %rdi, %rdx
-        // 		leaq (%rsp), %rsi
-        // 		leaq .L._readi_str0(%rip), %rdi
+        //  subq $16, %rsp
+        code.lib_functions.push(Instruction(Instr::Sub(
+            Scale::default(),
+            InstrOperand::Imm(16),
+            InstrOperand::Reg(Rsp),
+        )));
+        // 	movl %rdi, %rdx
+        code.lib_functions.push(Instruction(Instr::Mov(
+            Long,
+            InstrOperand::Reg(Rdi),
+            InstrOperand::Reg(Rdx)
+        )));
+        // 	leaq (%rsp), %rsi
+        code.lib_functions.push(Instruction(Instr::Lea(
+            Scale::default(),
+            InstrOperand::Reference(MemoryReference::new(
+                None,
+                Some(Rdi),
+                None,
+                None,
+            )),
+            InstrOperand::Reg(Rsi)
+        )));
+        // 	leaq .L._readi_str0(%rip), %rdi
         code.lib_functions.push(Instruction(Instr::Lea(
             Scale::Quad,
             InstrOperand::Reference(MemoryReference::new(
@@ -211,28 +454,32 @@ impl CLibFunctions {
             )),
             InstrOperand::Reg(Rdi),
         )));
-        // 		# on x86, al represents the number of SIMD registers used as variadic arguments
-        // 		movb $0, %al
+        // 	# on x86, al represents the number of SIMD registers used as variadic arguments
+        // 	movb $0, %al
         code.lib_functions.push(Instruction(Instr::Mov(
             Scale::Byte,
             InstrOperand::Imm(0),
             InstrOperand::RegVariant(Rax, Scale::Byte),
         )));
-        // 		call scanf@plt
+        // 	call scanf@plt
         code.lib_functions
             .push(Instruction(Instr::Call(String::from(SCANF_PLT))));
 
         // todo:
-        // movslq (%rsp), %rax
-        // addq $16, %rsp
+        //  movslq (%rsp), %rax
+        // code.lib_functions.push(Instruction(Instr::Mov(
+        //
+        // )))
+        //  addq $16, %rsp
 
-        // 		movq %rbp, %rsp
+
+        // 	movq %rbp, %rsp
         code.lib_functions.push(Instruction(Instr::Mov(
             Scale::default(),
             InstrOperand::Reg(Rbp),
             InstrOperand::Reg(Rsp),
         )));
-        // 		popq %rbp
+        // 	popq %rbp
         code.lib_functions
             .push(Instruction(Instr::Pop(Scale::default(), Rbp)));
         // 		ret
