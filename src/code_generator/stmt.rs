@@ -5,7 +5,7 @@ use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rdi, Rsp};
 use crate::code_generator::asm::{
     AsmLine, BinaryInstruction, CLibFunctions, GeneratedCode, Instr, InstrOperand, InstrType,
-    MemoryReference, Register, Scale, RESULT_REG,
+    MemoryReference, Register, Scale, UnaryInstruction, RESULT_REG,
 };
 use crate::code_generator::clib_functions::{PRINT_LABEL_FOR_STRING, SYS_EXIT_LABEL};
 use crate::code_generator::x86_generate::Generator;
@@ -186,7 +186,11 @@ impl Stmt {
             _ => todo!(),
         };
         code.codes
-            .push(Instruction(Instr::Call(String::from(print_label))));
+            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                InstrType::Call,
+                Scale::default(),
+                InstrOperand::LabelRef(String::from(print_label)),
+            ))));
     }
 }
 
@@ -224,5 +228,9 @@ fn generate_stat_exit(
 
     // add instruction dependency: system exit
     code.codes
-        .push(Instruction(Instr::Call(String::from(SYS_EXIT_LABEL))));
+        .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+            InstrType::Call,
+            Scale::default(),
+            InstrOperand::LabelRef(String::from(SYS_EXIT_LABEL)),
+        ))));
 }

@@ -3,7 +3,7 @@ use crate::code_generator::asm::Register::*;
 use crate::code_generator::asm::Scale::{Long, Quad};
 use crate::code_generator::asm::{
     AsmLine, BinaryInstruction, CLibFunctions, GeneratedCode, Instr, InstrOperand, InstrType,
-    MemoryReference, MemoryReferenceImmediate, Register, Scale,
+    MemoryReference, MemoryReferenceImmediate, Register, Scale, UnaryInstruction,
 };
 use crate::code_generator::def_libary::{Directives, FormatLabel};
 use crate::code_generator::x86_generate::Generator;
@@ -163,7 +163,11 @@ impl CLibFunctions {
     // pushq &rbp
     fn pushq_rbp(code: &mut GeneratedCode) {
         code.lib_functions
-            .push(Instruction(Instr::Push(Scale::default(), Rbp)));
+            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                InstrType::Push,
+                Scale::default(),
+                InstrOperand::Reg(Rbp),
+            ))));
     }
 
     /*
@@ -396,7 +400,11 @@ impl CLibFunctions {
 
     fn call_plt(code: &mut GeneratedCode, plt_label: &str) {
         code.lib_functions
-            .push(Instruction(Instr::Call(String::from(plt_label))));
+            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                InstrType::Call,
+                Scale::default(),
+                InstrOperand::LabelRef(String::from(plt_label)),
+            ))));
     }
 
     // call printf@plt
@@ -428,7 +436,11 @@ impl CLibFunctions {
     // popq %rbp
     fn popq_rbp(code: &mut GeneratedCode) {
         code.lib_functions
-            .push(Instruction(Instr::Pop(Scale::default(), Rbp)));
+            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                InstrType::Pop,
+                Scale::default(),
+                InstrOperand::Reg(Rbp),
+            ))));
     }
 
     /*

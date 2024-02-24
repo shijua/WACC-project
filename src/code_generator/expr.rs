@@ -1,9 +1,10 @@
 use crate::ast::{Expr, UnaryOperator};
+use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::MemoryReferenceImmediate::LabelledImm;
 use crate::code_generator::asm::Scale::Quad;
 use crate::code_generator::asm::{
     AsmLine, BinaryInstruction, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference,
-    Register, Scale,
+    Register, Scale, UnaryInstruction,
 };
 use crate::code_generator::x86_generate::Generator;
 use crate::symbol_table::ScopeTranslator;
@@ -57,7 +58,11 @@ impl Expr {
 
     fn generate_unary_app_negation(code: &mut GeneratedCode, reg: Register) {
         code.codes
-            .push(AsmLine::Instruction(Instr::Neg(Scale::default(), reg)))
+            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                InstrType::Neg,
+                Scale::default(),
+                InstrOperand::Reg(reg),
+            ))))
 
         // todo: Add negation: overflow error check
     }

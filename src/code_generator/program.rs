@@ -1,8 +1,9 @@
 use crate::ast::{Function, Program, Type};
+use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::Register::{Rbp, Rsp};
 use crate::code_generator::asm::{
     AsmLine, BinaryInstruction, GeneratedCode, Instr, InstrOperand, InstrType, Register, Scale,
-    RESULT_REG,
+    UnaryInstruction, RESULT_REG,
 };
 use crate::code_generator::def_libary::{Directives, MAIN_FUNCTION_TITLE};
 use crate::code_generator::x86_generate::{Generator, DEFAULT_EXIT_CODE};
@@ -31,10 +32,12 @@ impl Generator for Function {
             .push(AsmLine::Directive(Directives::Label(function_label_string)));
 
         // push RBP and link RBP with RSP
-        code.codes.push(AsmLine::Instruction(Instr::Push(
-            Scale::default(),
-            Register::Rbp,
-        )));
+        code.codes
+            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                InstrType::Push,
+                Scale::default(),
+                InstrOperand::Reg(Rbp),
+            ))));
 
         code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
@@ -87,10 +90,12 @@ impl Generator for Function {
         }
 
         // pop RBP
-        code.codes.push(AsmLine::Instruction(Instr::Pop(
-            Scale::default(),
-            Register::Rbp,
-        )));
+        code.codes
+            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                InstrType::Pop,
+                Scale::default(),
+                InstrOperand::Reg(Rbp),
+            ))));
 
         // return
         code.codes.push(AsmLine::Instruction(Instr::Ret));

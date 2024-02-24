@@ -1,6 +1,7 @@
 use crate::code_generator::def_libary::Directives;
 use lazy_static::lazy_static;
 use std::collections::HashSet;
+use std::fs::OpenOptions;
 use std::sync::Mutex;
 
 lazy_static! {
@@ -218,6 +219,7 @@ pub enum InstrOperand {
     Reg(Register),
     RegVariant(Register, Scale),
     Imm(i32),
+    LabelRef(Label),
     Reference(MemoryReference),
 }
 
@@ -235,6 +237,7 @@ pub enum InstrType {
     Push,
     Pop,
     Neg,
+    Not,
     Mov,
     MovS,
     Lea,
@@ -246,12 +249,29 @@ pub enum InstrType {
 }
 
 #[derive(PartialEq, Debug, Clone)]
+pub struct UnaryInstruction {
+    pub instr_type: InstrType,
+    pub scale: Scale,
+    pub operand: InstrOperand,
+}
+
+#[derive(PartialEq, Debug, Clone)]
 pub struct BinaryInstruction {
     pub instr_type: InstrType,
     pub src_scale: Scale,
     pub src_operand: InstrOperand,
     pub dst_scale: Option<Scale>,
     pub dst_operand: InstrOperand,
+}
+
+impl UnaryInstruction {
+    pub fn new_unary(instr_type: InstrType, scale: Scale, operand: InstrOperand) -> Self {
+        Self {
+            instr_type,
+            scale,
+            operand,
+        }
+    }
 }
 
 impl BinaryInstruction {
@@ -289,11 +309,12 @@ impl BinaryInstruction {
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Instr {
-    Push(Scale, Register),
-    Pop(Scale, Register),
-    Neg(Scale, Register),
+    // Push(Scale, Register),
+    // Pop(Scale, Register),
+    // Neg(Scale, Register),
+    // Call(String),
+    UnaryInstr(UnaryInstruction),
     BinaryInstr(BinaryInstruction),
-    Call(String),
     Ret,
 }
 

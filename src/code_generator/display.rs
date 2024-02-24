@@ -1,9 +1,9 @@
 use crate::code_generator::asm::{
     AsmLine, BinaryInstruction, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference,
-    MemoryReferenceImmediate, Register, Scale, ScaledRegister,
+    MemoryReferenceImmediate, Register, Scale, ScaledRegister, UnaryInstruction,
 };
 use crate::code_generator::def_libary::{Directives, FormatLabel};
-use std::fmt::{Display, Formatter};
+use std::fmt::{write, Display, Formatter};
 
 impl Display for GeneratedCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -86,7 +86,14 @@ impl Display for InstrType {
             InstrType::And => write!(f, "and"),
             InstrType::Call => write!(f, "call"),
             InstrType::Ret => write!(f, "ret"),
+            InstrType::Not => write!(f, "not"),
         }
+    }
+}
+
+impl Display for UnaryInstruction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{} {}", self.instr_type, self.scale, self.operand)
     }
 }
 
@@ -118,11 +125,8 @@ impl Display for Instr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "\t")?;
         match self {
-            Instr::Push(scale, reg) => write!(f, "push{} {}", scale, reg),
-            Instr::Pop(scale, reg) => write!(f, "pop{} {}", scale, reg),
-            Instr::Neg(scale, reg) => write!(f, "neg{} {}", scale, reg),
-            Instr::Call(callee) => write!(f, "call {}", callee),
             Instr::Ret => write!(f, "ret"),
+            Instr::UnaryInstr(unary_ins) => write!(f, "{}", unary_ins),
             Instr::BinaryInstr(bin_ins) => write!(f, "{}", bin_ins),
         }
     }
@@ -143,6 +147,7 @@ impl Display for InstrOperand {
                     scale: scale.clone()
                 }
             ),
+            InstrOperand::LabelRef(label) => write!(f, "{}", label),
         }
     }
 }
