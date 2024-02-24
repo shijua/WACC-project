@@ -9,7 +9,6 @@ use crate::code_generator::asm::{
 use crate::code_generator::clib_functions::{PRINT_LABEL_FOR_STRING, SYS_EXIT_LABEL};
 use crate::code_generator::x86_generate::Generator;
 use crate::symbol_table::ScopeTranslator;
-use std::os::macos::raw::stat;
 
 impl Generator for Stmt {
     type Input = ();
