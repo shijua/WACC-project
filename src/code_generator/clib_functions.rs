@@ -26,6 +26,8 @@ pub const SCANF_PLT: &str = "scanf@plt";
 
 pub const F_FLUSH_PLT: &str = "fflush@plt";
 
+pub const SYS_EXIT_PLT: &str = "exit@plt";
+
 impl Generator for CLibFunctions {
     type Input = ();
     type Output = ();
@@ -50,7 +52,7 @@ impl Generator for CLibFunctions {
                 Self::generate_read_int(code);
             }
             CLibFunctions::SystemExit => {
-                todo!()
+                Self::generate_sys_exit(code);
             }
         }
     }
@@ -135,6 +137,11 @@ impl CLibFunctions {
     fn assembler_text(code: &mut GeneratedCode) {
         code.lib_functions
             .push(Directive(Directives::AssemblerText));
+    }
+
+    fn syscall_sub_function_label(code: &mut GeneratedCode, label_str: &str) {
+        code.lib_functions
+            .push(Directive(Directives::Label(String::from(label_str))));
     }
 
     // _readi:
@@ -387,23 +394,28 @@ impl CLibFunctions {
        ==========================================================
     */
 
-    // call printf@plt
-    fn call_printf(code: &mut GeneratedCode) {
+    fn call_plt(code: &mut GeneratedCode, plt_label: &str) {
         code.lib_functions
-            .push(Instruction(Instr::Call(String::from(PRINTF_PLT))));
+            .push(Instruction(Instr::Call(String::from(plt_label))));
     }
+
+    // call printf@plt
+    // fn call_printf(code: &mut GeneratedCode) {
+    //     code.lib_functions
+    //         .push(Instruction(Instr::Call(String::from(PRINTF_PLT))));
+    // }
 
     // call fflush@plt
-    fn call_fflush(code: &mut GeneratedCode) {
-        code.lib_functions
-            .push(Instruction(Instr::Call(String::from(F_FLUSH_PLT))));
-    }
+    // fn call_fflush(code: &mut GeneratedCode) {
+    //     code.lib_functions
+    //         .push(Instruction(Instr::Call(String::from(F_FLUSH_PLT))));
+    // }
 
     // call scanf@plt
-    fn call_scanf(code: &mut GeneratedCode) {
-        code.lib_functions
-            .push(Instruction(Instr::Call(String::from(SCANF_PLT))));
-    }
+    // fn call_scanf(code: &mut GeneratedCode) {
+    //     code.lib_functions
+    //         .push(Instruction(Instr::Call(String::from(SCANF_PLT))));
+    // }
 
     /*
        ==========================================================
@@ -533,13 +545,13 @@ impl CLibFunctions {
         Self::movb_rax(code, 0);
 
         // 	call printf@plt
-        Self::call_printf(code);
+        Self::call_plt(code, PRINTF_PLT);
 
         // 	movq $0, %rdi
         Self::movq_rdi(code, 0);
 
         // 	call fflush@plt
-        Self::call_fflush(code);
+        Self::call_plt(code, F_FLUSH_PLT);
 
         // 	movq %rbp, %rsp
         Self::movq_rsp_rbp(code);
@@ -600,7 +612,7 @@ impl CLibFunctions {
         Self::assembler_text(code);
 
         // _readi:
-        Self::readi_label(code);
+        Self::syscall_sub_function_label(code, READ_LABEL_FOR_INT);
 
         // 	pushq %rbp
         Self::pushq_rbp(code);
@@ -629,7 +641,7 @@ impl CLibFunctions {
         Self::movb_rax(code, 0);
 
         // 	call scanf@plt
-        Self::call_scanf(code);
+        Self::call_plt(code, SCANF_PLT);
 
         //  movslq (%rsp), %rax
         Self::movslq_rax_rsp(code);
@@ -644,6 +656,41 @@ impl CLibFunctions {
         Self::popq_rbp(code);
 
         // 		ret
+        Self::ret(code);
+    }
+
+    /*
+       ==========================================================
+       ==========================================================
+                           Generate Exit Syscall
+       ==========================================================
+       ==========================================================
+    */
+
+    fn generate_sys_exit(code: &mut GeneratedCode) {
+        // _exit:
+        Self::syscall_sub_function_label(code, SYS_EXIT_LABEL);
+
+        //     pushq %rbp
+        Self::pushq_rbp(code);
+
+        // movq %rsp, %rbp
+        Self::movq_rsp_rbp(code);
+
+        // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        // andq $-16, %rsp
+        Self::andq_rsp(code);
+
+        // call exit@plt
+        Self::call_plt(code, SYS_EXIT_PLT);
+
+        // movq %rbp, %rsp
+        Self::movq_rbp_rsp(code);
+
+        // popq %rbp
+        Self::popq_rbp(code);
+
+        // ret
         Self::ret(code);
     }
 }

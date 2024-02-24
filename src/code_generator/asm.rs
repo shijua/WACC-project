@@ -234,6 +234,7 @@ impl InstrOperand {
 pub enum InstrType {
     Push,
     Pop,
+    Neg,
     Mov,
     MovS,
     Lea,
@@ -290,6 +291,7 @@ impl BinaryInstruction {
 pub enum Instr {
     Push(Scale, Register),
     Pop(Scale, Register),
+    Neg(Scale, Register),
     BinaryInstr(BinaryInstruction),
     Call(String),
     Ret,

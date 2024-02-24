@@ -1,4 +1,4 @@
-use crate::ast::Expr;
+use crate::ast::{Expr, UnaryOperator};
 use crate::code_generator::asm::MemoryReferenceImmediate::LabelledImm;
 use crate::code_generator::asm::Scale::Quad;
 use crate::code_generator::asm::{
@@ -7,6 +7,7 @@ use crate::code_generator::asm::{
 };
 use crate::code_generator::x86_generate::Generator;
 use crate::symbol_table::ScopeTranslator;
+use crate::Spanned;
 
 impl Generator for Expr {
     type Input = ();
@@ -14,18 +15,51 @@ impl Generator for Expr {
 
     fn generate(
         &self,
-        _scope: &ScopeTranslator,
+        scope: &ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &[Register],
-        _aux: Self::Input,
+        aux: Self::Input,
     ) -> Self::Output {
         match self {
             Expr::IntLiter(int_val) => generate_int_liter(code, regs, int_val),
             Expr::BoolLiter(bool_val) => generate_bool_liter(code, regs, bool_val),
             Expr::CharLiter(char_val) => generate_char_liter(code, regs, char_val),
             Expr::StrLiter(str_val) => generate_string_liter(code, regs, str_val.clone()),
+            Expr::UnaryApp(op, inner) => {
+                Self::generate_unary_app(scope, code, regs, aux, op, inner)
+            }
             _ => todo!(),
         }
+    }
+}
+
+impl Expr {
+    fn generate_unary_app(
+        scope: &ScopeTranslator,
+        code: &mut GeneratedCode,
+        regs: &[Register],
+        aux: (),
+        op: &UnaryOperator,
+        inner: &Box<Spanned<Expr>>,
+    ) {
+        // store the result of generating the inner register (to reg[0])
+        let inner_exp = inner.0.clone();
+        inner_exp.generate(scope, code, regs, aux);
+
+        match op {
+            UnaryOperator::Bang => {}
+            UnaryOperator::Negative => Self::generate_unary_app_negation(code, regs[0]),
+            UnaryOperator::Len => {}
+            UnaryOperator::Ord => {}
+            UnaryOperator::Chr => {}
+        }
+    }
+
+    fn generate_unary_app_negation(code: &mut GeneratedCode, reg: Register) {
+        code.codes
+            .push(AsmLine::Instruction(Instr::Neg(Scale::default(), reg)))
+
+        // todo: Add negation: overflow error check
     }
 }
 

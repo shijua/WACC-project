@@ -77,6 +77,7 @@ impl Display for InstrType {
         match self {
             InstrType::Push => write!(f, "push"),
             InstrType::Pop => write!(f, "pop"),
+            InstrType::Neg => write!(f, "neg"),
             InstrType::Mov => write!(f, "mov"),
             InstrType::MovS => write!(f, "movs"),
             InstrType::Lea => write!(f, "lea"),
@@ -119,6 +120,7 @@ impl Display for Instr {
         match self {
             Instr::Push(scale, reg) => write!(f, "push{} {}", scale, reg),
             Instr::Pop(scale, reg) => write!(f, "pop{} {}", scale, reg),
+            Instr::Neg(scale, reg) => write!(f, "neg{} {}", scale, reg),
             Instr::Call(callee) => write!(f, "call {}", callee),
             Instr::Ret => write!(f, "ret"),
             Instr::BinaryInstr(bin_ins) => write!(f, "{}", bin_ins),
@@ -202,8 +204,18 @@ impl Display for ScaledRegister {
             },
             Rcx => todo!(),
             Rdx => todo!(),
-            Rdi => todo!(),
-            Rbp => todo!(),
+            Rdi => match self.scale {
+                Scale::Byte => write!(f, "dil"),
+                Scale::Word => write!(f, "di"),
+                Scale::Long => write!(f, "edi"),
+                Scale::Quad => write!(f, "rdi"),
+            },
+            Rbp => match self.scale {
+                Scale::Byte => write!(f, "bpl"),
+                Scale::Word => write!(f, "bp"),
+                Scale::Long => write!(f, "ebp"),
+                Scale::Quad => write!(f, "rbp"),
+            },
             Rsp => match self.scale {
                 Scale::Byte => write!(f, "spl"),
                 Scale::Word => write!(f, "sp"),

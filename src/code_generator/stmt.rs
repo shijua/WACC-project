@@ -209,6 +209,16 @@ fn generate_stat_exit(
         ),
     )));
 
+    // move result stored in rax into the rdi register
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            Scale::default(),
+            Reg(RESULT_REG),
+            Reg(Rdi),
+        ),
+    )));
+
     // call predefined exit
     code.required_clib.insert(CLibFunctions::SystemExit);
 
