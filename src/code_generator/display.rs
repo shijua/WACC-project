@@ -203,6 +203,15 @@ impl Display for ScaledRegister {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use crate::code_generator::asm::Register::*;
         write!(f, "%")?;
+
+        let mut reg_formatter_for_8_to_15 = |reg_string: &str, scale: Scale| {
+            write!(f, "{}", reg_string,)?;
+            match scale {
+                Scale::Quad => write!(f, ""),
+                other => write!(f, "{}", other),
+            }
+        };
+
         match self.reg {
             Rax => match self.scale {
                 Scale::Byte => write!(f, "al"),
@@ -216,12 +225,6 @@ impl Display for ScaledRegister {
                 Scale::Long => write!(f, "esi"),
                 Scale::Quad => write!(f, "rsi"),
             },
-            R10 => match self.scale {
-                Scale::Byte => write!(f, "r10b"),
-                Scale::Word => write!(f, "r10w"),
-                Scale::Long => write!(f, "r10d"),
-                Scale::Quad => write!(f, "r10"),
-            },
 
             Rbx => match self.scale {
                 Scale::Byte => write!(f, "bl"),
@@ -229,8 +232,18 @@ impl Display for ScaledRegister {
                 Scale::Long => write!(f, "ebx"),
                 Scale::Quad => write!(f, "rbx"),
             },
-            Rcx => todo!(),
-            Rdx => todo!(),
+            Rcx => match self.scale {
+                Scale::Byte => write!(f, "cl"),
+                Scale::Word => write!(f, "cx"),
+                Scale::Long => write!(f, "ecx"),
+                Scale::Quad => write!(f, "rcx"),
+            },
+            Rdx => match self.scale {
+                Scale::Byte => write!(f, "dl"),
+                Scale::Word => write!(f, "dx"),
+                Scale::Long => write!(f, "edx"),
+                Scale::Quad => write!(f, "rdx"),
+            },
             Rdi => match self.scale {
                 Scale::Byte => write!(f, "dil"),
                 Scale::Word => write!(f, "di"),
@@ -249,14 +262,18 @@ impl Display for ScaledRegister {
                 Scale::Long => write!(f, "esp"),
                 Scale::Quad => write!(f, "rsp"),
             },
-            R8 => todo!(),
-            R9 => todo!(),
-            R11 => todo!(),
-            R12 => todo!(),
-            R13 => todo!(),
-            R14 => todo!(),
-            R15 => todo!(),
-            Rip => todo!(),
+            R8 => reg_formatter_for_8_to_15("r8", self.scale.clone()),
+            R9 => reg_formatter_for_8_to_15("r9", self.scale.clone()),
+            R10 => reg_formatter_for_8_to_15("r10", self.scale.clone()),
+            R11 => reg_formatter_for_8_to_15("r11", self.scale.clone()),
+            R12 => reg_formatter_for_8_to_15("r12", self.scale.clone()),
+            R13 => reg_formatter_for_8_to_15("r13", self.scale.clone()),
+            R14 => reg_formatter_for_8_to_15("r14", self.scale.clone()),
+            R15 => reg_formatter_for_8_to_15("r15", self.scale.clone()),
+            Rip => match self.scale.clone() {
+                Scale::Quad => write!(f, "rdi"),
+                other_scale => write!(f, "Cannot bind scale {} with RIP", other_scale),
+            },
         }
     }
 }

@@ -8,7 +8,10 @@ use crate::code_generator::asm::{
     AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand,
     InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, RESULT_REG,
 };
-use crate::code_generator::clib_functions::{PRINT_LABEL_FOR_STRING, SYS_EXIT_LABEL};
+use crate::code_generator::clib_functions::{
+    PRINTLN_LABEL, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_STRING,
+    SYS_EXIT_LABEL,
+};
 use crate::code_generator::def_libary::Directives;
 use crate::code_generator::x86_generate::Generator;
 use crate::symbol_table::{Offset, ScopeTranslator};
@@ -114,7 +117,14 @@ impl Generator for Stmt {
                 Self::generate_stmt_print(scope, code, regs, aux, print_type, exp)
             }
             Stmt::Println(print_type, (exp, _)) => {
-                todo!()
+                Self::generate_stmt_print(scope, code, regs, aux, print_type, exp);
+                code.required_clib.insert(CLibFunctions::PrintLn);
+                code.codes
+                    .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                        InstrType::Call,
+                        Scale::default(),
+                        InstrOperand::LabelRef(String::from(PRINTLN_LABEL)),
+                    ))));
             }
             Stmt::Read(read_type, (lvalue, _)) => {
                 todo!()
@@ -161,6 +171,9 @@ impl Stmt {
         exp.generate(scope, code, regs, aux);
         match print_type {
             Type::StringType => code.required_clib.insert(CLibFunctions::PrintString),
+            Type::IntType => code.required_clib.insert(CLibFunctions::PrintInt),
+            Type::CharType => code.required_clib.insert(CLibFunctions::PrintChar),
+            // Type::BoolType => code.required_clib.insert(CLibFunctions::P)
             _ => todo!(),
         };
         // todo:
@@ -179,6 +192,8 @@ impl Stmt {
         // call relevant print statements
         let print_label = match print_type {
             Type::StringType => PRINT_LABEL_FOR_STRING,
+            Type::IntType => PRINT_LABEL_FOR_INT,
+            Type::CharType => PRINT_LABEL_FOR_CHAR,
             _ => todo!(),
         };
         code.codes

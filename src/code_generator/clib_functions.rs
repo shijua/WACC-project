@@ -28,6 +28,7 @@ pub const READ_CHAR_LABEL: &str = ".L._readc_str0";
 pub const READ_LABEL_FOR_CHAR: &str = "_readc";
 
 pub const SYS_EXIT_LABEL: &str = "_exit";
+pub const PRINTLN_LABEL: &str = "_println";
 
 pub const CONTENT_STRING_LITERAL: &str = "%.*s";
 pub const CONTENT_INT_LITERAL: &str = "%d";
@@ -406,21 +407,20 @@ impl CLibFunctions {
         //     )),
         //     InstrOperand::Reg(Rdi),
         // )));
-        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Lea,
-                Quad,
-                InstrOperand::Reference(MemoryReference::new(
-                    Some(MemoryReferenceImmediate::LabelledImm(String::from(
-                        string,
-                    ))),
-                    Some(Rip),
-                    None,
-                    None,
-                )),
-                InstrOperand::Reg(Rdi),
-            ),
-        )));
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Lea,
+                    Quad,
+                    InstrOperand::Reference(MemoryReference::new(
+                        Some(MemoryReferenceImmediate::LabelledImm(String::from(string))),
+                        Some(Rip),
+                        None,
+                        None,
+                    )),
+                    InstrOperand::Reg(Rdi),
+                ),
+            )));
     }
 
     // 	leaq (%rsp), %rsi
@@ -430,14 +430,15 @@ impl CLibFunctions {
         //     InstrOperand::Reference(MemoryReference::new(None, Some(Rsp), None, None)),
         //     InstrOperand::Reg(Rsi),
         // )));
-        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Lea,
-                Scale::default(),
-                InstrOperand::Reference(MemoryReference::new(None, Some(Rsp), None, None)),
-                InstrOperand::Reg(Rsi),
-            ),
-        )));
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Lea,
+                    Scale::default(),
+                    InstrOperand::Reference(MemoryReference::new(None, Some(Rsp), None, None)),
+                    InstrOperand::Reg(Rsi),
+                ),
+            )));
     }
 
     /*

@@ -31,7 +31,7 @@ assemble-local:
 	docker rm assembler || true
 	docker run -it --platform=linux/x86_64 --name assembler -v ${PWD}:/project assembler bash
 
-TEST_SOURCE = wacc-examples-36/valid/basic
+TEST_SOURCE = wacc-examples-36/valid/IO/print
 
 integration-test-local:
 	docker stop assembler || true
