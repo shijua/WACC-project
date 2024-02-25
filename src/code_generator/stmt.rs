@@ -1,6 +1,7 @@
 use crate::ast::{Expr, Ident, Lvalue, Rvalue, ScopedStmt, Stmt, Type};
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
-use crate::code_generator::asm::InstrOperand::Reg;
+use crate::code_generator::asm::InstrOperand::{Imm, Reg};
+use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rdi, Rsp};
 use crate::code_generator::asm::{
@@ -125,8 +126,12 @@ impl Generator for Stmt {
                 Self::generate_stmt_assign(scope, code, &regs, aux, type_, lvalue, rvalue);
             }
             Stmt::If((cond, _), st1, st2) => {
-                Self::generate_stmt_if(scope, code, regs, aux, cond, st1, st2);
+                Self::generate_stmt_if(scope, code, regs, aux, cond, st1, st2)
             }
+            Stmt::While((cond, _), body) => {
+                Self::generate_stmt_while(scope, code, regs, aux, cond, body)
+            }
+            Stmt::Scope(statement) => statement.generate(scope, code, regs, aux),
             _ => todo!(),
         }
     }
@@ -325,5 +330,49 @@ impl Stmt {
                 Scale::default(),
                 InstrOperand::LabelRef(String::from(SYS_EXIT_LABEL)),
             ))));
+    }
+
+    fn generate_stmt_while(
+        scope: &ScopeTranslator,
+        code: &mut GeneratedCode,
+        regs: &[Register],
+        aux: (),
+        cond: &Expr,
+        body: &ScopedStmt,
+    ) {
+        let cond_label = code.get_control_label();
+        let body_label = code.get_control_label();
+        // jmp cond_label
+        code.codes
+            .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
+                Jump(None),
+                InstrOperand::LabelRef(cond_label.clone()),
+            ))));
+        // body_label:
+        code.codes
+            .push(Directive(Directives::Label(body_label.clone())));
+        // generate(body)
+        body.generate(scope, code, regs, aux);
+        // cond_label:
+        code.codes
+            .push(Directive(Directives::Label(cond_label.clone())));
+        // evaluate condition
+        cond.generate(scope, code, regs, aux);
+        // cmpq $1, cond_reg => check if condition is true
+        code.codes.push(Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Cmp,
+                Scale::default(),
+                Imm(1),
+                Reg(regs[0]),
+            ),
+        )));
+        // je body_label
+        code.codes
+            .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
+                Jump(Some(ConditionCode::EQ)),
+                InstrOperand::LabelRef(body_label.clone()),
+            ))));
+        // if false: break from the loop
     }
 }
