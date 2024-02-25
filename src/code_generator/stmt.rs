@@ -3,7 +3,7 @@ use crate::code_generator::asm::AsmLine::{Directive, Instruction};
 use crate::code_generator::asm::InstrOperand::{Imm, Reg};
 use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
-use crate::code_generator::asm::Register::{Rdi, Rsp};
+use crate::code_generator::asm::Register::{Rbp, Rdi, Rsp};
 use crate::code_generator::asm::{
     AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand,
     InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, RESULT_REG,
@@ -32,8 +32,8 @@ impl Generator for ScopedStmt {
             BinaryInstruction::new_single_scale(
                 InstrType::Sub,
                 Scale::default(),
-                InstrOperand::Imm(new_offset),
-                InstrOperand::Reg(Rsp),
+                Imm(new_offset),
+                Reg(Rsp),
             ),
         )));
 
@@ -46,8 +46,8 @@ impl Generator for ScopedStmt {
             BinaryInstruction::new_single_scale(
                 InstrType::Add,
                 Scale::default(),
-                InstrOperand::Imm(new_offset),
-                InstrOperand::Reg(Rsp),
+                Imm(new_offset),
+                Reg(Rsp),
             ),
         )));
     }
@@ -113,6 +113,12 @@ impl Generator for Stmt {
             Stmt::Print(print_type, (exp, _)) => {
                 Self::generate_stmt_print(scope, code, regs, aux, print_type, exp)
             }
+            Stmt::Println(print_type, (exp, _)) => {
+                todo!()
+            }
+            Stmt::Read(read_type, (lvalue, _)) => {
+                todo!()
+            }
             Stmt::Exit((exit_val, _)) => {
                 Self::generate_stmt_exit(scope, code, regs, exit_val);
             }
@@ -132,7 +138,12 @@ impl Generator for Stmt {
                 Self::generate_stmt_while(scope, code, regs, aux, cond, body)
             }
             Stmt::Scope(statement) => statement.generate(scope, code, regs, aux),
-            _ => todo!(),
+            Stmt::Return((return_val, _)) => {
+                Self::generate_stmt_return(scope, code, regs, aux, return_val);
+            }
+            Stmt::Free(_, _) => {
+                todo!()
+            }
         }
     }
 }
@@ -374,5 +385,42 @@ impl Stmt {
                 InstrOperand::LabelRef(body_label.clone()),
             ))));
         // if false: break from the loop
+    }
+
+    fn generate_stmt_return(
+        scope: &ScopeTranslator,
+        code: &mut GeneratedCode,
+        regs: &[Register],
+        aux: (),
+        return_val: &Expr,
+    ) {
+        // evaluate(return_val)
+        return_val.generate(scope, code, regs, aux);
+        // r0 = return_val
+        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Default::default(),
+                Reg(regs[0]),
+                Reg(RESULT_REG),
+            ),
+        )));
+        // push back offset space
+        // let final_offset = scope.get_total_offset();
+
+        // link rsp back
+        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Scale::default(),
+                Reg(Rbp),
+                Reg(Rsp),
+            ),
+        )));
+
+        // take back rbp
+        code.codes.push(AsmLine::Instruction(Instr::UnaryInstr(
+            UnaryInstruction::new_unary(InstrType::Pop, Scale::default(), Reg(Rbp)),
+        )));
     }
 }

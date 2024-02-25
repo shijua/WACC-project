@@ -1,6 +1,7 @@
-use crate::ast::{BinaryOperator, Expr, UnaryOperator};
+use crate::ast::{BinaryOperator, Expr, Ident, UnaryOperator};
 use crate::code_generator::asm::AsmLine::Instruction;
-use crate::code_generator::asm::MemoryReferenceImmediate::LabelledImm;
+use crate::code_generator::asm::Instr::BinaryInstr;
+use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
 use crate::code_generator::asm::Scale::Quad;
 use crate::code_generator::asm::{
     AsmLine, BinaryInstruction, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference,
@@ -81,7 +82,11 @@ impl Generator for Expr {
                     // as the push instruction may
                 }
             }
-            _ => todo!(),
+            Expr::PairLiter => {}
+            Expr::Ident(id) => {
+                Self::generate_expr_ident(scope, code, regs, id);
+            }
+            Expr::ArrayElem(_) => {}
         }
     }
 }
@@ -150,6 +155,29 @@ impl Expr {
 
     fn generate_unary_app_length(code: &mut GeneratedCode, reg: Register) {
         // todo:
+    }
+
+    fn generate_expr_ident(
+        scope: &ScopeTranslator,
+        code: &mut GeneratedCode,
+        regs: &[Register],
+        id: &Ident,
+    ) {
+        let id_offset = scope.get_offset(id).unwrap();
+
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Scale::default(),
+                InstrOperand::Reference(MemoryReference::new(
+                    Some(OffsetImm(id_offset)),
+                    Some(Register::Rsp),
+                    None,
+                    None,
+                )),
+                InstrOperand::Reg(regs[0]),
+            ),
+        )));
     }
 }
 
