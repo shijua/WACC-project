@@ -190,7 +190,7 @@ impl CLibFunctions {
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
                     InstrType::Mov,
-                    Scale::scale,
+                    scale,
                     InstrOperand::Reg(reg1),
                     InstrOperand::Reg(reg2),
                 ),
@@ -203,7 +203,7 @@ impl CLibFunctions {
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
                     InstrType::Mov,
-                    Scale::scale,
+                    scale,
                     InstrOperand::Imm(offset),
                     InstrOperand::Reg(reg),
                 ),
@@ -725,7 +725,7 @@ impl CLibFunctions {
         Self::length_of_formatter_string(code, 2);
 
         // .L._readi_str0:
-        Self::print_string_label(code, READ_INT_LABEL);
+        Self::print_label(code, READ_INT_LABEL);
 
         // .asciz "%d"
         Self::print_ascii_string(code, CONTENT_INT_LITERAL);
