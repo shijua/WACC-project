@@ -24,6 +24,9 @@ pub const PRINT_LABEL_FOR_CHAR: &str = "_printc";
 pub const READ_INT_LABEL: &str = ".L._readi_str0";
 pub const READ_LABEL_FOR_INT: &str = "_readi";
 
+pub const READ_CHAR_LABEL: &str = ".L._readc_str0";
+pub const READ_LABEL_FOR_CHAR: &str = "_readc";
+
 pub const SYS_EXIT_LABEL: &str = "_exit";
 
 pub const CONTENT_STRING_LITERAL: &str = "%.*s";
@@ -84,6 +87,7 @@ impl Generator for CLibFunctions {
      § 1.4 print_ascii_string() <.asciz "%.*s">
      § 1.5 assembler_text() <.text>
      § 1.6 readi_label() <_readi:>
+     § 1.7 syscall_sub_function_label()
 
  - § 2. Push functions:
      § 2.1 pushq_rbp() <pushq &rbp>
@@ -133,7 +137,7 @@ impl CLibFunctions {
     }
 
     // .L._prints_str0:
-    fn print_label(code: &mut GeneratedCode, label: &str) {
+    fn print_string_label(code: &mut GeneratedCode, label: &str) {
         code.lib_functions
             .push(Directive(Directives::Label(String::from(label))));
     }
@@ -326,7 +330,7 @@ impl CLibFunctions {
     }
 
     // movslq (%rsp), %rax
-    fn movslq_rax_rsp(code: &mut GeneratedCode) {
+    fn movslq_rsp_rax(code: &mut GeneratedCode) {
         // code.lib_functions.push(Instruction(Instr::MovS(
         //     Scale::Long,
         //     Scale::Long,
@@ -336,10 +340,24 @@ impl CLibFunctions {
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_double_scale(
-                    InstrType::Mov,
+                    InstrType::MovS,
                     Scale::Long,
                     InstrOperand::Reference(MemoryReference::new(None, Some(Rsp), None, None)),
-                    Scale::Long,
+                    Scale::Quad,
+                    InstrOperand::Reg(Rax),
+                ),
+            )));
+    }
+
+    // movsbq (%rsp), %rax
+    fn movsbq_rsp_rax(code: &mut GeneratedCode) {
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_double_scale(
+                    InstrType::MovS,
+                    Scale::Byte,
+                    InstrOperand::Reference(MemoryReference::new(None, Some(Rsp), None, None)),
+                    Scale::Quad,
                     InstrOperand::Reg(Rax),
                 ),
             )));
@@ -370,8 +388,8 @@ impl CLibFunctions {
        ==========================================================
     */
 
-    // leaq .L._prints_str0(%rip), %rdi
-    fn leaq_rdi_rip(code: &mut GeneratedCode) {
+    // leaq <string>(%rip), %rdi
+    fn leaq_rdi_rip(code: &mut GeneratedCode, string: &str) {
         // code.lib_functions.push(Instruction(Instr::Lea(
         //     Scale::Quad,
         //     InstrOperand::Reference(MemoryReference::new(
@@ -390,9 +408,9 @@ impl CLibFunctions {
                 Quad,
                 InstrOperand::Reference(MemoryReference::new(
                     Some(MemoryReferenceImmediate::LabelledImm(String::from(
-                        PRINT_STRING_LABEL,
+                        string,
                     ))),
-                    Some(Rsp),
+                    Some(Rip),
                     None,
                     None,
                 )),
@@ -587,17 +605,17 @@ impl CLibFunctions {
 
         Self::read_only_strings(code);
         Self::length_of_formatter_string(code, 4);
-        Self::print_label(code, PRINT_STRING_LABEL);
+        Self::print_string_label(code, PRINT_STRING_LABEL);
         Self::print_ascii_string(code, CONTENT_STRING_LITERAL);
         Self::assembler_text(code);
-        Self::print_label(code, PRINT_LABEL_FOR_STRING);
+        Self::print_string_label(code, PRINT_LABEL_FOR_STRING);
 
         Self::print_before_structure(code);
 
         Self::movq_rdx_rdi(code);
         Self::movl_esi_rdi(code, -4);
         /* wait for fixing: */
-        Self::leaq_rdi_rip(code);
+        Self::leaq_rdi_rip(code, PRINT_STRING_LABEL);
         /* */
         Self::movb_rax(code, 0);
         Self::call_plt(code, PRINTF_PLT);
@@ -620,17 +638,17 @@ impl CLibFunctions {
         // _println:
         Self::read_only_strings(code);
         Self::length_of_formatter_string(code, 0);
-        Self::print_label(code, PRINT_STRING_LINE_LABEL);
+        Self::print_string_label(code, PRINT_STRING_LINE_LABEL);
         Self::print_ascii_string(code, CONTENT_EMPTY);
         Self::assembler_text(code);
-        Self::print_label(code, PRINT_LABEL_FOR_STRING_LINE);
+        Self::print_string_label(code, PRINT_LABEL_FOR_STRING_LINE);
 
         Self::print_before_structure(code);
 
         //   leaq .L._println_str0(%rip), %rdi
         //   call puts@plt
         /* wait for fixing: */
-        Self::leaq_rdi_rip(code);
+        Self::leaq_rdi_rip(code, PRINT_STRING_LINE_LABEL);
         /* */
         Self::call_plt(code, PUTS_PLT);
 
@@ -652,10 +670,10 @@ impl CLibFunctions {
         // _printi:
         Self::read_only_strings(code);
         Self::length_of_formatter_string(code, 2);
-        Self::print_label(code, PRINT_INT_LABEL);
+        Self::print_string_label(code, PRINT_INT_LABEL);
         Self::print_ascii_string(code, CONTENT_INT_LITERAL);
         Self::assembler_text(code);
-        Self::print_label(code, PRINT_LABEL_FOR_INT);
+        Self::print_string_label(code, PRINT_LABEL_FOR_INT);
 
         Self::print_before_structure(code);
 
@@ -666,7 +684,7 @@ impl CLibFunctions {
         //   call printf@plt
         Self::mov_registers(code, Long, Rdi, Rsi);
         /* wait for fixing: */
-        Self::leaq_rdi_rip(code);
+        Self::leaq_rdi_rip(code, PRINT_INT_LABEL);
         /* */
         Self::mov_offset(code, Byte, 0, Rax);
         Self::call_plt(code, PRINTF_PLT);
@@ -689,10 +707,10 @@ impl CLibFunctions {
         // _printc:
         Self::read_only_strings(code);
         Self::length_of_formatter_string(code, 2);
-        Self::print_label(code, PRINT_CHAR_LABEL);
+        Self::print_string_label(code, PRINT_CHAR_LABEL);
         Self::print_ascii_string(code, CONTENT_CHAR_LITERAL);
         Self::assembler_text(code);
-        Self::print_label(code, PRINT_LABEL_FOR_CHAR);
+        Self::print_string_label(code, PRINT_LABEL_FOR_CHAR);
 
         Self::print_before_structure(code);
 
@@ -702,7 +720,7 @@ impl CLibFunctions {
         //   movb $0, %al
         //   call printf@plt
         Self::mov_registers(code, Byte, Rdi, Rsi);
-        Self::leaq_rdi_rip(code);
+        Self::leaq_rdi_rip(code, PRINT_CHAR_LABEL);
         Self::mov_offset(code, Byte, 0, Rax);
         Self::call_plt(code, PRINTF_PLT);
 
@@ -725,7 +743,7 @@ impl CLibFunctions {
         Self::length_of_formatter_string(code, 2);
 
         // .L._readi_str0:
-        Self::print_label(code, READ_INT_LABEL);
+        Self::print_string_label(code, READ_INT_LABEL);
 
         // .asciz "%d"
         Self::print_ascii_string(code, CONTENT_INT_LITERAL);
@@ -756,7 +774,7 @@ impl CLibFunctions {
         Self::leaq_rsi_rsp(code);
 
         // 	leaq .L._readi_str0(%rip), %rdi
-        Self::leaq_rdi_rip(code);
+        Self::leaq_rdi_rip(code, READ_INT_LABEL);
 
         // 	# on x86, al represents the number of SIMD registers used as variadic arguments
         // 	movb $0, %al
@@ -766,7 +784,79 @@ impl CLibFunctions {
         Self::call_plt(code, SCANF_PLT);
 
         //  movslq (%rsp), %rax
-        Self::movslq_rax_rsp(code);
+        Self::movslq_rsp_rax(code);
+
+        //  addq $16, %rsp
+        Self::addq_rsp(code);
+
+        // 	movq %rbp, %rsp
+        Self::movq_rsp_rbp(code);
+
+        // 	popq %rbp
+        Self::popq_rbp(code);
+
+        // 	ret
+        Self::ret(code);
+    }
+
+    /*
+       ==========================================================
+       ==========================================================
+                           Generate Read Char
+       ==========================================================
+       ==========================================================
+    */
+
+    fn generate_read_char(code: &mut GeneratedCode) {
+        // .section .rodata
+        Self::read_only_strings(code);
+
+        // .int 2, length of formatter string
+        Self::length_of_formatter_string(code, 2);
+
+        // .L._readc_str0:
+        Self::print_string_label(code, READ_CHAR_LABEL);
+
+        // .asciz "%c"
+        Self::print_ascii_string(code, CONTENT_CHAR_LITERAL);
+
+        // .text
+        Self::assembler_text(code);
+
+        // _readc:
+        Self::syscall_sub_function_label(code, READ_LABEL_FOR_CHAR);
+
+        // 	pushq %rbp
+        Self::pushq_rbp(code);
+
+        // 	movq %rsp, %rbp
+        Self::movq_rbp_rsp(code);
+
+        // 	# external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        // 	andq $-16, %rsp
+        Self::andq_rsp(code);
+
+        //  subq $16, %rsp
+        Self::subq_rsp(code);
+
+        // 	movl %rdi, %rdx
+        Self::movl_rdi_rdx(code);
+
+        // 	leaq (%rsp), %rsi
+        Self::leaq_rsi_rsp(code);
+
+        // 	leaq .L._readi_str0(%rip), %rdi
+        Self::leaq_rdi_rip(code, READ_CHAR_LABEL);
+
+        // 	# on x86, al represents the number of SIMD registers used as variadic arguments
+        // 	movb $0, %al
+        Self::movb_rax(code, 0);
+
+        // 	call scanf@plt
+        Self::call_plt(code, SCANF_PLT);
+
+        //  movsbq (%rsp), %rax
+        Self::movsbq_rsp_rax(code);
 
         //  addq $16, %rsp
         Self::addq_rsp(code);
