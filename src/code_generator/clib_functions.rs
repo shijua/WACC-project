@@ -1,6 +1,6 @@
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
 use crate::code_generator::asm::Register::*;
-use crate::code_generator::asm::Scale::{Long, Quad};
+use crate::code_generator::asm::Scale::{Byte, Long, Quad};
 use crate::code_generator::asm::{
     AsmLine, BinaryInstruction, CLibFunctions, GeneratedCode, Instr, InstrOperand, InstrType,
     MemoryReference, MemoryReferenceImmediate, Register, Scale,
@@ -12,6 +12,15 @@ use crate::symbol_table::ScopeTranslator;
 pub const PRINT_STRING_LABEL: &str = ".L._prints_str0";
 pub const PRINT_LABEL_FOR_STRING: &str = "_prints";
 
+pub const PRINT_STRING_LINE_LABEL: &str = ".L._println_str0";
+pub const PRINT_LABEL_FOR_STRING_LINE: &str = "_println";
+
+pub const PRINT_INT_LABEL: &str = ".L._printi_str0";
+pub const PRINT_LABEL_FOR_INT: &str = "_printi";
+
+pub const PRINT_CHAR_LABEL: &str = ".L._printc_str0";
+pub const PRINT_LABEL_FOR_CHAR: &str = "_printc";
+
 pub const READ_INT_LABEL: &str = ".L._readi_str0";
 pub const READ_LABEL_FOR_INT: &str = "_readi";
 
@@ -19,13 +28,13 @@ pub const SYS_EXIT_LABEL: &str = "_exit";
 
 pub const CONTENT_STRING_LITERAL: &str = "%.*s";
 pub const CONTENT_INT_LITERAL: &str = "%d";
+pub const CONTENT_EMPTY: &str = "";
+pub const CONTENT_CHAR_LITERAL: &str = "%c";
 
 pub const PRINTF_PLT: &str = "printf@plt";
-
+pub const PUTS_PLT: &str = "puts@plt";
 pub const SCANF_PLT: &str = "scanf@plt";
-
 pub const F_FLUSH_PLT: &str = "fflush@plt";
-
 pub const SYS_EXIT_PLT: &str = "exit@plt";
 
 impl Generator for CLibFunctions {
@@ -46,6 +55,14 @@ impl Generator for CLibFunctions {
 
             CLibFunctions::PrintLn => {
                 Self::generate_print_ln(code);
+            }
+
+            CLibFunctions::PrintInt => {
+                Self::generate_print_int(code);
+            }
+
+            CLibFunctions::PrintChar => {
+                Self::generate_print_char(code);
             }
 
             CLibFunctions::ReadInt => {
@@ -79,7 +96,6 @@ impl Generator for CLibFunctions {
      § 3.5 movq_rdi() <movq $offset, %rdi>
      § 3.6 movq_rsp_rbp() <movq %rbp, %rsp>
 
-
  - § 4. And functions:
      § 4.1 andq_rsp() <andq $-16, %rsp>
 
@@ -100,9 +116,7 @@ impl Generator for CLibFunctions {
 impl CLibFunctions {
     /*
        ==========================================================
-       ==========================================================
                                 Basic
-       ==========================================================
        ==========================================================
     */
 
@@ -119,12 +133,12 @@ impl CLibFunctions {
     }
 
     // .L._prints_str0:
-    fn print_string_label(code: &mut GeneratedCode, label: &str) {
+    fn print_label(code: &mut GeneratedCode, label: &str) {
         code.lib_functions
             .push(Directive(Directives::Label(String::from(label))));
     }
 
-    // .asciz "%.*s"
+    // .asciz "{}"
     fn print_ascii_string(code: &mut GeneratedCode, content: &str) {
         code.lib_functions
             .push(Directive(Directives::FormattedString(
@@ -154,9 +168,7 @@ impl CLibFunctions {
 
     /*
        ==========================================================
-       ==========================================================
                                 Push
-       ==========================================================
        ==========================================================
     */
 
@@ -168,11 +180,35 @@ impl CLibFunctions {
 
     /*
        ==========================================================
-       ==========================================================
                                  Mov
        ==========================================================
-       ==========================================================
     */
+
+    // mov{} %reg1 %reg2
+    fn mov_registers(code: &mut GeneratedCode, scale: Scale, reg1: Register, reg2: Register) {
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Mov,
+                    Scale::scale,
+                    InstrOperand::Reg(reg1),
+                    InstrOperand::Reg(reg2),
+                ),
+            )));
+    }
+
+    // mov{} $offset %reg
+    fn mov_offset(code: &mut GeneratedCode, scale: Scale, offset: i32, reg: Register) {
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Mov,
+                    Scale::scale,
+                    InstrOperand::Imm(offset),
+                    InstrOperand::Reg(reg),
+                ),
+            )));
+    }
 
     // movq %rsp, %rbp
     fn movq_rbp_rsp(code: &mut GeneratedCode) {
@@ -311,9 +347,7 @@ impl CLibFunctions {
 
     /*
        ==========================================================
-       ==========================================================
                                  And
-       ==========================================================
        ==========================================================
     */
 
@@ -332,9 +366,7 @@ impl CLibFunctions {
 
     /*
        ==========================================================
-       ==========================================================
                                  Lea
-       ==========================================================
        ==========================================================
     */
 
@@ -388,9 +420,7 @@ impl CLibFunctions {
 
     /*
        ==========================================================
-       ==========================================================
                                  Call
-       ==========================================================
        ==========================================================
     */
 
@@ -419,9 +449,7 @@ impl CLibFunctions {
 
     /*
        ==========================================================
-       ==========================================================
                                  Pop
-       ==========================================================
        ==========================================================
     */
 
@@ -433,9 +461,7 @@ impl CLibFunctions {
 
     /*
         ==========================================================
-        ==========================================================
                                   Ret
-        ==========================================================
         ==========================================================
     */
 
@@ -445,9 +471,7 @@ impl CLibFunctions {
 
     /*
         ==========================================================
-        ==========================================================
                                   Add
-        ==========================================================
         ==========================================================
     */
 
@@ -471,9 +495,7 @@ impl CLibFunctions {
 
     /*
         ==========================================================
-        ==========================================================
                                   Sub
-        ==========================================================
         ==========================================================
     */
 
@@ -495,96 +517,196 @@ impl CLibFunctions {
     }
 
     /*
-       ==========================================================
-       ==========================================================
-                         Generate Print String
-       ==========================================================
-       ==========================================================
+        ==========================================================
+                            Print Before Structure
+        ==========================================================
     */
-
-    fn generate_print_string(code: &mut GeneratedCode) {
-        //  .section .rodata
-        Self::read_only_strings(code);
-
-        //  .int 4, length of formatter string
-        Self::length_of_formatter_string(code, 4);
-
-        //  .L._prints_str0:
-        Self::print_string_label(code, PRINT_STRING_LABEL);
-
-        //  .asciz "%.*s"
-        Self::print_ascii_string(code, CONTENT_STRING_LITERAL);
-
-        //  .text
-        Self::assembler_text(code);
-
-        //  _prints:
-        Self::print_string_label(code, PRINT_LABEL_FOR_STRING);
-
-        // 	pushq %rbp
+    fn print_before_structure(code: &mut GeneratedCode) {
+        // (_print?:)
+        //   pushq %rbp
+        //   movq %rsp, %rbp
+        //   # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        //   andq $-16, %rsp
+        // ......
         Self::pushq_rbp(code);
-
-        // 	movq %rsp, %rbp
         Self::movq_rbp_rsp(code);
-
-        // 	# external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
-        // 	andq $-16, %rsp
         Self::andq_rsp(code);
+    }
 
-        // 	movq %rdi, %rdx
-        Self::movq_rdx_rdi(code);
-
-        // 	movl -4(%rdi), %esi
-        Self::movl_esi_rdi(code, -4);
-
-        // 	leaq .L._prints_str0(%rip), %rdi
-        Self::leaq_rdi_rip(code);
-
-        // 	# on x86, al represents the number of SIMD registers used as variadic arguments
-        // 	movb $0, %al
-        Self::movb_rax(code, 0);
-
-        // 	call printf@plt
-        Self::call_plt(code, PRINTF_PLT);
-
-        // 	movq $0, %rdi
+    /*
+        ==========================================================
+                            Print Before Structure
+        ==========================================================
+    */
+    fn print_after_structure(code: &mut GeneratedCode) {
+        // (_print?:)
+        // ......
+        //   movq $0, %rdi
+        //   call fflush@plt
+        //   movq %rbp, %rsp
+        //   popq %rbp
+        //   ret
         Self::movq_rdi(code, 0);
-
-        // 	call fflush@plt
         Self::call_plt(code, F_FLUSH_PLT);
-
-        // 	movq %rbp, %rsp
         Self::movq_rsp_rbp(code);
-
-        // 	popq %rbp
         Self::popq_rbp(code);
-
-        // 	ret
         Self::ret(code);
     }
 
     /*
        ==========================================================
-       ==========================================================
-                           Generate Print Line
-       ==========================================================
+                         Generate Print String
        ==========================================================
     */
+    fn generate_print_string(code: &mut GeneratedCode) {
+        // .section .rodata
+        // # length of .L._prints_str0
+        //   .int 4
+        // .L._prints_str0:
+        //   .asciz "%.*s"
+        // .text
+        // _prints:
 
-    fn generate_print_ln(code: &mut GeneratedCode) {
-        // todo
+        //   pushq %rbp
+        //   movq %rsp, %rbp
+        //   # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        //   andq $-16, %rsp
+
+        //   movq %rdi, %rdx
+        //   movl -4(%rdi), %esi
+        //   leaq .L._prints_str0(%rip), %rdi
+        //   # on x86, al represents the number of SIMD registers used as variadic arguments
+        //   movb $0, %al
+        //   call printf@plt
+
+        //   movq $0, %rdi
+        //   call fflush@plt
+        //   movq %rbp, %rsp
+        //   popq %rbp
+        //   ret
+
+        Self::read_only_strings(code);
+        Self::length_of_formatter_string(code, 4);
+        Self::print_label(code, PRINT_STRING_LABEL);
+        Self::print_ascii_string(code, CONTENT_STRING_LITERAL);
+        Self::assembler_text(code);
+        Self::print_label(code, PRINT_LABEL_FOR_STRING);
+
+        Self::print_before_structure(code);
+
+        Self::movq_rdx_rdi(code);
+        Self::movl_esi_rdi(code, -4);
+        /* wait for fixing: */
+        Self::leaq_rdi_rip(code);
+        /* */
+        Self::movb_rax(code, 0);
+        Self::call_plt(code, PRINTF_PLT);
+
+        Self::print_after_structure(code);
     }
 
     /*
        ==========================================================
+                           Generate Print Line
+       ==========================================================
+    */
+    fn generate_print_ln(code: &mut GeneratedCode) {
+        // .section .rodata
+        // # length of .L._println_str0
+        //   .int 0
+        // .L._println_str0:
+        //   .asciz ""
+        // .text
+        // _println:
+        Self::read_only_strings(code);
+        Self::length_of_formatter_string(code, 0);
+        Self::print_label(code, PRINT_STRING_LINE_LABEL);
+        Self::print_ascii_string(code, CONTENT_EMPTY);
+        Self::assembler_text(code);
+        Self::print_label(code, PRINT_LABEL_FOR_STRING_LINE);
+
+        Self::print_before_structure(code);
+
+        //   leaq .L._println_str0(%rip), %rdi
+        //   call puts@plt
+        /* wait for fixing: */
+        Self::leaq_rdi_rip(code);
+        /* */
+        Self::call_plt(code, PUTS_PLT);
+
+        Self::print_after_structure(code);
+    }
+
+    /*
        ==========================================================
                            Generate Print Int
        ==========================================================
+    */
+    fn generate_print_int(code: &mut GeneratedCode) {
+        // .section .rodata
+        // # length of .L._printi_str0
+        // 	 .int 2
+        // .L._printi_str0:
+        //   .asciz "%d"
+        // .text
+        // _printi:
+        Self::read_only_strings(code);
+        Self::length_of_formatter_string(code, 2);
+        Self::print_label(code, PRINT_INT_LABEL);
+        Self::print_ascii_string(code, CONTENT_INT_LITERAL);
+        Self::assembler_text(code);
+        Self::print_label(code, PRINT_LABEL_FOR_INT);
+
+        Self::print_before_structure(code);
+
+        //   movl %edi, %esi
+        //   leaq .L._printi_str0(%rip), %rdi
+        //   # on x86, al represents the number of SIMD registers used as variadic arguments
+        //   movb $0, %al
+        //   call printf@plt
+        Self::mov_registers(code, Long, Rdi, Rsi);
+        /* wait for fixing: */
+        Self::leaq_rdi_rip(code);
+        /* */
+        Self::mov_offset(code, Byte, 0, Rax);
+        Self::call_plt(code, PRINTF_PLT);
+
+        Self::print_after_structure(code);
+    }
+
+    /*
+       ==========================================================
+                           Generate Print Char
        ==========================================================
     */
+    fn generate_print_char(code: &mut GeneratedCode) {
+        // .section .rodata
+        // # length of .L._printc_str0
+        //   .int 2
+        // .L._printc_str0:
+        //   .asciz "%c"
+        // .text
+        // _printc:
+        Self::read_only_strings(code);
+        Self::length_of_formatter_string(code, 2);
+        Self::print_label(code, PRINT_CHAR_LABEL);
+        Self::print_ascii_string(code, CONTENT_CHAR_LITERAL);
+        Self::assembler_text(code);
+        Self::print_label(code, PRINT_LABEL_FOR_CHAR);
 
-    fn generate_print_int(code: &mut GeneratedCode) {
-        // todo
+        Self::print_before_structure(code);
+
+        //   movb %dil, %sil
+        //   leaq .L._printc_str0(%rip), %rdi
+        //   # on x86, al represents the number of SIMD registers used as variadic arguments
+        //   movb $0, %al
+        //   call printf@plt
+        Self::mov_registers(code, Byte, Rdi, Rsi);
+        Self::leaq_rdi_rip(code);
+        Self::mov_offset(code, Byte, 0, Rax);
+        Self::call_plt(code, PRINTF_PLT);
+
+        Self::print_after_structure(code);
     }
 
     /*
@@ -655,7 +777,7 @@ impl CLibFunctions {
         // 	popq %rbp
         Self::popq_rbp(code);
 
-        // 		ret
+        // 	ret
         Self::ret(code);
     }
 
@@ -668,29 +790,29 @@ impl CLibFunctions {
     */
 
     fn generate_sys_exit(code: &mut GeneratedCode) {
-        // _exit:
+        //  _exit:
         Self::syscall_sub_function_label(code, SYS_EXIT_LABEL);
 
-        //     pushq %rbp
+        //  pushq %rbp
         Self::pushq_rbp(code);
 
-        // movq %rsp, %rbp
+        //  movq %rsp, %rbp
         Self::movq_rsp_rbp(code);
 
-        // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
-        // andq $-16, %rsp
+        //  # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        //  andq $-16, %rsp
         Self::andq_rsp(code);
 
-        // call exit@plt
+        //  call exit@plt
         Self::call_plt(code, SYS_EXIT_PLT);
 
-        // movq %rbp, %rsp
+        //  movq %rbp, %rsp
         Self::movq_rbp_rsp(code);
 
-        // popq %rbp
+        //  popq %rbp
         Self::popq_rbp(code);
 
-        // ret
+        //  ret
         Self::ret(code);
     }
 }
