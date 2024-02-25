@@ -1,6 +1,7 @@
 use crate::code_generator::asm::{
-    AsmLine, BinaryInstruction, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference,
-    MemoryReferenceImmediate, Register, Scale, ScaledRegister, UnaryInstruction,
+    AsmLine, BinaryInstruction, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
+    MemoryReference, MemoryReferenceImmediate, Register, Scale, ScaledRegister, UnaryInstruction,
+    UnaryNotScaled,
 };
 use crate::code_generator::def_libary::{Directives, FormatLabel};
 use std::fmt::{write, Display, Formatter};
@@ -72,6 +73,14 @@ impl Display for Scale {
     }
 }
 
+impl Display for ConditionCode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConditionCode::EQ => write!(f, "e"),
+            ConditionCode::NEQ => write!(f, "ne"),
+        }
+    }
+}
 impl Display for InstrType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -87,7 +96,19 @@ impl Display for InstrType {
             InstrType::Call => write!(f, "call"),
             InstrType::Ret => write!(f, "ret"),
             InstrType::Not => write!(f, "not"),
+            InstrType::Or => write!(f, "or"),
+            InstrType::Cmp => write!(f, "cmp"),
+            InstrType::Jump(condition_code) => match condition_code {
+                None => write!(f, "jmp"),
+                Some(cond_code) => write!(f, "j{}", cond_code),
+            },
         }
+    }
+}
+
+impl Display for UnaryNotScaled {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.instr_type, self.operand)
     }
 }
 
@@ -128,6 +149,7 @@ impl Display for Instr {
             Instr::Ret => write!(f, "ret"),
             Instr::UnaryInstr(unary_ins) => write!(f, "{}", unary_ins),
             Instr::BinaryInstr(bin_ins) => write!(f, "{}", bin_ins),
+            Instr::UnaryControl(unary_control) => write!(f, "{}", unary_control),
         }
     }
 }

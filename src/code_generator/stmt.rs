@@ -1,16 +1,18 @@
 use crate::ast::{Expr, Lvalue, Rvalue, ScopedStmt, Stmt, Type};
-use crate::code_generator::asm::AsmLine::Instruction;
+use crate::code_generator::asm::AsmLine::{Directive, Instruction};
 use crate::code_generator::asm::InstrOperand::Reg;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rdi, Rsp};
 use crate::code_generator::asm::{
-    AsmLine, BinaryInstruction, CLibFunctions, GeneratedCode, Instr, InstrOperand, InstrType,
-    MemoryReference, Register, Scale, UnaryInstruction, RESULT_REG,
+    AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand,
+    InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, RESULT_REG,
 };
 use crate::code_generator::clib_functions::{PRINT_LABEL_FOR_STRING, SYS_EXIT_LABEL};
+use crate::code_generator::def_libary::Directives;
 use crate::code_generator::x86_generate::Generator;
 use crate::new_spanned;
 use crate::symbol_table::{Offset, ScopeTranslator};
+use std::process::exit;
 
 impl Generator for ScopedStmt {
     type Input = ();
@@ -146,6 +148,49 @@ impl Generator for Stmt {
                         }),
                     ),
                 )));
+            }
+            Stmt::If((cond, _), st1, st2) => {
+                let true_label = code.get_control_label();
+                let exit_if_label = code.get_control_label();
+
+                // r[0] = evaluate if-condition
+                cond.generate(scope, code, regs, aux);
+
+                // cmpq $1, r[0]
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Cmp,
+                        Scale::default(),
+                        InstrOperand::Imm(1),
+                        InstrOperand::Reg(regs[0]),
+                    ),
+                )));
+
+                // je true_label
+                code.codes
+                    .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
+                        InstrType::Jump(Some(ConditionCode::EQ)),
+                        InstrOperand::LabelRef(true_label.clone()),
+                    ))));
+
+                // st2.body
+                st2.generate(scope, code, regs, aux);
+
+                // jmp exit_if_label
+                code.codes
+                    .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
+                        InstrType::Jump(None),
+                        InstrOperand::LabelRef(exit_if_label.clone()),
+                    ))));
+
+                // true_label:
+                code.codes.push(Directive(Directives::Label(true_label)));
+
+                // st1.body
+                st1.generate(scope, code, regs, aux);
+
+                // exit_label:
+                code.codes.push(Directive(Directives::Label(exit_if_label)))
             }
             _ => todo!(),
         }

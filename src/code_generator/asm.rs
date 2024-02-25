@@ -8,6 +8,10 @@ lazy_static! {
     static ref STR_LABEL: Mutex<usize> = Mutex::new(0);
 }
 
+lazy_static! {
+    static ref CONTROL_LABEL: Mutex<usize> = Mutex::new(0);
+}
+
 pub type Label = String;
 
 pub fn revert_escape_char(ch: char) -> Option<&'static str> {
@@ -233,6 +237,12 @@ impl InstrOperand {
 }
 
 #[derive(PartialEq, Debug, Clone)]
+pub enum ConditionCode {
+    EQ,
+    NEQ,
+}
+
+#[derive(PartialEq, Debug, Clone)]
 pub enum InstrType {
     Push,
     Pop,
@@ -244,8 +254,17 @@ pub enum InstrType {
     Add,
     Sub,
     And,
+    Or,
+    Cmp,
     Call,
     Ret,
+    Jump(Option<ConditionCode>),
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct UnaryNotScaled {
+    pub instr_type: InstrType,
+    pub operand: InstrOperand,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -262,6 +281,15 @@ pub struct BinaryInstruction {
     pub src_operand: InstrOperand,
     pub dst_scale: Option<Scale>,
     pub dst_operand: InstrOperand,
+}
+
+impl UnaryNotScaled {
+    pub fn new(instr_type: InstrType, operand: InstrOperand) -> Self {
+        Self {
+            instr_type,
+            operand,
+        }
+    }
 }
 
 impl UnaryInstruction {
@@ -313,6 +341,7 @@ pub enum Instr {
     // Pop(Scale, Register),
     // Neg(Scale, Register),
     // Call(String),
+    UnaryControl(UnaryNotScaled),
     UnaryInstr(UnaryInstruction),
     BinaryInstr(BinaryInstruction),
     Ret,
@@ -350,6 +379,12 @@ impl GeneratedCode {
             .push(AsmLine::Directive(Directives::AsciiStringText(str_content)));
 
         str_label
+    }
+
+    pub fn get_control_label(&mut self) -> Label {
+        let control_label = format!(".L_control_{}", *CONTROL_LABEL.lock().unwrap());
+        *CONTROL_LABEL.lock().unwrap() += 1;
+        control_label
     }
 }
 
