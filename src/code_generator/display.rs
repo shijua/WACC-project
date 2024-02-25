@@ -204,14 +204,6 @@ impl Display for ScaledRegister {
         use crate::code_generator::asm::Register::*;
         write!(f, "%")?;
 
-        let mut reg_formatter_for_8_to_15 = |reg_string: &str, scale: Scale| {
-            write!(f, "{}", reg_string,)?;
-            match scale {
-                Scale::Quad => write!(f, ""),
-                other => write!(f, "{}", other),
-            }
-        };
-
         match self.reg {
             Rax => match self.scale {
                 Scale::Byte => write!(f, "al"),
@@ -262,14 +254,14 @@ impl Display for ScaledRegister {
                 Scale::Long => write!(f, "esp"),
                 Scale::Quad => write!(f, "rsp"),
             },
-            R8 => reg_formatter_for_8_to_15("r8", self.scale.clone()),
-            R9 => reg_formatter_for_8_to_15("r9", self.scale.clone()),
-            R10 => reg_formatter_for_8_to_15("r10", self.scale.clone()),
-            R11 => reg_formatter_for_8_to_15("r11", self.scale.clone()),
-            R12 => reg_formatter_for_8_to_15("r12", self.scale.clone()),
-            R13 => reg_formatter_for_8_to_15("r13", self.scale.clone()),
-            R14 => reg_formatter_for_8_to_15("r14", self.scale.clone()),
-            R15 => reg_formatter_for_8_to_15("r15", self.scale.clone()),
+            R8 => write!(f, "r8"),
+            R9 => write!(f, "r9"),
+            R10 => write!(f, "r10"),
+            R11 => write!(f, "r11"),
+            R12 => write!(f, "r12"),
+            R13 => write!(f, "r13"),
+            R14 => write!(f, "r14"),
+            R15 => write!(f, "r15"),
             Rip => match self.scale.clone() {
                 Scale::Quad => write!(f, "rdi"),
                 other_scale => write!(f, "Cannot bind scale {} with RIP", other_scale),
