@@ -203,6 +203,7 @@ impl Stmt {
             Type::StringType => PRINT_LABEL_FOR_STRING,
             Type::IntType => PRINT_LABEL_FOR_INT,
             Type::CharType => PRINT_LABEL_FOR_CHAR,
+            Type::BoolType => todo!(),
             _ => todo!(),
         };
         code.codes
@@ -274,18 +275,17 @@ impl Stmt {
         rvalue: &Rvalue,
     ) {
         // regs[0] = rvalue
-        // todo dealing with rvalue
-        rvalue.generate(scope, code, regs, aux);
+        let src_reg = rvalue.generate(scope, code, regs, aux);
 
         // store value in regs[0] to that of lvalue
-        let (src_reg, size) = lvalue.generate(scope, code, regs, type_.clone());
+        let (dst_reg, size) = lvalue.generate(scope, code, regs, type_.clone());
 
         code.codes.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
                 InstrType::Mov,
                 Scale::from_size(size),
                 Reg(src_reg),
-                Reg(get_next_register(regs, size)),
+                Reg(dst_reg),
             ),
         )));
     }
