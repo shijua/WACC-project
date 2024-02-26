@@ -1,6 +1,6 @@
 use crate::ast::{ArrayElem, ArrayLiter, BinaryOperator, Expr, Ident, UnaryOperator};
 use crate::code_generator::asm::AsmLine::Instruction;
-use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl};
+use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
 use crate::code_generator::asm::Scale::Quad;
 use crate::code_generator::asm::{
@@ -48,7 +48,6 @@ impl Generator for Expr {
                             ),
                         )));
                         // TODO: 1. check overflow
-                        // TODO: 2. movslq (currently movsl)
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
@@ -72,7 +71,6 @@ impl Generator for Expr {
                             ),
                         )));
                         // TODO: 1. check overflow
-                        // TODO: 2. movslq (currently movsl)
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
@@ -96,7 +94,6 @@ impl Generator for Expr {
                             ),
                         )));
                         // TODO: 1. check overflow
-                        // TODO: 2. movslq (currently movsl)
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
@@ -109,66 +106,200 @@ impl Generator for Expr {
                         lhs_reg
                     }
 
-                    // cmpl, je _errDivZero, cltd, idivl
+                    // cmpl, je _errDivZero, cltd, idivl, movl, movl, movslq
                     BinaryOperator::Div => {
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
-                                InstrType::Div,
+                                InstrType::Cmp,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        // TODO: 1. check divide by zero
+                        code.codes.push(Instruction(UnaryControl(UnaryNotScaled::new(
+                            InstrType::Cltd,
+                            InstrOperand::Reg(rhs_reg),
+                            ),
+                        )));
+                        code.codes.push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
+                            InstrType::Div,
+                            Scale::Long,
+                            InstrOperand::Reg(rhs_reg),
+                            ),
+                        )));
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Mov,
                                 Scale::Long,
                                 InstrOperand::Reg(lhs_reg),
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Mov,
+                                Scale::Long,
+                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            )
+                        )));
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_double_scale(
+                                InstrType::MovS,
+                                Scale::Long,
+                                InstrOperand::Reg(lhs_reg),
+                                Scale::Quad,
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
                         lhs_reg
                     }
 
-                    // TODO: Checking divide by zero
-                    // TODO: Checking modulo process
+                    // cmpl, je _errDivZero, cltd, idivl, movl, movl, movslq
                     BinaryOperator::Modulo => {
-                        todo!()
-
-                        // // cmpq lhs rhs
-                        // code.codes.push(Instruction(BinaryInstr(
-                        //     BinaryInstruction::new_single_scale(
-                        //         InstrType::Cmp,
-                        //         Scale::default(),
-                        //         InstrOperand::Reg(rhs_reg),
-                        //         InstrOperand::Reg(lhs_reg),
-                        //     ),
-                        // )));
-                        // // sete %al
-                        // code.codes
-                        //     .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                        //         InstrType::Set(ConditionCode::EQ),
-                        //         InstrOperand::RegVariant(lhs_reg, Scale::Byte),
-                        //     ))));
-                        // // movsbq lhs
-                        // code.codes.push(Instruction(BinaryInstr(
-                        //     BinaryInstruction::new_double_scale(
-                        //         InstrType::MovS,
-                        //         Scale::Byte,
-                        //         InstrOperand::Reg(lhs_reg),
-                        //         Quad,
-                        //         InstrOperand::Reg(lhs_reg),
-                        //     ),
-                        // )));
-                        // lhs_reg
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Cmp,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        // TODO: 1. check divide by zero
+                        code.codes.push(Instruction(UnaryControl(UnaryNotScaled::new(
+                            InstrType::Cltd,
+                            InstrOperand::Reg(rhs_reg),
+                        ),
+                        )));
+                        code.codes.push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
+                            InstrType::Div,
+                            Scale::Long,
+                            InstrOperand::Reg(rhs_reg),
+                        ),
+                        )));
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Mov,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Mov,
+                                Scale::Long,
+                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            )
+                        )));
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_double_scale(
+                                InstrType::MovS,
+                                Scale::Long,
+                                InstrOperand::Reg(lhs_reg),
+                                Scale::Quad,
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        lhs_reg
                     }
 
+                    // cmpq, setg, movsbq
                     BinaryOperator::Gt => {
-                        todo!()
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Cmp,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        // TODO: setg instruction
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_double_scale(
+                                InstrType::MovS,
+                                Scale::Byte,
+                                InstrOperand::Reg(lhs_reg),
+                                Scale::Quad,
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        lhs_reg
                     }
+
+                    //
                     BinaryOperator::Gte => {
-                        todo!()
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Cmp,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        // TODO: setge instruction
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_double_scale(
+                                InstrType::MovS,
+                                Scale::Byte,
+                                InstrOperand::Reg(lhs_reg),
+                                Scale::Quad,
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        lhs_reg
                     }
+
+                    // cmpq, setl, movsbq
                     BinaryOperator::Lt => {
-                        todo!()
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Cmp,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        // TODO: setl instruction
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_double_scale(
+                                InstrType::MovS,
+                                Scale::Byte,
+                                InstrOperand::Reg(lhs_reg),
+                                Scale::Quad,
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        lhs_reg
                     }
+
+                    // cmpq, setle, movsbq
                     BinaryOperator::Lte => {
-                        todo!()
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Cmp,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        // TODO: setle instruction
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_double_scale(
+                                InstrType::MovS,
+                                Scale::Byte,
+                                InstrOperand::Reg(lhs_reg),
+                                Scale::Quad,
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        lhs_reg
                     }
+
+                    // cmpq, sete, movsbq
                     BinaryOperator::Eq => {
-                        // cmpq lhs rhs
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
                                 InstrType::Cmp,
@@ -177,13 +308,10 @@ impl Generator for Expr {
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
-                        // sete %al
-                        code.codes
-                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                        code.codes.push(Instruction(UnaryControl(UnaryNotScaled::new(
                                 InstrType::Set(ConditionCode::EQ),
                                 InstrOperand::RegVariant(lhs_reg, Scale::Byte),
                             ))));
-                        // movsbq lhs
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
@@ -195,8 +323,34 @@ impl Generator for Expr {
                         )));
                         lhs_reg
                     }
+
+                    // cmpq, sete, movsbq
                     BinaryOperator::Neq => {
-                        // cmpq lhs rhs
+                        code.codes.push(Instruction(BinaryInstr(BinaryInstruction::new_single_scale(
+                                InstrType::Cmp,
+                                Scale::default(),
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        code.codes.push(Instruction(UnaryControl(UnaryNotScaled::new(
+                                InstrType::Set(ConditionCode::NEQ),
+                                InstrOperand::RegVariant(lhs_reg, Scale::Byte),
+                            ))));
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_double_scale(
+                                InstrType::MovS,
+                                Scale::Byte,
+                                InstrOperand::Reg(lhs_reg),
+                                Quad,
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        lhs_reg
+                    }
+
+                    // cmpq, and, movq, cmpq
+                    BinaryOperator::And => {
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
                                 InstrType::Cmp,
@@ -205,45 +359,77 @@ impl Generator for Expr {
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
-                        // sete %al
-                        code.codes
-                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                                InstrType::Set(ConditionCode::NEQ),
-                                InstrOperand::RegVariant(lhs_reg, Scale::Byte),
-                            ))));
-                        // movsbq lhs
                         code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_double_scale(
-                                InstrType::MovS,
-                                Scale::Byte,
+                            BinaryInstruction::new_single_scale(
+                                InstrType::And,
+                                Scale::default(),
+                                InstrOperand::Reg(rhs_reg),
                                 InstrOperand::Reg(lhs_reg),
-                                Quad,
+                            ),
+                        )));
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Mov,
+                                Scale::default(),
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Cmp,
+                                Scale::default(),
+                                InstrOperand::Reg(rhs_reg),
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
                         lhs_reg
                     }
-                    BinaryOperator::And => {
-                        todo!()
-                    }
+
+                    // cmpq, or, movq, cmpq
                     BinaryOperator::Or => {
-                        todo!()
-                        // code.codes.push(Instruction(BinaryInstr(
-                        //     BinaryInstruction::new_single_scale(
-                        //         InstrType::Or,
-                        //         Scale::default(),
-                        //         InstrOperand::Reg(rhs_reg),
-                        //         InstrOperand::Reg(lhs_reg),
-                        //     ),
-                        // )));
-                        // lhs_reg
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Cmp,
+                                Scale::default(),
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Or,
+                                Scale::default(),
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Mov,
+                                Scale::default(),
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Cmp,
+                                Scale::default(),
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        lhs_reg
                     }
                 }
             }
+
             Expr::PairLiter => {
                 todo!()
             }
             Expr::Ident(id) => Self::generate_expr_ident(scope, code, regs, id),
+
             Expr::ArrayElem(_) => {
                 todo!()
             }

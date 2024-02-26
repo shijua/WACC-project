@@ -280,6 +280,7 @@ pub enum InstrType {
     Set(ConditionCode),
     IMul,
     Div,
+    Cltd,
 }
 
 #[derive(PartialEq, Debug, Clone)]

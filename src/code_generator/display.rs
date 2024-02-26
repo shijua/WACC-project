@@ -105,6 +105,7 @@ impl Display for InstrType {
             InstrType::Set(condition_code) => write!(f, "set{}", condition_code),
             InstrType::IMul => write!(f, "imul"),
             InstrType::Div => write!(f, "idiv"),
+            InstrType::Cltd => write!(f, "cltd"),
 
         }
     }
