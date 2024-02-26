@@ -30,6 +30,12 @@ pub fn gen_x86_for_program(ast: &Program) -> GeneratedCode {
     let mut regs: Vec<Register> = GENERAL_REGS.iter().cloned().collect();
 
     ast.generate(&mut base_scope, &mut asm, &mut regs, ());
+    // asm.required_clib
+    //     .iter()
+    //     .for_each(|clib_func| clib_func.generate_dependency(&mut asm));
+    for clib_func in asm.required_clib.clone() {
+        clib_func.generate_dependency(&mut asm)
+    }
     asm.required_clib
         .clone()
         .iter()

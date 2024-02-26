@@ -1,10 +1,16 @@
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
+use crate::code_generator::asm::CLibFunctions::{OutOfMemoryError, PrintString};
+use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl};
 use crate::code_generator::asm::Register::*;
 use crate::code_generator::asm::Scale::{Byte, Long, Quad};
-use crate::code_generator::asm::{AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, MemoryReferenceImmediate, Register, Scale, UnaryInstruction, UnaryNotScaled};
-use crate::code_generator::asm::Instr::UnaryControl;
+use crate::code_generator::asm::{
+    AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand,
+    InstrType, MemoryReference, MemoryReferenceImmediate, Register, Scale, UnaryInstruction,
+    UnaryNotScaled, RESULT_REG,
+};
 use crate::code_generator::def_libary::{Directives, FormatLabel};
 use crate::code_generator::x86_generate::Generator;
+use crate::parser::program::program;
 use crate::symbol_table::ScopeTranslator;
 
 pub const PRINT_STRING_LABEL: &str = ".L._prints_str0";
@@ -37,6 +43,11 @@ pub const READ_LABEL_FOR_CHAR: &str = "_readc";
 
 pub const SYS_EXIT_LABEL: &str = "_exit";
 
+pub const MALLOC_LABEL: &str = "_malloc";
+
+pub const OUT_OF_MEMORY_LABEL: &str = ".L._errOutOfMemory_str0";
+pub const ERROR_LABEL_FOR_OUT_OF_MEMORY: &str = "_errOutOfMemory";
+
 pub const CONTENT_STRING_LITERAL: &str = "%.*s";
 pub const CONTENT_INT_LITERAL: &str = "%d";
 pub const CONTENT_EMPTY: &str = "";
@@ -51,6 +62,29 @@ pub const PUTS_PLT: &str = "puts@plt";
 pub const SCANF_PLT: &str = "scanf@plt";
 pub const F_FLUSH_PLT: &str = "fflush@plt";
 pub const SYS_EXIT_PLT: &str = "exit@plt";
+
+pub const MALLOC_PLT: &str = "malloc@plt";
+
+impl CLibFunctions {
+    pub fn generate_dependency(&self, code: &mut GeneratedCode) {
+        match self {
+            // CLibFunctions::PrintString => {}
+            // CLibFunctions::PrintLn => {}
+            // CLibFunctions::PrintInt => {}
+            // CLibFunctions::PrintChar => {}
+            // CLibFunctions::PrintBool => {}
+            // CLibFunctions::PrintRefs => {}
+            // CLibFunctions::ReadInt => {}
+            // CLibFunctions::ReadChar => {}
+            // CLibFunctions::SystemExit => {}
+            CLibFunctions::Malloc => {
+                code.required_clib.insert(PrintString);
+                code.required_clib.insert(OutOfMemoryError);
+            }
+            _ => (),
+        }
+    }
+}
 
 impl Generator for CLibFunctions {
     type Input = ();
@@ -98,6 +132,12 @@ impl Generator for CLibFunctions {
 
             CLibFunctions::SystemExit => {
                 Self::generate_sys_exit(code);
+            }
+            CLibFunctions::Malloc => {
+                Self::generate_sys_malloc(code);
+            }
+            CLibFunctions::OutOfMemoryError => {
+                Self::generate_out_of_memory_error(code);
             }
         }
     }
@@ -221,7 +261,7 @@ impl CLibFunctions {
     }
 
     // mov<scale> $<offset> %<reg>
-    fn mov_offset(code: &mut GeneratedCode, scale: Scale, offset: i32, reg: Register) {
+    fn mov_immediate(code: &mut GeneratedCode, scale: Scale, offset: i32, reg: Register) {
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
@@ -238,8 +278,15 @@ impl CLibFunctions {
     //    else: src = %<reg1>
     // if memory_ref2: dst = (%<reg2>)
     //    else: dst = %<reg2>
-    fn mov_memory_ref_reg(code: &mut GeneratedCode, scale: Scale, offset: i32,
-        memory_ref1: bool, reg1: Register, memory_ref2: bool, reg2: Register) {
+    fn mov_memory_ref_reg(
+        code: &mut GeneratedCode,
+        scale: Scale,
+        offset: i32,
+        memory_ref1: bool,
+        reg1: Register,
+        memory_ref2: bool,
+        reg2: Register,
+    ) {
         let src = if memory_ref1 {
             InstrOperand::Reference(MemoryReference::new(
                 Some(MemoryReferenceImmediate::OffsetImm(offset)),
@@ -251,28 +298,23 @@ impl CLibFunctions {
             InstrOperand::Reg(reg1)
         };
         let dst = if memory_ref2 {
-            InstrOperand::Reference(MemoryReference::new(
-                None,
-                Some(reg2),
-                None,
-                None,
-            ))
+            InstrOperand::Reference(MemoryReference::new(None, Some(reg2), None, None))
         } else {
             InstrOperand::Reg(reg2)
         };
         code.lib_functions.push(Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                scale,
-                src,
-                dst,
-            ),
+            BinaryInstruction::new_single_scale(InstrType::Mov, scale, src, dst),
         )));
     }
 
     // movs<scale1><scale2> (%<reg1>) <%reg2>
-    fn movs_registers(code: &mut GeneratedCode, scale1: Scale, scale2: Scale,
-                      reg1: Register, reg2: Register) {
+    fn movs_registers(
+        code: &mut GeneratedCode,
+        scale1: Scale,
+        scale2: Scale,
+        reg1: Register,
+        reg2: Register,
+    ) {
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_double_scale(
@@ -435,7 +477,7 @@ impl CLibFunctions {
     */
 
     // call <plt_label>
-    fn call_plt(code: &mut GeneratedCode, plt_label: &str) {
+    fn call_func(code: &mut GeneratedCode, plt_label: &str) {
         code.lib_functions
             .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
                 InstrType::Call,
@@ -520,8 +562,7 @@ impl CLibFunctions {
        ==========================================================
     */
 
-    fn create_string(code: &mut GeneratedCode, length: i32,
-                     label: &str, string: &str) {
+    fn create_string(code: &mut GeneratedCode, length: i32, label: &str, string: &str) {
         //   .int <length>
         // <label>:
         //   .asciz "<string>"
@@ -530,8 +571,13 @@ impl CLibFunctions {
         Self::ascii_string(code, string);
     }
 
-    fn general_set_up(code: &mut GeneratedCode, length: i32,
-                      str_label: &str, string: &str, func_label: &str) {
+    fn general_set_up(
+        code: &mut GeneratedCode,
+        length: i32,
+        str_label: &str,
+        string: &str,
+        func_label: &str,
+    ) {
         // .section .rodata
         // # length of <str_label>
         //   .int <length>
@@ -559,8 +605,13 @@ impl CLibFunctions {
         //   .asciz "%.*s"
         // .text
         // _prints:
-        Self::general_set_up(code, 4, PRINT_STRING_LABEL,
-                             CONTENT_STRING_LITERAL, PRINT_LABEL_FOR_STRING);
+        Self::general_set_up(
+            code,
+            4,
+            PRINT_STRING_LABEL,
+            CONTENT_STRING_LITERAL,
+            PRINT_LABEL_FOR_STRING,
+        );
 
         Self::set_up_stack(code);
 
@@ -573,13 +624,13 @@ impl CLibFunctions {
         Self::mov_registers(code, Quad, Rdi, Rdx);
         Self::mov_memory_ref_reg(code, Long, -4, true, Rdi, false, Rsi);
         Self::leaq_rip_with_label(code, PRINT_STRING_LABEL, Rdi);
-        Self::mov_offset(code, Byte, 0, Rax);
-        Self::call_plt(code, PRINTF_PLT);
+        Self::mov_immediate(code, Byte, 0, Rax);
+        Self::call_func(code, PRINTF_PLT);
 
         //   movq $0, %rdi
         //   call fflush@plt
-        Self::mov_offset(code, Quad, 0, Rdi);
-        Self::call_plt(code, F_FLUSH_PLT);
+        Self::mov_immediate(code, Quad, 0, Rdi);
+        Self::call_func(code, F_FLUSH_PLT);
 
         Self::set_back_stack(code);
     }
@@ -592,20 +643,25 @@ impl CLibFunctions {
         //   .asciz ""
         // .text
         // _println:
-        Self::general_set_up(code, 0, PRINT_STRING_LINE_LABEL,
-                             CONTENT_EMPTY, PRINT_LABEL_FOR_STRING_LINE);
+        Self::general_set_up(
+            code,
+            0,
+            PRINT_STRING_LINE_LABEL,
+            CONTENT_EMPTY,
+            PRINT_LABEL_FOR_STRING_LINE,
+        );
 
         Self::set_up_stack(code);
 
         //   leaq .L._println_str0(%rip), %rdi
         //   call puts@plt
         Self::leaq_rip_with_label(code, PRINT_STRING_LINE_LABEL, Rdi);
-        Self::call_plt(code, PUTS_PLT);
+        Self::call_func(code, PUTS_PLT);
 
         //   movq $0, %rdi
         //   call fflush@plt
-        Self::mov_offset(code, Quad, 0, Rdi);
-        Self::call_plt(code, F_FLUSH_PLT);
+        Self::mov_immediate(code, Quad, 0, Rdi);
+        Self::call_func(code, F_FLUSH_PLT);
 
         Self::set_back_stack(code);
     }
@@ -618,8 +674,13 @@ impl CLibFunctions {
         //   .asciz "%d"
         // .text
         // _printi:
-        Self::general_set_up(code, 2, PRINT_INT_LABEL,
-                             CONTENT_INT_LITERAL, PRINT_LABEL_FOR_INT);
+        Self::general_set_up(
+            code,
+            2,
+            PRINT_INT_LABEL,
+            CONTENT_INT_LITERAL,
+            PRINT_LABEL_FOR_INT,
+        );
 
         Self::set_up_stack(code);
 
@@ -630,13 +691,13 @@ impl CLibFunctions {
         //   call printf@plt
         Self::mov_registers(code, Long, Rdi, Rsi);
         Self::leaq_rip_with_label(code, PRINT_INT_LABEL, Rdi);
-        Self::mov_offset(code, Byte, 0, Rax);
-        Self::call_plt(code, PRINTF_PLT);
+        Self::mov_immediate(code, Byte, 0, Rax);
+        Self::call_func(code, PRINTF_PLT);
 
         //   movq $0, %rdi
         //   call fflush@plt
-        Self::mov_offset(code, Quad, 0, Rdi);
-        Self::call_plt(code, F_FLUSH_PLT);
+        Self::mov_immediate(code, Quad, 0, Rdi);
+        Self::call_func(code, F_FLUSH_PLT);
 
         Self::set_back_stack(code);
     }
@@ -649,8 +710,13 @@ impl CLibFunctions {
         //   .asciz "%c"
         // .text
         // _printc:
-        Self::general_set_up(code, 2, PRINT_CHAR_LABEL,
-                             CONTENT_CHAR_LITERAL, PRINT_LABEL_FOR_CHAR);
+        Self::general_set_up(
+            code,
+            2,
+            PRINT_CHAR_LABEL,
+            CONTENT_CHAR_LITERAL,
+            PRINT_LABEL_FOR_CHAR,
+        );
 
         Self::set_up_stack(code);
 
@@ -661,13 +727,13 @@ impl CLibFunctions {
         //   call printf@plt
         Self::mov_registers(code, Byte, Rdi, Rsi);
         Self::leaq_rip_with_label(code, PRINT_CHAR_LABEL, Rdi);
-        Self::mov_offset(code, Byte, 0, Rax);
-        Self::call_plt(code, PRINTF_PLT);
+        Self::mov_immediate(code, Byte, 0, Rax);
+        Self::call_func(code, PRINTF_PLT);
 
         //   movq $0, %rdi
         //   call fflush@plt
-        Self::mov_offset(code, Quad, 0, Rdi);
-        Self::call_plt(code, F_FLUSH_PLT);
+        Self::mov_immediate(code, Quad, 0, Rdi);
+        Self::call_func(code, F_FLUSH_PLT);
 
         Self::set_back_stack(code);
     }
@@ -689,12 +755,9 @@ impl CLibFunctions {
         // .text
         // _printb:
         Self::read_only_strings(code);
-        Self::create_string(code, 5,
-                            PRINT_BOOL_LABEL_0, CONTENT_BOOL_LITERAL_FALSE);
-        Self::create_string(code, 4,
-                            PRINT_BOOL_LABEL_1, CONTENT_BOOL_LITERAL_TRUE);
-        Self::create_string(code, 4,
-                            PRINT_BOOL_LABEL_2, CONTENT_STRING_LITERAL);
+        Self::create_string(code, 5, PRINT_BOOL_LABEL_0, CONTENT_BOOL_LITERAL_FALSE);
+        Self::create_string(code, 4, PRINT_BOOL_LABEL_1, CONTENT_BOOL_LITERAL_TRUE);
+        Self::create_string(code, 4, PRINT_BOOL_LABEL_2, CONTENT_STRING_LITERAL);
         Self::assembler_text(code);
         Self::labelling(code, PRINT_LABEL_FOR_BOOL);
 
@@ -723,20 +786,25 @@ impl CLibFunctions {
         Self::labelling(code, PRINT_LABEL_FOR_BOOL_1);
         Self::mov_memory_ref_reg(code, Long, -4, true, Rdx, false, Rdi);
         Self::leaq_rip_with_label(code, PRINT_BOOL_LABEL_2, Rdi);
-        Self::mov_offset(code, Byte, 0, Rax);
-        Self::call_plt(code, PRINTF_PLT);
+        Self::mov_immediate(code, Byte, 0, Rax);
+        Self::call_func(code, PRINTF_PLT);
 
         //   movq $0, %rdi
         //   call fflush@plt
-        Self::mov_offset(code, Quad, 0, Rdi);
-        Self::call_plt(code, F_FLUSH_PLT);
+        Self::mov_immediate(code, Quad, 0, Rdi);
+        Self::call_func(code, F_FLUSH_PLT);
 
         Self::set_back_stack(code);
     }
 
     fn generate_print_reference(code: &mut GeneratedCode) {
-        Self::general_set_up(code, 2,
-                             PRINT_REF_LABEL, CONTENT_REF_LITERAL, PRINT_LABEL_FOR_REF);
+        Self::general_set_up(
+            code,
+            2,
+            PRINT_REF_LABEL,
+            CONTENT_REF_LITERAL,
+            PRINT_LABEL_FOR_REF,
+        );
         Self::set_up_stack(code);
 
         //   movq %rdi, %rsi
@@ -748,10 +816,10 @@ impl CLibFunctions {
         //   call fflush@plt
         Self::mov_registers(code, Quad, Rdi, Rsi);
         Self::leaq_rip_with_label(code, PRINT_REF_LABEL, Rdi);
-        Self::mov_offset(code, Byte, 0, Rax);
-        Self::call_plt(code, PRINTF_PLT);
-        Self::mov_offset(code, Quad, 0, Rdi);
-        Self::call_plt(code, F_FLUSH_PLT);
+        Self::mov_immediate(code, Byte, 0, Rax);
+        Self::call_func(code, PRINTF_PLT);
+        Self::mov_immediate(code, Quad, 0, Rdi);
+        Self::call_func(code, F_FLUSH_PLT);
 
         Self::set_back_stack(code);
     }
@@ -764,8 +832,13 @@ impl CLibFunctions {
         //   .asciz "%d"
         // .text
         // _readi:
-        Self::general_set_up(code, 2,
-                             READ_INT_LABEL, CONTENT_INT_LITERAL, READ_LABEL_FOR_INT);
+        Self::general_set_up(
+            code,
+            2,
+            READ_INT_LABEL,
+            CONTENT_INT_LITERAL,
+            READ_LABEL_FOR_INT,
+        );
 
         Self::set_up_stack(code);
 
@@ -785,8 +858,8 @@ impl CLibFunctions {
         Self::mov_memory_ref_reg(code, Long, 0, false, Rdi, true, Rsp);
         Self::leaq_registers(code, Rsp, Rsi);
         Self::leaq_rip_with_label(code, READ_INT_LABEL, Rdi);
-        Self::mov_offset(code, Byte, 0, Rax);
-        Self::call_plt(code, SCANF_PLT);
+        Self::mov_immediate(code, Byte, 0, Rax);
+        Self::call_func(code, SCANF_PLT);
         Self::movs_registers(code, Long, Quad, Rsp, Rax);
         Self::addq_rsp(code);
 
@@ -801,8 +874,13 @@ impl CLibFunctions {
         //   .asciz " %c"
         // .text
         // _readc:
-        Self::general_set_up(code, 3,
-                             READ_CHAR_LABEL, CONTENT_READ_CHAR_LITERAL, READ_LABEL_FOR_CHAR);
+        Self::general_set_up(
+            code,
+            3,
+            READ_CHAR_LABEL,
+            CONTENT_READ_CHAR_LITERAL,
+            READ_LABEL_FOR_CHAR,
+        );
 
         Self::set_up_stack(code);
 
@@ -822,8 +900,8 @@ impl CLibFunctions {
         Self::mov_memory_ref_reg(code, Byte, 0, true, Rsp, false, Rsi);
         Self::leaq_registers(code, Rsp, Rsi);
         Self::leaq_rip_with_label(code, READ_CHAR_LABEL, Rdi);
-        Self::mov_offset(code, Byte, 0, Rax);
-        Self::call_plt(code, SCANF_PLT);
+        Self::mov_immediate(code, Byte, 0, Rax);
+        Self::call_func(code, SCANF_PLT);
         Self::movs_registers(code, Byte, Quad, Rsp, Rax);
         Self::addq_rsp(code);
 
@@ -842,7 +920,68 @@ impl CLibFunctions {
         //   ret
         Self::labelling(code, SYS_EXIT_LABEL);
         Self::set_up_stack(code);
-        Self::call_plt(code, SYS_EXIT_PLT);
+        Self::call_func(code, SYS_EXIT_PLT);
         Self::set_back_stack(code);
+    }
+
+    fn generate_sys_malloc(code: &mut GeneratedCode) {
+        Self::labelling(code, MALLOC_LABEL);
+        // pushq %rbp
+        // movq %rsp, %rbp
+        // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        // andq $-16, %rsp
+        Self::set_up_stack(code);
+        // call malloc@plt
+        Self::call_func(code, MALLOC_PLT);
+
+        // cmpq $0, %rax
+        code.lib_functions.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Cmp,
+                Scale::default(),
+                InstrOperand::Imm(0),
+                InstrOperand::Reg(RESULT_REG),
+            ),
+        )));
+
+        // je _errOutOfMemory
+        code.lib_functions
+            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                InstrType::Jump(Some(ConditionCode::EQ)),
+                InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OUT_OF_MEMORY)),
+            ))));
+
+        // movq %rbp, %rsp
+        // popq %rbp
+        // ret
+        Self::set_back_stack(code);
+    }
+
+    fn generate_out_of_memory_error(code: &mut GeneratedCode) {
+        // .section .rodata
+        // # length of .L._errOutOfMemory_str0
+        //     .int 27
+        //     .L._errOutOfMemory_str0:
+        // .asciz "fatal error: out of memory\n"
+        //     .text
+        // _errOutOfMemory:
+        Self::general_set_up(
+            code,
+            27,
+            OUT_OF_MEMORY_LABEL,
+            "fatal error: out of memory\n",
+            ERROR_LABEL_FOR_OUT_OF_MEMORY,
+        );
+        // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        // andq $-16, %rsp
+        Self::andq_rsp(code);
+        // leaq .L._errOutOfMemory_str0(%rip), %rdi
+        Self::leaq_rip_with_label(code, OUT_OF_MEMORY_LABEL, Rdi);
+        // call _prints
+        Self::call_func(code, PRINT_LABEL_FOR_STRING);
+        // movb $-1, %dil
+        Self::mov_immediate(code, Byte, -1, Rdi);
+        // call exit@plt
+        Self::call_func(code, SYS_EXIT_PLT);
     }
 }

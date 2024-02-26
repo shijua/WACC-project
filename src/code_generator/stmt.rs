@@ -7,7 +7,7 @@ use crate::code_generator::asm::Register::{Rbp, Rdi, Rsp};
 use crate::code_generator::asm::{
     get_next_register, AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode,
     Instr, InstrOperand, InstrType, MemoryReference, Register, Scale, UnaryInstruction,
-    UnaryNotScaled, RESULT_REG,
+    UnaryNotScaled, ARG_REGS, RESULT_REG,
 };
 use crate::code_generator::clib_functions::{
     PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_STRING, PRINT_LABEL_FOR_STRING_LINE,
@@ -473,4 +473,38 @@ impl Generator for PairElem {
     ) -> Self::Output {
         todo!()
     }
+}
+
+fn generate_malloc(code: &mut GeneratedCode, bytes: i32, reg: Register) {
+    // push rdi
+    code.codes.push(AsmLine::Instruction(Instr::UnaryInstr(
+        UnaryInstruction::new_unary(InstrType::Push, Scale::default(), Reg(ARG_REGS[0])),
+    )));
+
+    // movl bytes edi
+    code.codes.push(Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            Scale::Long,
+            Imm(bytes),
+            Reg(ARG_REGS[0]),
+        ),
+    )));
+
+    // call _malloc
+
+    // mov RESULT_REG reg
+    code.codes.push(Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            Scale::default(),
+            Reg(RESULT_REG),
+            Reg(reg),
+        ),
+    )));
+
+    // pop RDI
+    code.codes.push(AsmLine::Instruction(Instr::UnaryInstr(
+        UnaryInstruction::new_unary(InstrType::Pop, Scale::default(), Reg(ARG_REGS[0])),
+    )));
 }

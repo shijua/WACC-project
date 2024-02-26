@@ -1,9 +1,9 @@
+use crate::ast::Type;
 use crate::code_generator::def_libary::Directives;
 use lazy_static::lazy_static;
 use std::collections::HashSet;
 use std::fs::OpenOptions;
 use std::sync::Mutex;
-use crate::ast::Type;
 
 lazy_static! {
     static ref STR_LABEL: Mutex<usize> = Mutex::new(0);
@@ -16,7 +16,7 @@ lazy_static! {
 pub type Label = String;
 
 pub fn get_rbp_size(regs: &Vec<Register>) -> i32 {
-    match regs[regs.len()-1] {
+    match regs[regs.len() - 1] {
         Register::Stack(i) => -i,
         _ => 0,
     }
@@ -136,10 +136,11 @@ pub enum CLibFunctions {
     // DivideByZeroError,
     // ArrayBoundsError,
     // CheckNullPointer,
+    OutOfMemoryError,
 
     // FreePair -> Unsure
     // FreeArray -> Unsure
-    // Malloc -> Unsure
+    Malloc,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -363,7 +364,6 @@ pub enum Instr {
     // Pop(Scale, Register),
     // Neg(Scale, Register),
     // Call(String),
-
     UnaryControl(UnaryNotScaled),
     UnaryInstr(UnaryInstruction),
     BinaryInstr(BinaryInstruction),
