@@ -103,6 +103,9 @@ impl Display for InstrType {
                 Some(cond_code) => write!(f, "j{}", cond_code),
             },
             InstrType::Set(condition_code) => write!(f, "set{}", condition_code),
+            InstrType::IMul => write!(f, "imul"),
+            InstrType::Div => write!(f, "idiv"),
+
         }
     }
 }

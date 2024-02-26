@@ -1,4 +1,4 @@
-use crate::ast::{BinaryOperator, Expr, Ident, UnaryOperator};
+use crate::ast::{ArrayElem, ArrayLiter, BinaryOperator, Expr, Ident, UnaryOperator};
 use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
@@ -37,15 +37,8 @@ impl Generator for Expr {
                 let rhs_reg = rhs_exp.generate(scope, code, regs, ());
 
                 match op {
-                    BinaryOperator::Mul => {
-                        todo!()
-                    }
-                    BinaryOperator::Div => {
-                        todo!()
-                    }
-                    BinaryOperator::Modulo => {
-                        todo!()
-                    }
+
+                    // addl, jo _errOverflow, movslq
                     BinaryOperator::Add => {
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
@@ -55,8 +48,20 @@ impl Generator for Expr {
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
+                        // TODO: 1. check overflow
+                        // TODO: 2. movslq (currently movsl)
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::MovS,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
                         lhs_reg
                     }
+
+                    // subl, jo _errOverflow, movslq
                     BinaryOperator::Sub => {
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
@@ -66,8 +71,88 @@ impl Generator for Expr {
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
+                        // TODO: 1. check overflow
+                        // TODO: 2. movslq (currently movsl)
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::MovS,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
                         lhs_reg
                     }
+
+                    // imull, jo _errOverflow, movslq
+                    BinaryOperator::Mul => {
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::IMul,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        // TODO: 1. check overflow
+                        // TODO: 2. movslq (currently movsl)
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::MovS,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        lhs_reg
+                    }
+
+                    // cmpl, je _errDivZero, cltd, idivl
+                    BinaryOperator::Div => {
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Div,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        lhs_reg
+                    }
+
+                    // TODO: Checking divide by zero
+                    // TODO: Checking modulo process
+                    BinaryOperator::Modulo => {
+                        todo!()
+
+                        // // cmpq lhs rhs
+                        // code.codes.push(Instruction(BinaryInstr(
+                        //     BinaryInstruction::new_single_scale(
+                        //         InstrType::Cmp,
+                        //         Scale::default(),
+                        //         InstrOperand::Reg(rhs_reg),
+                        //         InstrOperand::Reg(lhs_reg),
+                        //     ),
+                        // )));
+                        // // sete %al
+                        // code.codes
+                        //     .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                        //         InstrType::Set(ConditionCode::EQ),
+                        //         InstrOperand::RegVariant(lhs_reg, Scale::Byte),
+                        //     ))));
+                        // // movsbq lhs
+                        // code.codes.push(Instruction(BinaryInstr(
+                        //     BinaryInstruction::new_double_scale(
+                        //         InstrType::MovS,
+                        //         Scale::Byte,
+                        //         InstrOperand::Reg(lhs_reg),
+                        //         Quad,
+                        //         InstrOperand::Reg(lhs_reg),
+                        //     ),
+                        // )));
+                        // lhs_reg
+                    }
+
                     BinaryOperator::Gt => {
                         todo!()
                     }
@@ -81,7 +166,6 @@ impl Generator for Expr {
                         todo!()
                     }
                     BinaryOperator::Eq => {
-                        // todo!()
                         // cmpq lhs rhs
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
@@ -95,22 +179,47 @@ impl Generator for Expr {
                         code.codes
                             .push(Instruction(UnaryControl(UnaryNotScaled::new(
                                 InstrType::Set(ConditionCode::EQ),
-                                InstrOperand::RegVariant(Register::lhs_reg, Scale::Byte),
+                                InstrOperand::RegVariant(lhs_reg, Scale::Byte),
                             ))));
                         // movsbq lhs
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
                                 Scale::Byte,
-                                InstrOperand::Reg(Register::lhs_reg),
-                                Scale::Quad,
-                                InstrOperand::Reg(Register::lhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                                Quad,
+                                InstrOperand::Reg(lhs_reg),
                             ),
                         )));
                         lhs_reg
                     }
                     BinaryOperator::Neq => {
-                        todo!()
+                        // cmpq lhs rhs
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Cmp,
+                                Scale::default(),
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        // sete %al
+                        code.codes
+                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                                InstrType::Set(ConditionCode::NEQ),
+                                InstrOperand::RegVariant(lhs_reg, Scale::Byte),
+                            ))));
+                        // movsbq lhs
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_double_scale(
+                                InstrType::MovS,
+                                Scale::Byte,
+                                InstrOperand::Reg(lhs_reg),
+                                Quad,
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        lhs_reg
                     }
                     BinaryOperator::And => {
                         todo!()
@@ -313,4 +422,23 @@ fn generate_string_liter(
         ),
     )));
     next_reg
+}
+
+
+impl Generator for ArrayElem {
+    type Input = ();
+    type Output = ();
+
+    fn generate(&self, scope: &mut ScopeTranslator, code: &mut GeneratedCode, regs: &mut Vec<Register>, aux: Self::Input) -> Self::Output {
+        todo!()
+    }
+}
+
+impl Generator for ArrayLiter {
+    type Input = ();
+    type Output = ();
+
+    fn generate(&self, scope: &mut ScopeTranslator, code: &mut GeneratedCode, regs: &mut Vec<Register>, aux: Self::Input) -> Self::Output {
+        todo!()
+    }
 }

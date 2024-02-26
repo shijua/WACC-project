@@ -1,4 +1,4 @@
-use crate::ast::{Expr, Ident, Lvalue, Rvalue, ScopedStmt, Stmt, Type};
+use crate::ast::{Expr, Ident, Lvalue, PairElem, Rvalue, ScopedStmt, Stmt, Type};
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
 use crate::code_generator::asm::InstrOperand::{Imm, Reg};
 use crate::code_generator::asm::InstrType::Jump;
@@ -14,6 +14,7 @@ use crate::code_generator::x86_generate::Generator;
 use crate::symbol_table::{Offset, ScopeTranslator};
 use crate::{new_spanned, Spanned};
 use std::process::exit;
+use chumsky::prelude::todo;
 
 impl Generator for ScopedStmt {
     type Input = ();
@@ -69,8 +70,8 @@ impl Generator for Lvalue {
                 scope.get_register(id).unwrap(),
                 aux.size(),
             ),
-            Lvalue::LArrElem(_) => todo!(),
-            Lvalue::LPairElem(_) => todo!(),
+            Lvalue::LArrElem(arr_elem) => {todo!()},
+            Lvalue::LPairElem(arr_elem) => {todo!()},
         }
     }
 }
@@ -88,13 +89,14 @@ impl Generator for Rvalue {
     ) -> Self::Output {
         match self {
             Rvalue::RExpr(boxed_expr) => boxed_expr.0.generate(scope, code, regs, aux),
-            Rvalue::RArrLit(_) => {todo!()}
-            Rvalue::RNewPair(_, _) => {todo!()}
-            Rvalue::RPairElem(_) => {todo!()}
-            Rvalue::RCall(_, _) => {todo!()}
+            Rvalue::RArrLit(boxed_arrlit) => {todo!()},
+            Rvalue::RNewPair(boxed_pair1, boxed_pair2) => {todo!()},
+            Rvalue::RPairElem(_) => {todo!()},
+            Rvalue::RCall(_, _) => {todo!()},
+            }
         }
     }
-}
+
 
 impl Generator for Stmt {
     type Input = ();
@@ -193,7 +195,7 @@ impl Stmt {
             _ => todo!(),
         };
         code.codes
-            .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new_unary(
+            .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
                 InstrType::Call,
                 InstrOperand::LabelRef(String::from(print_label)),
             ))));
@@ -448,5 +450,14 @@ impl Stmt {
         code.codes.push(AsmLine::Instruction(Instr::UnaryInstr(
             UnaryInstruction::new_unary(InstrType::Pop, Scale::default(), Reg(Rbp)),
         )));
+    }
+}
+
+impl Generator for PairElem {
+    type Input = ();
+    type Output = ();
+
+    fn generate(&self, scope: &mut ScopeTranslator, code: &mut GeneratedCode, regs: &mut Vec<Register>, aux: Self::Input) -> Self::Output {
+        todo!()
     }
 }

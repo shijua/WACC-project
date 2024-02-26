@@ -278,6 +278,8 @@ pub enum InstrType {
     Ret,
     Jump(Option<ConditionCode>),
     Set(ConditionCode),
+    IMul,
+    Div,
 }
 
 #[derive(PartialEq, Debug, Clone)]
