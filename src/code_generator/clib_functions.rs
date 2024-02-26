@@ -1,10 +1,8 @@
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
 use crate::code_generator::asm::Register::*;
 use crate::code_generator::asm::Scale::{Byte, Long, Quad};
-use crate::code_generator::asm::{
-    AsmLine, BinaryInstruction, CLibFunctions, GeneratedCode, Instr, InstrOperand, InstrType,
-    MemoryReference, MemoryReferenceImmediate, Register, Scale, UnaryInstruction,
-};
+use crate::code_generator::asm::{AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, MemoryReferenceImmediate, Register, Scale, UnaryInstruction, UnaryNotScaled};
+use crate::code_generator::asm::Instr::UnaryControl;
 use crate::code_generator::def_libary::{Directives, FormatLabel};
 use crate::code_generator::x86_generate::Generator;
 use crate::symbol_table::ScopeTranslator;
@@ -21,6 +19,13 @@ pub const PRINT_LABEL_FOR_INT: &str = "_printi";
 pub const PRINT_CHAR_LABEL: &str = ".L._printc_str0";
 pub const PRINT_LABEL_FOR_CHAR: &str = "_printc";
 
+pub const PRINT_BOOL_LABEL_0: &str = ".L._printb_str0";
+pub const PRINT_BOOL_LABEL_1: &str = ".L._printb_str1";
+pub const PRINT_BOOL_LABEL_2: &str = ".L._printb_str2";
+pub const PRINT_LABEL_FOR_BOOL: &str = "_printb";
+pub const PRINT_LABEL_FOR_BOOL_0: &str = ".L_printb0";
+pub const PRINT_LABEL_FOR_BOOL_1: &str = ".L_printb1";
+
 pub const READ_INT_LABEL: &str = ".L._readi_str0";
 pub const READ_LABEL_FOR_INT: &str = "_readi";
 
@@ -34,6 +39,8 @@ pub const CONTENT_STRING_LITERAL: &str = "%.*s";
 pub const CONTENT_INT_LITERAL: &str = "%d";
 pub const CONTENT_EMPTY: &str = "";
 pub const CONTENT_CHAR_LITERAL: &str = "%c";
+pub const CONTENT_BOOL_LITERAL_TRUE: &str = "true";
+pub const CONTENT_BOOL_LITERAL_FALSE: &str = "false";
 
 pub const PRINTF_PLT: &str = "printf@plt";
 pub const PUTS_PLT: &str = "puts@plt";
@@ -69,9 +76,18 @@ impl Generator for CLibFunctions {
                 Self::generate_print_char(code);
             }
 
+            CLibFunctions::PrintBool => {
+                Self::generate_print_bool(code);
+            }
+
             CLibFunctions::ReadInt => {
                 Self::generate_read_int(code);
             }
+
+            // CLibFunctions::ReadChar => {
+            //     Self::generate_read_char(code);
+            // }
+
             CLibFunctions::SystemExit => {
                 Self::generate_sys_exit(code);
             }
@@ -137,8 +153,8 @@ impl CLibFunctions {
             .push(Directive(Directives::IntLabel(length as usize)));
     }
 
-    // .L._prints_str0:
-    fn print_string_label(code: &mut GeneratedCode, label: &str) {
+    // .L._print{}_str0:
+    fn print_label(code: &mut GeneratedCode, label: &str) {
         code.lib_functions
             .push(Directive(Directives::Label(String::from(label))));
     }
@@ -243,6 +259,23 @@ impl CLibFunctions {
                     InstrOperand::Reg(Rdx),
                 ),
             )));
+    }
+
+    // movl <offset>(%reg1) %reg2
+    fn movl_offset_on_reg(code: &mut GeneratedCode, offset: i32, reg1: Register, reg2: Register) {
+        code.lib_functions.push(Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Long,
+                InstrOperand::Reference(MemoryReference::new(
+                    Some(MemoryReferenceImmediate::OffsetImm(offset)),
+                    Some(reg1),
+                    None,
+                    None,
+                )),
+                InstrOperand::Reg(reg2),
+            ),
+        )));
     }
 
     // movl -4(%rdi), %esi
@@ -393,6 +426,24 @@ impl CLibFunctions {
        ==========================================================
     */
 
+    // leaq <label>(%rip), %reg
+    fn leaq_rip(code: &mut GeneratedCode, label: &str, reg: Register) {
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Lea,
+                    Quad,
+                    InstrOperand::Reference(MemoryReference::new(
+                        Some(MemoryReferenceImmediate::LabelledImm(String::from(label))),
+                        Some(Rip),
+                        None,
+                        None,
+                    )),
+                    InstrOperand::Reg(reg),
+                ),
+            )));
+    }
+
     // leaq <string>(%rip), %rdi
     fn leaq_rdi_rip(code: &mut GeneratedCode, string: &str) {
         // code.lib_functions.push(Instruction(Instr::Lea(
@@ -456,24 +507,6 @@ impl CLibFunctions {
             ))));
     }
 
-    // call printf@plt
-    // fn call_printf(code: &mut GeneratedCode) {
-    //     code.lib_functions
-    //         .push(Instruction(Instr::Call(String::from(PRINTF_PLT))));
-    // }
-
-    // call fflush@plt
-    // fn call_fflush(code: &mut GeneratedCode) {
-    //     code.lib_functions
-    //         .push(Instruction(Instr::Call(String::from(F_FLUSH_PLT))));
-    // }
-
-    // call scanf@plt
-    // fn call_scanf(code: &mut GeneratedCode) {
-    //     code.lib_functions
-    //         .push(Instruction(Instr::Call(String::from(SCANF_PLT))));
-    // }
-
     /*
        ==========================================================
                                  Pop
@@ -529,7 +562,7 @@ impl CLibFunctions {
                                   Sub
         ==========================================================
     */
-
+    // subq $16, %rsp
     fn subq_rsp(code: &mut GeneratedCode) {
         // code.lib_functions.push(Instruction(Instr::Sub(
         //     Scale::default(),
@@ -543,6 +576,56 @@ impl CLibFunctions {
                     Scale::default(),
                     InstrOperand::Imm(16),
                     InstrOperand::Reg(Rsp),
+                ),
+            )));
+    }
+
+    /*
+        ==========================================================
+                                  Cmp
+        ==========================================================
+    */
+    // cmpb $0, %dil
+    fn cmpb_rdx(code: &mut GeneratedCode) {
+        // code.lib_functions.push(Instruction(Instr::Sub(
+        //     Scale::default(),
+        //     InstrOperand::Imm(16),
+        //     InstrOperand::Reg(Rsp),
+        // )));
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Cmp,
+                    Scale::Byte,
+                    InstrOperand::Imm(0),
+                    InstrOperand::Reg(Rdx),
+                ),
+            )));
+    }
+
+    /*
+        ==========================================================
+                                  Jump
+        ==========================================================
+    */
+    // jmp .L_printb1
+    fn jmp(code: &mut GeneratedCode) {
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::UnaryControl(
+                UnaryNotScaled::new(
+                    InstrType::Jump(Some(ConditionCode::EQ)),
+                    InstrOperand::LabelRef(PRINT_LABEL_FOR_BOOL_1.parse().unwrap()),
+                ),
+            )));
+    }
+
+    // jne .L_printb0
+    fn jne(code: &mut GeneratedCode) {
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::UnaryControl(
+                UnaryNotScaled::new(
+                    InstrType::Jump(Some(ConditionCode::NEQ)),
+                    InstrOperand::LabelRef(PRINT_LABEL_FOR_BOOL_0.parse().unwrap()),
                 ),
             )));
     }
@@ -566,7 +649,7 @@ impl CLibFunctions {
 
     /*
         ==========================================================
-                            Print Before Structure
+                            Print After Structure
         ==========================================================
     */
     fn print_after_structure(code: &mut GeneratedCode) {
@@ -618,10 +701,10 @@ impl CLibFunctions {
 
         Self::read_only_strings(code);
         Self::length_of_formatter_string(code, 4);
-        Self::print_string_label(code, PRINT_STRING_LABEL);
+        Self::print_label(code, PRINT_STRING_LABEL);
         Self::print_ascii_string(code, CONTENT_STRING_LITERAL);
         Self::assembler_text(code);
-        Self::print_string_label(code, PRINT_LABEL_FOR_STRING);
+        Self::print_label(code, PRINT_LABEL_FOR_STRING);
 
         Self::print_before_structure(code);
 
@@ -651,10 +734,10 @@ impl CLibFunctions {
         // _println:
         Self::read_only_strings(code);
         Self::length_of_formatter_string(code, 0);
-        Self::print_string_label(code, PRINT_STRING_LINE_LABEL);
+        Self::print_label(code, PRINT_STRING_LINE_LABEL);
         Self::print_ascii_string(code, CONTENT_EMPTY);
         Self::assembler_text(code);
-        Self::print_string_label(code, PRINT_LABEL_FOR_STRING_LINE);
+        Self::print_label(code, PRINT_LABEL_FOR_STRING_LINE);
 
         Self::print_before_structure(code);
 
@@ -683,10 +766,10 @@ impl CLibFunctions {
         // _printi:
         Self::read_only_strings(code);
         Self::length_of_formatter_string(code, 2);
-        Self::print_string_label(code, PRINT_INT_LABEL);
+        Self::print_label(code, PRINT_INT_LABEL);
         Self::print_ascii_string(code, CONTENT_INT_LITERAL);
         Self::assembler_text(code);
-        Self::print_string_label(code, PRINT_LABEL_FOR_INT);
+        Self::print_label(code, PRINT_LABEL_FOR_INT);
 
         Self::print_before_structure(code);
 
@@ -720,10 +803,10 @@ impl CLibFunctions {
         // _printc:
         Self::read_only_strings(code);
         Self::length_of_formatter_string(code, 2);
-        Self::print_string_label(code, PRINT_CHAR_LABEL);
+        Self::print_label(code, PRINT_CHAR_LABEL);
         Self::print_ascii_string(code, CONTENT_CHAR_LITERAL);
         Self::assembler_text(code);
-        Self::print_string_label(code, PRINT_LABEL_FOR_CHAR);
+        Self::print_label(code, PRINT_LABEL_FOR_CHAR);
 
         Self::print_before_structure(code);
 
@@ -735,6 +818,74 @@ impl CLibFunctions {
         Self::mov_registers(code, Byte, Rdi, Rsi);
         Self::leaq_rdi_rip(code, PRINT_CHAR_LABEL);
         Self::mov_offset(code, Byte, 0, Rax);
+        Self::call_plt(code, PRINTF_PLT);
+
+        Self::print_after_structure(code);
+    }
+
+    /*
+       ==========================================================
+                           Generate Print Bool
+       ==========================================================
+    */
+    fn generate_print_bool(code: &mut GeneratedCode) {
+        // .section .rodata
+        // # length of .L._printb_str0
+        //   .int 5
+        // .L._printb_str0:
+        //   .asciz "false"
+        // # length of .L._printb_str1
+        //   .int 4
+        // .L._printb_str1:
+        //   .asciz "true"
+        // # length of .L._printb_str2
+        //   .int 4
+        // .L._printb_str2:
+        //   .asciz "%.*s"
+        // .text
+        // _printb:
+        Self::read_only_strings(code);
+        Self::length_of_formatter_string(code, 5);
+        Self::print_label(code, PRINT_BOOL_LABEL_0);
+        Self::print_ascii_string(code, CONTENT_BOOL_LITERAL_FALSE);
+        Self::length_of_formatter_string(code, 4);
+
+        Self::print_label(code, PRINT_BOOL_LABEL_1);
+        Self::print_ascii_string(code, CONTENT_BOOL_LITERAL_TRUE);
+        Self::length_of_formatter_string(code, 4);
+
+        Self::print_label(code, PRINT_BOOL_LABEL_2);
+        Self::print_ascii_string(code, CONTENT_STRING_LITERAL);
+
+        Self::assembler_text(code);
+        Self::print_label(code, PRINT_LABEL_FOR_BOOL);
+
+        Self::print_before_structure(code);
+
+        //   cmpb $0, %dil
+        //   jne .L_printb0
+        //   leaq .L._printb_str0(%rip), %rdx
+        //   jmp .L_printb1
+        // .L_printb0:
+        //   leaq .L._printb_str1(%rip), %rdx
+        // .L_printb1:
+        //   movl -4(%rdx), %esi
+        //   leaq .L._printb_str2(%rip), %rdi
+        //   # on x86, al represents the number of SIMD registers used as variadic arguments
+        //   movb $0, %al
+        //   call printf@plt
+        Self::cmpb_rdx(code);
+        Self::jne(code);
+        Self::leaq_rip(code, PRINT_BOOL_LABEL_0, Rdx);
+        Self::jmp(code);
+
+        Self::print_label(code, PRINT_LABEL_FOR_BOOL_0);
+        Self::leaq_rip(code, PRINT_BOOL_LABEL_1, Rdx);
+
+        Self::print_label(code, PRINT_LABEL_FOR_BOOL_1);
+        Self::movl_offset_on_reg(code, -4, Rdx, Rsi);
+        Self::leaq_rip(code, PRINT_BOOL_LABEL_2, Rdi);
+        Self::movb_rax(code, 0);
         Self::call_plt(code, PRINTF_PLT);
 
         Self::print_after_structure(code);
@@ -756,7 +907,7 @@ impl CLibFunctions {
         Self::length_of_formatter_string(code, 2);
 
         // .L._readi_str0:
-        Self::print_string_label(code, READ_INT_LABEL);
+        Self::print_label(code, READ_INT_LABEL);
 
         // .asciz "%d"
         Self::print_ascii_string(code, CONTENT_INT_LITERAL);
@@ -828,7 +979,7 @@ impl CLibFunctions {
         Self::length_of_formatter_string(code, 2);
 
         // .L._readc_str0:
-        Self::print_string_label(code, READ_CHAR_LABEL);
+        Self::print_label(code, READ_CHAR_LABEL);
 
         // .asciz "%c"
         Self::print_ascii_string(code, CONTENT_CHAR_LITERAL);
