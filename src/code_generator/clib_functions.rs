@@ -47,10 +47,10 @@ impl Generator for CLibFunctions {
 
     fn generate(
         &self,
-        _scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
-        _regs: &mut Vec<Register>,
-        _aux: Self::Input,
+        regs: &mut Vec<Register>,
+        aux: Self::Input,
     ) -> Self::Output {
         match self {
             CLibFunctions::PrintString => {

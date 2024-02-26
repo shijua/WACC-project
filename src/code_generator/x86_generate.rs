@@ -14,7 +14,7 @@ pub trait Generator: Debug {
 
     fn generate(
         &self,
-        _scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: Self::Input,
@@ -25,14 +25,14 @@ pub fn gen_x86_for_program(ast: &Program) -> GeneratedCode {
     let mut asm = GeneratedCode::default();
 
     let base_symbol_table = SymbolTable::default();
-    let base_scope = ScopeTranslator::new(&base_symbol_table);
+    let mut base_scope = ScopeTranslator::new(&base_symbol_table);
     // ast.generate(&mut asm);
     let mut regs: Vec<Register> = GENERAL_REGS.iter().cloned().collect();
 
-    ast.generate(&base_scope, &mut asm, &mut regs, ());
+    ast.generate(&mut base_scope, &mut asm, &mut regs, ());
     asm.required_clib
         .clone()
         .iter()
-        .for_each(|clib_func| clib_func.generate(&base_scope, &mut asm, &mut regs, ()));
+        .for_each(|clib_func| clib_func.generate(&mut base_scope, &mut asm, &mut regs, ()));
     asm
 }

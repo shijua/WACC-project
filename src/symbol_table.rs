@@ -41,7 +41,7 @@ impl ScopeInfo<'_> {
     pub fn get_type(&self, ident: &Ident) -> Option<(&Type, Ident)> {
         match self.symbol_table.table.get(ident) {
             /* Identifier declared in this scope, return. */
-            Some((t, offset)) => {
+            Some((t, register)) => {
                 let new_id = format!("{}", self.symbol_table.prefix);
                 Some((t, new_id))
             }
@@ -159,9 +159,39 @@ impl ScopeTranslator<'_> {
         }
     }
 
+    pub fn add(&mut self, ident: &Ident, type_: Type, reg: Register) -> MessageResult<Ident> {
+        // increase the space needed by the stack frame by the size of the given type
+        self.symbol_table.size += type_.size();
+
+        match self
+            .symbol_table
+            .table
+            .insert(ident.clone(), (type_, Some(reg)))
+        {
+            // not allowing duplicated definition
+            Some(_) => Err("This identifier already exist.".to_string()),
+            // allow first time usage, including renaming
+            None => Ok(format!("{}", self.symbol_table.prefix)),
+        }
+    }
+
+    // pub fn update_register<'a>(&'a mut self, ident: &Ident, reg: Register) -> Option<(Type, Option<Register>)> {
+    //     match self.symbol_table.table.get(ident) {
+    //         Some(_) => {
+    //             // self.symbol_table.table.get_mut(ident).map(|x| x.1 = Some(reg))
+    //             self.symbol_table.table.remove(ident);
+    //             // TODO
+    //             self.symbol_table.table.insert(ident.clone(), (Type::IntType, Some(reg)))
+    //         },
+    //         None => {
+    //             self.parent?.update_register(ident, reg)
+    //         },
+    //     }
+    // }
+
     // check the type of tb bottom element of the table
     pub fn get_bottom(&self, ident: &Ident) -> Option<&Type> {
-        match self.parent {
+        match &self.parent {
             Some(parent) => parent.get_bottom(ident),
             None => Some(&self.symbol_table.table.get(ident)?.0),
         }
@@ -178,7 +208,7 @@ impl ScopeTranslator<'_> {
     //     }
     // }
 
-    pub fn make_scope<'a>(&'a self, symbol_table: &'a SymbolTable) -> ScopeTranslator<'a> {
+    pub fn make_scope<'a>(&'a mut self, symbol_table: &'a SymbolTable) -> ScopeTranslator<'a> {
         let mut st = ScopeTranslator::new(symbol_table);
 
         /* The parent of the returned scope is the caller. */

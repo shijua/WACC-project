@@ -79,7 +79,7 @@ pub enum Register {
 }
 
 const ARG_REGS_N: usize = 6;
-const REGS_N: usize = 7;
+const REGS_N: usize = 10;
 
 pub const RESULT_REG: Register = Register::Rax;
 
@@ -97,13 +97,16 @@ pub const ARG_REGS: [Register; ARG_REGS_N] = [
 // const ARG_REGS32: [&str; ARG_REGS_N] = ["edi", "esi", "edx", "ecx", "r8d", "r9d"];
 
 pub const GENERAL_REGS: [Register; REGS_N] = [
-    Register::R10,
-    Register::R11,
-    Register::Rbx,
     Register::R12,
     Register::R13,
     Register::R14,
     Register::R15,
+    Register::Rcx,
+    Register::Rdx,
+    Register::Rsi,
+    Register::Rdi,
+    Register::R8,
+    Register::R9,
 ];
 // const REGS8: [&str; REGS_N] = ["r10b", "r11b", "bl", "r12b", "r13b", "r14b", "r15b"];
 // const REGS32: [&str; REGS_N] = ["r10d", "r11d", "ebx", "r12d", "r13d", "r14d", "r15d"];

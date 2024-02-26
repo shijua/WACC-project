@@ -17,12 +17,12 @@ impl Generator for Function {
 
     fn generate(
         &self,
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
-        is_main: bool,
+        aux: Self::Input,
     ) -> Self::Output {
-        let function_label_string = match is_main {
+        let function_label_string = match aux {
             true => String::from("main"),
             false => format!("wacc_function_{}", self.ident.clone().0),
         };
@@ -49,6 +49,7 @@ impl Generator for Function {
         )));
 
         // allocate stack frame
+        // TODO value is wrong currently. Need to calculate the size of the stack frame
         let body_allocated_size = self.body_symbol_table.size;
         code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
@@ -60,15 +61,15 @@ impl Generator for Function {
         )));
 
         // process parameter scope
-        let scope = &scope.make_scope(&self.param_symbol_table);
+        let mut scope = scope.make_scope(&self.param_symbol_table);
 
-        let scope = &scope.make_scope(&self.body_symbol_table);
+        let mut scope = scope.make_scope(&self.body_symbol_table);
 
         // make body statements
-        self.body.0.generate(scope, code, regs, ());
+        self.body.0.generate(&mut scope, code, regs, ());
 
         // main function will exit by exit-code 0, (or does it involve manipulating exit?)
-        if is_main {
+        if aux {
             // deallocate stack for main function
             code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
@@ -108,10 +109,10 @@ impl Generator for Program {
 
     fn generate(
         &self,
-        _scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
-        _aux: Self::Input,
+        aux: Self::Input,
     ) -> Self::Output {
         // todo: text directive and global main
         // push global main directive
@@ -122,7 +123,7 @@ impl Generator for Program {
         code.pre_defined
             .push(AsmLine::Directive(Directives::ReadOnlyStrings));
 
-        let scope = &ScopeTranslator::new(&self.symbol_table);
+        let mut scope = ScopeTranslator::new(&self.symbol_table);
 
         // todo: generate assembly for the functions
 
@@ -137,6 +138,6 @@ impl Generator for Program {
             param_symbol_table: Default::default(),
             body_symbol_table: self.body.symbol_table.clone(),
         }
-        .generate(scope, code, regs, true);
+        .generate(&mut scope, code, regs, true);
     }
 }

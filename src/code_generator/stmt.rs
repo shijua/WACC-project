@@ -21,7 +21,7 @@ impl Generator for ScopedStmt {
 
     fn generate(
         &self,
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: Self::Input,
@@ -38,9 +38,9 @@ impl Generator for ScopedStmt {
         )));
 
         // enter the new scope
-        let scope = scope.make_scope(&self.symbol_table);
+        let mut scope = scope.make_scope(&self.symbol_table);
 
-        self.stmt.0.generate(&scope, code, regs, aux);
+        self.stmt.0.generate(&mut scope, code, regs, aux);
 
         code.codes.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
@@ -59,16 +59,16 @@ impl Generator for Lvalue {
 
     fn generate(
         &self,
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
-        t: Type,
+        aux: Self::Input,
     ) -> Self::Output {
         match self {
             Lvalue::LIdent((id, _)) => (
                 Rsp,
                 scope.get_register(id).unwrap(),
-                Scale::from_size(t.size()),
+                Scale::from_size(aux.size()),
             ),
             Lvalue::LArrElem(_) => todo!(),
             Lvalue::LPairElem(_) => todo!(),
@@ -82,7 +82,7 @@ impl Generator for Rvalue {
 
     fn generate(
         &self,
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: Self::Input,
@@ -103,7 +103,7 @@ impl Generator for Stmt {
 
     fn generate(
         &self,
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: Self::Input,
@@ -157,7 +157,7 @@ impl Generator for Stmt {
 
 impl Stmt {
     fn generate_stmt_print(
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: (),
@@ -202,7 +202,7 @@ impl Stmt {
     }
 
     fn generate_stmt_if(
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: (),
@@ -254,7 +254,7 @@ impl Stmt {
     }
 
     fn generate_stmt_assign(
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: (),
@@ -279,7 +279,7 @@ impl Stmt {
     }
 
     fn generate_stmt_declare(
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: (),
@@ -297,6 +297,7 @@ impl Stmt {
         // .generate(scope, code, regs, aux);
         // symboltable
         let res = rvalue.0.generate(scope, code, regs, aux);
+        let sto = get_next_register(regs, type_.size());
         let scale = Scale::from_size(type_.size());
         code.codes.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
@@ -311,13 +312,14 @@ impl Stmt {
                 InstrType::Mov,
                 scale.clone(),
                 Reg(Register::Rax),
-                Reg(get_next_register(regs, type_.size())),
+                Reg(sto),
             ),
         )));
+        scope.add(lvalue_, type_.clone(), sto);
     }
 
     fn generate_stmt_serial(
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: (),
@@ -329,7 +331,7 @@ impl Stmt {
     }
 
     fn generate_stmt_exit(
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         exit_val: &Expr,
@@ -370,7 +372,7 @@ impl Stmt {
     }
 
     fn generate_stmt_while(
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: (),
@@ -414,7 +416,7 @@ impl Stmt {
     }
 
     fn generate_stmt_return(
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: (),

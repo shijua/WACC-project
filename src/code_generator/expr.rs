@@ -14,7 +14,7 @@ impl Generator for Expr {
 
     fn generate(
         &self,
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: Self::Input,
@@ -28,56 +28,44 @@ impl Generator for Expr {
                 Self::generate_unary_app(scope, code, regs, aux, op, inner)
             }
             Expr::BinaryApp(boxed_lhs, op, boxed_rhs) => {
-                assert!(regs.len() >= 2);
-
                 let lhs_exp = &boxed_lhs.0;
                 let rhs_exp = &boxed_rhs.0;
+                let lhs_reg = lhs_exp.generate(scope, code, regs, ());
+                let rhs_reg = rhs_exp.generate(scope, code, regs, ());
 
-                // lhs_exp.generate(scope, code, regs, aux);
-
-                if regs.len() > 2 {
-                    // rhs_exp.generate(scope, code, &regs[1..], aux);
-                    // todo: generate Binary App
-
-                    let dst_reg = regs[0];
-                    let exp1_reg = regs[0];
-                    let exp2_reg = regs[1];
-
-                    match op {
-                        BinaryOperator::Mul => {todo!()}
-                        BinaryOperator::Div => {todo!()}
-                        BinaryOperator::Modulo => {todo!()}
-                        BinaryOperator::Add => {todo!()}
-                        BinaryOperator::Sub => {todo!()}
-                        BinaryOperator::Gt => {todo!()}
-                        BinaryOperator::Gte => {todo!()}
-                        BinaryOperator::Lt => {todo!()}
-                        BinaryOperator::Lte => {todo!()}
-                        BinaryOperator::Eq => {todo!()}
-                        BinaryOperator::Neq => {todo!()}
-                        BinaryOperator::And => {todo!()}
-                        BinaryOperator::Or => {todo!()
-                            // code.codes.push(Instruction(Instr::BinaryInstr(
-                            //     BinaryInstruction::new_single_scale(
-                            //         InstrType::Or,
-                            //         Scale::default(),
-                            //         InstrOperand::Reg(exp2_reg),
-                            //         InstrOperand::Reg(dst_reg),
-                            //     ),
-                            // )));
-                        }
+                match op {
+                    BinaryOperator::Mul => {todo!()}
+                    BinaryOperator::Div => {todo!()}
+                    BinaryOperator::Modulo => {todo!()}
+                    BinaryOperator::Add => {
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Add,
+                                Scale::default(),
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        lhs_reg
                     }
-                } else {
-                    // push value of regs[0] so this register could be used again
-                    // code.codes
-                    //     .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-                    //         InstrType::Push,
-                    //         Scale::default(),
-                    //         InstrOperand::Reg(regs[0]),
-                    //     ))))
-
-                    // as the push instruction may
-                    todo!()
+                    BinaryOperator::Sub => {todo!()}
+                    BinaryOperator::Gt => {todo!()}
+                    BinaryOperator::Gte => {todo!()}
+                    BinaryOperator::Lt => {todo!()}
+                    BinaryOperator::Lte => {todo!()}
+                    BinaryOperator::Eq => {todo!()}
+                    BinaryOperator::Neq => {todo!()}
+                    BinaryOperator::And => {todo!()}
+                    BinaryOperator::Or => {todo!()
+                        // code.codes.push(Instruction(Instr::BinaryInstr(
+                        //     BinaryInstruction::new_single_scale(
+                        //         InstrType::Or,
+                        //         Scale::default(),
+                        //         InstrOperand::Reg(exp2_reg),
+                        //         InstrOperand::Reg(dst_reg),
+                        //     ),
+                        // )));
+                    }
                 }
             }
             Expr::PairLiter => {todo!()}
@@ -91,7 +79,7 @@ impl Generator for Expr {
 
 impl Expr {
     fn generate_unary_app(
-        scope: &ScopeTranslator,
+        scope: &mut ScopeTranslator,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: (),
