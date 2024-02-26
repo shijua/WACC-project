@@ -437,9 +437,8 @@ impl CLibFunctions {
     // call <plt_label>
     fn call_plt(code: &mut GeneratedCode, plt_label: &str) {
         code.lib_functions
-            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+            .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
                 InstrType::Call,
-                Scale::default(),
                 InstrOperand::LabelRef(String::from(plt_label)),
             ))));
     }
