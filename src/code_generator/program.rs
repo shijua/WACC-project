@@ -19,7 +19,7 @@ impl Generator for Function {
         &self,
         scope: &ScopeTranslator,
         code: &mut GeneratedCode,
-        regs: &[Register],
+        regs: &mut Vec<Register>,
         is_main: bool,
     ) -> Self::Output {
         let function_label_string = match is_main {
@@ -110,7 +110,7 @@ impl Generator for Program {
         &self,
         _scope: &ScopeTranslator,
         code: &mut GeneratedCode,
-        regs: &[Register],
+        regs: &mut Vec<Register>,
         _aux: Self::Input,
     ) -> Self::Output {
         // todo: text directive and global main

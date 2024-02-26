@@ -4,10 +4,7 @@ use crate::code_generator::asm::InstrOperand::{Imm, Reg};
 use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rbp, Rdi, Rsp};
-use crate::code_generator::asm::{
-    AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand,
-    InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, RESULT_REG,
-};
+use crate::code_generator::asm::{AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, RESULT_REG, get_next_register};
 use crate::code_generator::clib_functions::{
     PRINTLN_LABEL, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_STRING,
     SYS_EXIT_LABEL,
@@ -26,7 +23,7 @@ impl Generator for ScopedStmt {
         &self,
         scope: &ScopeTranslator,
         code: &mut GeneratedCode,
-        regs: &[Register],
+        regs: &mut Vec<Register>,
         aux: Self::Input,
     ) -> Self::Output {
         // Allocate relevant space onto the stack for new variables declared within the scope
@@ -58,19 +55,19 @@ impl Generator for ScopedStmt {
 
 impl Generator for Lvalue {
     type Input = Type;
-    type Output = (Register, Offset, Scale);
+    type Output = (Register, Register, Scale);
 
     fn generate(
         &self,
         scope: &ScopeTranslator,
         code: &mut GeneratedCode,
-        regs: &[Register],
+        regs: &mut Vec<Register>,
         t: Type,
     ) -> Self::Output {
         match self {
             Lvalue::LIdent((id, _)) => (
                 Rsp,
-                scope.get_offset(id).unwrap(),
+                scope.get_register(id).unwrap(),
                 Scale::from_size(t.size()),
             ),
             Lvalue::LArrElem(_) => todo!(),
@@ -81,21 +78,21 @@ impl Generator for Lvalue {
 
 impl Generator for Rvalue {
     type Input = ();
-    type Output = ();
+    type Output = Register;
 
     fn generate(
         &self,
         scope: &ScopeTranslator,
         code: &mut GeneratedCode,
-        regs: &[Register],
+        regs: &mut Vec<Register>,
         aux: Self::Input,
     ) -> Self::Output {
         match self {
             Rvalue::RExpr(boxed_expr) => boxed_expr.0.generate(scope, code, regs, aux),
-            Rvalue::RArrLit(_) => {}
-            Rvalue::RNewPair(_, _) => {}
-            Rvalue::RPairElem(_) => {}
-            Rvalue::RCall(_, _) => {}
+            Rvalue::RArrLit(_) => {todo!()}
+            Rvalue::RNewPair(_, _) => {todo!()}
+            Rvalue::RPairElem(_) => {todo!()}
+            Rvalue::RCall(_, _) => {todo!()}
         }
     }
 }
@@ -108,7 +105,7 @@ impl Generator for Stmt {
         &self,
         scope: &ScopeTranslator,
         code: &mut GeneratedCode,
-        regs: &[Register],
+        regs: &mut Vec<Register>,
         aux: Self::Input,
     ) -> Self::Output {
         match self {
@@ -139,7 +136,7 @@ impl Generator for Stmt {
                 Self::generate_stmt_declare(scope, code, regs, aux, type_, lvalue_, rvalue);
             }
             Stmt::Assign(type_, (lvalue, _), (rvalue, _)) => {
-                Self::generate_stmt_assign(scope, code, &regs, aux, type_, lvalue, rvalue);
+                Self::generate_stmt_assign(scope, code, regs, aux, type_, lvalue, rvalue);
             }
             Stmt::If((cond, _), st1, st2) => {
                 Self::generate_stmt_if(scope, code, regs, aux, cond, st1, st2)
@@ -162,7 +159,7 @@ impl Stmt {
     fn generate_stmt_print(
         scope: &ScopeTranslator,
         code: &mut GeneratedCode,
-        regs: &[Register],
+        regs: &mut Vec<Register>,
         aux: (),
         print_type: &Type,
         exp: &Expr,
@@ -207,7 +204,7 @@ impl Stmt {
     fn generate_stmt_if(
         scope: &ScopeTranslator,
         code: &mut GeneratedCode,
-        regs: &[Register],
+        regs: &mut Vec<Register>,
         aux: (),
         cond: &Expr,
         st1: &ScopedStmt,
@@ -259,7 +256,7 @@ impl Stmt {
     fn generate_stmt_assign(
         scope: &ScopeTranslator,
         code: &mut GeneratedCode,
-        regs: &&[Register],
+        regs: &mut Vec<Register>,
         aux: (),
         type_: &Type,
         lvalue: &Lvalue,
@@ -269,19 +266,14 @@ impl Stmt {
         rvalue.generate(scope, code, regs, aux);
 
         // store value in regs[0] to that of lvalue
-        let (target_reg, offset, scale) = lvalue.generate(scope, code, &regs[1..], type_.clone());
+        let (target_reg, src_reg, scale) = lvalue.generate(scope, code, regs, type_.clone());
 
         code.codes.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
                 InstrType::Mov,
                 scale,
                 Reg(regs[0]),
-                InstrOperand::Reference(MemoryReference {
-                    imm: Some(OffsetImm(offset)),
-                    base_reg: Some(target_reg),
-                    shift_unit_reg: None,
-                    shift_cnt: None,
-                }),
+                todo!()
             ),
         )));
     }
@@ -289,7 +281,7 @@ impl Stmt {
     fn generate_stmt_declare(
         scope: &ScopeTranslator,
         code: &mut GeneratedCode,
-        regs: &[Register],
+        regs: &mut Vec<Register>,
         aux: (),
         type_: &Type,
         lvalue_: &Ident,
@@ -297,18 +289,37 @@ impl Stmt {
     ) {
         // a declare statement is equivalent to an assign statement with Lvalue type LIdent
         // its stack space must have already been allocated.
-        Stmt::Assign(
-            type_.clone(),
-            new_spanned(Lvalue::LIdent(new_spanned(lvalue_.clone()))),
-            rvalue.clone(),
-        )
-        .generate(scope, code, regs, aux);
+        // Stmt::Assign(
+        //     type_.clone(),
+        //     new_spanned(Lvalue::LIdent(new_spanned(lvalue_.clone()))),
+        //     rvalue.clone(),
+        // )
+        // .generate(scope, code, regs, aux);
+        // symboltable
+        let res = rvalue.0.generate(scope, code, regs, aux);
+        let scale = Scale::from_size(type_.size());
+        code.codes.push(Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                scale.clone(),
+                Reg(res),
+                Reg(Register::Rax),
+            ),
+        )));
+        code.codes.push(Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                scale.clone(),
+                Reg(Register::Rax),
+                Reg(get_next_register(regs, type_.size())),
+            ),
+        )));
     }
 
     fn generate_stmt_serial(
         scope: &ScopeTranslator,
         code: &mut GeneratedCode,
-        regs: &[Register],
+        regs: &mut Vec<Register>,
         aux: (),
         statement1: &Box<Spanned<Stmt>>,
         statement2: &Box<Spanned<Stmt>>,
@@ -320,18 +331,18 @@ impl Stmt {
     fn generate_stmt_exit(
         scope: &ScopeTranslator,
         code: &mut GeneratedCode,
-        regs: &[Register],
+        regs: &mut Vec<Register>,
         exit_val: &Expr,
     ) {
         // reg[0] = exit_value
-        exit_val.generate(scope, code, regs, ());
+        let res = exit_val.generate(scope, code, regs, ());
 
         // move result into the rax register
         code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
                 InstrType::Mov,
                 Scale::default(),
-                Reg(regs[0]),
+                Reg(res),
                 Reg(RESULT_REG),
             ),
         )));
@@ -361,7 +372,7 @@ impl Stmt {
     fn generate_stmt_while(
         scope: &ScopeTranslator,
         code: &mut GeneratedCode,
-        regs: &[Register],
+        regs: &mut Vec<Register>,
         aux: (),
         cond: &Expr,
         body: &ScopedStmt,
@@ -383,14 +394,14 @@ impl Stmt {
         code.codes
             .push(Directive(Directives::Label(cond_label.clone())));
         // evaluate condition
-        cond.generate(scope, code, regs, aux);
+        let res = cond.generate(scope, code, regs, aux);
         // cmpq $1, cond_reg => check if condition is true
         code.codes.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
                 InstrType::Cmp,
                 Scale::default(),
                 Imm(1),
-                Reg(regs[0]),
+                Reg(res),
             ),
         )));
         // je body_label
@@ -405,18 +416,18 @@ impl Stmt {
     fn generate_stmt_return(
         scope: &ScopeTranslator,
         code: &mut GeneratedCode,
-        regs: &[Register],
+        regs: &mut Vec<Register>,
         aux: (),
         return_val: &Expr,
     ) {
         // evaluate(return_val)
-        return_val.generate(scope, code, regs, aux);
+        let res = return_val.generate(scope, code, regs, aux);
         // r0 = return_val
         code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
                 InstrType::Mov,
                 Default::default(),
-                Reg(regs[0]),
+                Reg(res),
                 Reg(RESULT_REG),
             ),
         )));

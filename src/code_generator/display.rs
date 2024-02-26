@@ -176,7 +176,10 @@ impl Display for InstrOperand {
 
 impl Display for Register {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "%")?;
+        match self {
+            Register::Stack(_) => (),
+            _ => write!(f, "%")?,
+        }
         match self {
             Register::Rax => write!(f, "rax"),
             Register::Rbx => write!(f, "rbx"),
@@ -195,6 +198,7 @@ impl Display for Register {
             Register::R14 => write!(f, "r14"),
             Register::R15 => write!(f, "r15"),
             Register::Rip => write!(f, "rip"),
+            Register::Stack(ipos) => write!(f, "{}(%rsp)", ipos),
         }
     }
 }
@@ -202,7 +206,10 @@ impl Display for Register {
 impl Display for ScaledRegister {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use crate::code_generator::asm::Register::*;
-        write!(f, "%")?;
+        match self.reg {
+            Stack(_) => (),
+            _ => write!(f, "%")?,
+        }
 
         match self.reg {
             Rax => match self.scale {
@@ -254,18 +261,59 @@ impl Display for ScaledRegister {
                 Scale::Long => write!(f, "esp"),
                 Scale::Quad => write!(f, "rsp"),
             },
-            R8 => write!(f, "r8"),
-            R9 => write!(f, "r9"),
-            R10 => write!(f, "r10"),
-            R11 => write!(f, "r11"),
-            R12 => write!(f, "r12"),
-            R13 => write!(f, "r13"),
-            R14 => write!(f, "r14"),
-            R15 => write!(f, "r15"),
+            R8 => match self.scale {
+                Scale::Byte => write!(f, "r8b"),
+                Scale::Word => write!(f, "r8w"),
+                Scale::Long => write!(f, "r8d"),
+                Scale::Quad => write!(f, "r8"),
+            }
+            R9 => match self.scale {
+                Scale::Byte => write!(f, "r9b"),
+                Scale::Word => write!(f, "r9w"),
+                Scale::Long => write!(f, "r9d"),
+                Scale::Quad => write!(f, "r9"),
+            }
+            R10 => match self.scale {
+                Scale::Byte => write!(f, "r10b"),
+                Scale::Word => write!(f, "r10w"),
+                Scale::Long => write!(f, "r10d"),
+                Scale::Quad => write!(f, "r10"),
+            }
+            R11 => match self.scale {
+                Scale::Byte => write!(f, "r11b"),
+                Scale::Word => write!(f, "r11w"),
+                Scale::Long => write!(f, "r11d"),
+                Scale::Quad => write!(f, "r11"),
+            }
+            R12 => match self.scale {
+                Scale::Byte => write!(f, "r12b"),
+                Scale::Word => write!(f, "r12w"),
+                Scale::Long => write!(f, "r12d"),
+                Scale::Quad => write!(f, "r12"),
+            }
+            R13 => match self.scale {
+                Scale::Byte => write!(f, "r13b"),
+                Scale::Word => write!(f, "r13w"),
+                Scale::Long => write!(f, "r13d"),
+                Scale::Quad => write!(f, "r13"),
+            }
+            R14 => match self.scale {
+                Scale::Byte => write!(f, "r14b"),
+                Scale::Word => write!(f, "r14w"),
+                Scale::Long => write!(f, "r14d"),
+                Scale::Quad => write!(f, "r14"),
+            }
+            R15 => match self.scale {
+                Scale::Byte => write!(f, "r15b"),
+                Scale::Word => write!(f, "r15w"),
+                Scale::Long => write!(f, "r15d"),
+                Scale::Quad => write!(f, "r15"),
+            }
             Rip => match self.scale.clone() {
                 Scale::Quad => write!(f, "rdi"),
                 other_scale => write!(f, "Cannot bind scale {} with RIP", other_scale),
             },
+            Stack(ipos) => write!(f, "{}(%rsp)", ipos),
         }
     }
 }

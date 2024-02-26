@@ -2,6 +2,7 @@ use crate::ast::{Ident, Type};
 
 use crate::MessageResult;
 use std::collections::HashMap;
+use crate::code_generator::asm::Register;
 
 // pub type Label = String;
 
@@ -13,7 +14,7 @@ pub struct SymbolTable {
        The hashmap stores the offset distances of local variables in storage
         from the top of stack frame
     */
-    pub table: HashMap<Ident, (Type, Offset)>,
+    pub table: HashMap<Ident, (Type, Option<Register>)>,
     pub size: Offset,
     pub prefix: String,
 }
@@ -41,7 +42,7 @@ impl ScopeInfo<'_> {
         match self.symbol_table.table.get(ident) {
             /* Identifier declared in this scope, return. */
             Some((t, offset)) => {
-                let new_id = format!("{}{}", self.symbol_table.prefix, offset);
+                let new_id = format!("{}", self.symbol_table.prefix);
                 Some((t, new_id))
             }
             /* Look for identifier in parent scope, recurse. */
@@ -59,31 +60,31 @@ impl ScopeInfo<'_> {
         }
     }
 
-    pub fn get_offset(&self, ident: &Ident) -> Option<Offset> {
-        match self.symbol_table.table.get(ident) {
-            /* Identifier declared in this scope, return. */
-            Some((_, base_offset)) => Some(self.symbol_table.size - base_offset),
-            /* Look for identifier in parent scope, recurse. */
-            None => Some(self.parent?.get_offset(ident)? + self.symbol_table.size),
-        }
-    }
+    // pub fn get_offset(&self, ident: &Ident) -> Option<Offset> {
+    //     match self.symbol_table.table.get(ident) {
+    //         /* Identifier declared in this scope, return. */
+    //         Some((_, base_offset)) => Some(self.symbol_table.size - base_offset),
+    //         /* Look for identifier in parent scope, recurse. */
+    //         None => Some(self.parent?.get_offset(ident)? + self.symbol_table.size),
+    //     }
+    // }
 
     pub fn add(&mut self, ident: &Ident, type_: Type) -> MessageResult<Ident> {
         // increase the space needed by the stack frame by the size of the given type
         self.symbol_table.size += type_.size();
 
         // manage new offset of the given variable
-        let offset = self.symbol_table.size;
+        // let offset = self.symbol_table.size;
 
         match self
             .symbol_table
             .table
-            .insert(ident.clone(), (type_, offset))
+            .insert(ident.clone(), (type_, None))
         {
             // not allowing duplicated definition
             Some(_) => Err("This identifier already exist.".to_string()),
             // allow first time usage, including renaming
-            None => Ok(format!("{}{}", self.symbol_table.prefix, offset)),
+            None => Ok(format!("{}", self.symbol_table.prefix)),
         }
     }
 
@@ -116,16 +117,16 @@ impl ScopeTranslator<'_> {
             prefix: st.prefix.clone(),
         };
 
-        for (id, (t, offset)) in st.table.iter() {
+        for (id, (t, reg)) in st.table.iter() {
             // Fetch renamed identifier
             let new_id = if let Type::Func(_) = t {
                 // no renaming for functions
                 id.clone()
             } else {
-                format!("{}{}", st.prefix, offset)
+                format!("{}{:?}", st.prefix, reg)
             };
 
-            sym_table.table.insert(new_id, (t.clone(), *offset));
+            sym_table.table.insert(new_id, (t.clone(), *reg));
         }
 
         ScopeTranslator {
@@ -143,12 +144,18 @@ impl ScopeTranslator<'_> {
         }
     }
 
-    pub fn get_offset(&self, ident: &Ident) -> Option<Offset> {
+    // pub fn get_offset(&self, ident: &Ident) -> Option<Offset> {
+    //     match self.symbol_table.table.get(ident) {
+    //         /* Identifier declared in this scope, return. */
+    //         Some((_, base_offset)) => Some(self.symbol_table.size - base_offset),
+    //         /* Look for identifier in parent scope, recurse. */
+    //         None => Some(self.parent?.get_offset(ident)? + self.symbol_table.size),
+    //     }
+    // }
+    pub fn get_register(&self, ident: &Ident) -> Option<Register> {
         match self.symbol_table.table.get(ident) {
-            /* Identifier declared in this scope, return. */
-            Some((_, base_offset)) => Some(self.symbol_table.size - base_offset),
-            /* Look for identifier in parent scope, recurse. */
-            None => Some(self.parent?.get_offset(ident)? + self.symbol_table.size),
+            Some((_, reg)) => reg.clone(),
+            None => self.parent?.get_register(ident),
         }
     }
 
@@ -160,16 +167,16 @@ impl ScopeTranslator<'_> {
         }
     }
 
-    pub fn get_total_offset(&self) -> Offset {
-        if self.symbol_table.table.is_empty() && self.symbol_table.size == 4 {
-            /* When there are no symbols but the scope is 4 bytes long, we're at the
-            scope used to reserve space for the scope register. */
-            0
-        } else {
-            /* Otherwise, add the size of this scope and all the above scopes. */
-            self.symbol_table.size + self.parent.unwrap().get_total_offset()
-        }
-    }
+    // pub fn get_total_offset(&self) -> Offset {
+    //     if self.symbol_table.table.is_empty() && self.symbol_table.size == 4 {
+    //         /* When there are no symbols but the scope is 4 bytes long, we're at the
+    //         scope used to reserve space for the scope register. */
+    //         0
+    //     } else {
+    //         /* Otherwise, add the size of this scope and all the above scopes. */
+    //         self.symbol_table.size + self.parent.unwrap().get_total_offset()
+    //     }
+    // }
 
     pub fn make_scope<'a>(&'a self, symbol_table: &'a SymbolTable) -> ScopeTranslator<'a> {
         let mut st = ScopeTranslator::new(symbol_table);

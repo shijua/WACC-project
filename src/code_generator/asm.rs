@@ -3,6 +3,7 @@ use lazy_static::lazy_static;
 use std::collections::HashSet;
 use std::fs::OpenOptions;
 use std::sync::Mutex;
+use crate::ast::Type;
 
 lazy_static! {
     static ref STR_LABEL: Mutex<usize> = Mutex::new(0);
@@ -13,6 +14,18 @@ lazy_static! {
 }
 
 pub type Label = String;
+
+pub fn get_next_register(regs: &mut Vec<Register>, size: i32) -> Register {
+    if (regs.len() == 1) {
+        match regs[0] {
+            Register::Stack(i) => regs.push(Register::Stack(i - size)),
+            _ => regs.push(Register::Stack(-size)),
+        }
+    }
+    let ret = regs[0].clone();
+    regs.remove(0);
+    ret
+}
 
 pub fn revert_escape_char(ch: char) -> Option<&'static str> {
     match ch {
@@ -62,6 +75,7 @@ pub enum Register {
     R14,
     R15,
     Rip,
+    Stack(i32),
 }
 
 const ARG_REGS_N: usize = 6;
