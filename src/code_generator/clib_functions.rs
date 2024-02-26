@@ -148,13 +148,13 @@ impl CLibFunctions {
     }
 
     // .int <length>
-    fn length_of_formatter_string(code: &mut GeneratedCode, length: i32) {
+    fn length_of_string(code: &mut GeneratedCode, length: i32) {
         code.lib_functions
             .push(Directive(Directives::IntLabel(length as usize)));
     }
 
     // .<label>:
-    fn print_label(code: &mut GeneratedCode, label: &str) {
+    fn labelling(code: &mut GeneratedCode, label: &str) {
         code.lib_functions
             .push(Directive(Directives::Label(String::from(label))));
     }
@@ -172,15 +172,6 @@ impl CLibFunctions {
     fn assembler_text(code: &mut GeneratedCode) {
         code.lib_functions
             .push(Directive(Directives::AssemblerText));
-    }
-
-    /* Needless -> replaced by print_label, which considers a rename -- mc */
-    // _readi:
-    fn readi_label(code: &mut GeneratedCode) {
-        code.lib_functions
-            .push(Directive(Directives::Label(String::from(
-                READ_LABEL_FOR_INT,
-            ))));
     }
 
     /*
@@ -271,7 +262,7 @@ impl CLibFunctions {
                 None,
             ))
         } else {
-            reg1
+            InstrOperand::Reg(reg1)
         };
         let dst = if memory_ref2 {
             InstrOperand::Reference(MemoryReference::new(
@@ -281,7 +272,7 @@ impl CLibFunctions {
                 None,
             ))
         } else {
-            reg2
+            InstrOperand::Reg(reg2)
         };
         code.lib_functions.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
@@ -682,11 +673,11 @@ impl CLibFunctions {
         // .text
         // _prints:
         Self::read_only_strings(code);
-        Self::length_of_formatter_string(code, 4);
-        Self::print_label(code, PRINT_STRING_LABEL);
+        Self::length_of_string(code, 4);
+        Self::labelling(code, PRINT_STRING_LABEL);
         Self::print_ascii_string(code, CONTENT_STRING_LITERAL);
         Self::assembler_text(code);
-        Self::print_label(code, PRINT_LABEL_FOR_STRING);
+        Self::labelling(code, PRINT_LABEL_FOR_STRING);
 
         Self::print_before_structure(code);
 
@@ -719,11 +710,11 @@ impl CLibFunctions {
         // .text
         // _println:
         Self::read_only_strings(code);
-        Self::length_of_formatter_string(code, 0);
-        Self::print_label(code, PRINT_STRING_LINE_LABEL);
+        Self::length_of_string(code, 0);
+        Self::labelling(code, PRINT_STRING_LINE_LABEL);
         Self::print_ascii_string(code, CONTENT_EMPTY);
         Self::assembler_text(code);
-        Self::print_label(code, PRINT_LABEL_FOR_STRING_LINE);
+        Self::labelling(code, PRINT_LABEL_FOR_STRING_LINE);
 
         Self::print_before_structure(code);
 
@@ -749,11 +740,11 @@ impl CLibFunctions {
         // .text
         // _printi:
         Self::read_only_strings(code);
-        Self::length_of_formatter_string(code, 2);
-        Self::print_label(code, PRINT_INT_LABEL);
+        Self::length_of_string(code, 2);
+        Self::labelling(code, PRINT_INT_LABEL);
         Self::print_ascii_string(code, CONTENT_INT_LITERAL);
         Self::assembler_text(code);
-        Self::print_label(code, PRINT_LABEL_FOR_INT);
+        Self::labelling(code, PRINT_LABEL_FOR_INT);
 
         Self::print_before_structure(code);
 
@@ -784,11 +775,11 @@ impl CLibFunctions {
         // .text
         // _printc:
         Self::read_only_strings(code);
-        Self::length_of_formatter_string(code, 2);
-        Self::print_label(code, PRINT_CHAR_LABEL);
+        Self::length_of_string(code, 2);
+        Self::labelling(code, PRINT_CHAR_LABEL);
         Self::print_ascii_string(code, CONTENT_CHAR_LITERAL);
         Self::assembler_text(code);
-        Self::print_label(code, PRINT_LABEL_FOR_CHAR);
+        Self::labelling(code, PRINT_LABEL_FOR_CHAR);
 
         Self::print_before_structure(code);
 
@@ -827,20 +818,20 @@ impl CLibFunctions {
         // .text
         // _printb:
         Self::read_only_strings(code);
-        Self::length_of_formatter_string(code, 5);
-        Self::print_label(code, PRINT_BOOL_LABEL_0);
+        Self::length_of_string(code, 5);
+        Self::labelling(code, PRINT_BOOL_LABEL_0);
         Self::print_ascii_string(code, CONTENT_BOOL_LITERAL_FALSE);
-        Self::length_of_formatter_string(code, 4);
+        Self::length_of_string(code, 4);
 
-        Self::print_label(code, PRINT_BOOL_LABEL_1);
+        Self::labelling(code, PRINT_BOOL_LABEL_1);
         Self::print_ascii_string(code, CONTENT_BOOL_LITERAL_TRUE);
-        Self::length_of_formatter_string(code, 4);
+        Self::length_of_string(code, 4);
 
-        Self::print_label(code, PRINT_BOOL_LABEL_2);
+        Self::labelling(code, PRINT_BOOL_LABEL_2);
         Self::print_ascii_string(code, CONTENT_STRING_LITERAL);
 
         Self::assembler_text(code);
-        Self::print_label(code, PRINT_LABEL_FOR_BOOL);
+        Self::labelling(code, PRINT_LABEL_FOR_BOOL);
 
         Self::print_before_structure(code);
 
@@ -861,10 +852,10 @@ impl CLibFunctions {
         Self::leaq_rip_with_label(code, PRINT_BOOL_LABEL_0, Rdx);
         Self::jmp(code);
 
-        Self::print_label(code, PRINT_LABEL_FOR_BOOL_0);
+        Self::labelling(code, PRINT_LABEL_FOR_BOOL_0);
         Self::leaq_rip_with_label(code, PRINT_BOOL_LABEL_1, Rdx);
 
-        Self::print_label(code, PRINT_LABEL_FOR_BOOL_1);
+        Self::labelling(code, PRINT_LABEL_FOR_BOOL_1);
         Self::movl_offset_on_reg(code, -4, Rdx, Rsi);
         Self::leaq_rip_with_label(code, PRINT_BOOL_LABEL_2, Rdi);
         Self::movb_rax(code, 0);
@@ -887,11 +878,11 @@ impl CLibFunctions {
         // .text
         // _readi:
         Self::read_only_strings(code);
-        Self::length_of_formatter_string(code, 2);
-        Self::print_label(code, READ_INT_LABEL);
+        Self::length_of_string(code, 2);
+        Self::labelling(code, READ_INT_LABEL);
         Self::print_ascii_string(code, CONTENT_INT_LITERAL);
         Self::assembler_text(code);
-        Self::syscall_sub_function_label(code, READ_LABEL_FOR_INT);
+        Self::labelling(code, READ_LABEL_FOR_INT);
 
         Self::print_before_structure(code);
 
@@ -938,11 +929,11 @@ impl CLibFunctions {
         // .text
         // _readc:
         Self::read_only_strings(code);
-        Self::length_of_formatter_string(code, 3);
-        Self::print_label(code, READ_CHAR_LABEL);
+        Self::length_of_string(code, 3);
+        Self::labelling(code, READ_CHAR_LABEL);
         Self::print_ascii_string(code, CONTENT_READ_CHAR_LITERAL);
         Self::assembler_text(code);
-        Self::syscall_sub_function_label(code, READ_LABEL_FOR_CHAR);
+        Self::labelling(code, READ_LABEL_FOR_CHAR);
 
         Self::print_before_structure(code);
 
@@ -985,7 +976,7 @@ impl CLibFunctions {
         //   movq %rbp, %rsp
         //   popq %rbp
         //   ret
-        Self::print_label(code, SYS_EXIT_LABEL);
+        Self::labelling(code, SYS_EXIT_LABEL);
         Self::print_before_structure(code);
         Self::call_plt(code, SYS_EXIT_PLT);
         Self::print_after_structure(code);
