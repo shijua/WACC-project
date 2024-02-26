@@ -102,6 +102,7 @@ impl Display for InstrType {
                 None => write!(f, "jmp"),
                 Some(cond_code) => write!(f, "j{}", cond_code),
             },
+            InstrType::Set(condition_code) => write!(f, "set{}", condition_code),
         }
     }
 }

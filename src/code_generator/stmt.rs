@@ -55,7 +55,7 @@ impl Generator for ScopedStmt {
 
 impl Generator for Lvalue {
     type Input = Type;
-    type Output = (Register, Register, Scale);
+    type Output = (Register, i32);
 
     fn generate(
         &self,
@@ -66,9 +66,8 @@ impl Generator for Lvalue {
     ) -> Self::Output {
         match self {
             Lvalue::LIdent((id, _)) => (
-                Rsp,
                 scope.get_register(id).unwrap(),
-                Scale::from_size(aux.size()),
+                aux.size(),
             ),
             Lvalue::LArrElem(_) => todo!(),
             Lvalue::LPairElem(_) => todo!(),
@@ -170,7 +169,7 @@ impl Stmt {
             Type::StringType => code.required_clib.insert(CLibFunctions::PrintString),
             Type::IntType => code.required_clib.insert(CLibFunctions::PrintInt),
             Type::CharType => code.required_clib.insert(CLibFunctions::PrintChar),
-            // Type::BoolType => code.required_clib.insert(CLibFunctions::P)
+            Type::BoolType => code.required_clib.insert(CLibFunctions::PrintBool),
             _ => todo!(),
         };
         // todo:
@@ -194,9 +193,8 @@ impl Stmt {
             _ => todo!(),
         };
         code.codes
-            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+            .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new_unary(
                 InstrType::Call,
-                Scale::default(),
                 InstrOperand::LabelRef(String::from(print_label)),
             ))));
     }
@@ -266,14 +264,14 @@ impl Stmt {
         rvalue.generate(scope, code, regs, aux);
 
         // store value in regs[0] to that of lvalue
-        let (target_reg, src_reg, scale) = lvalue.generate(scope, code, regs, type_.clone());
+        let (src_reg, size) = lvalue.generate(scope, code, regs, type_.clone());
 
         code.codes.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
                 InstrType::Mov,
-                scale,
-                Reg(regs[0]),
-                todo!()
+                Scale::from_size(size),
+                Reg(src_reg),
+                Reg(get_next_register(regs, size)),
             ),
         )));
     }

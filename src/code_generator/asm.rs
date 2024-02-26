@@ -15,6 +15,14 @@ lazy_static! {
 
 pub type Label = String;
 
+pub fn get_rbp_size(regs: &Vec<Register>) -> i32 {
+    match regs[regs.len()-1] {
+        Register::Stack(i) => -i,
+        _ => 0,
+    }
+}
+
+// first register is for indicating the last register used so that we can record current stack location
 pub fn get_next_register(regs: &mut Vec<Register>, size: i32) -> Register {
     if (regs.len() == 1) {
         match regs[0] {
@@ -22,7 +30,7 @@ pub fn get_next_register(regs: &mut Vec<Register>, size: i32) -> Register {
             _ => regs.push(Register::Stack(-size)),
         }
     }
-    let ret = regs[0].clone();
+    let ret = regs[1].clone();
     regs.remove(0);
     ret
 }
@@ -269,6 +277,7 @@ pub enum InstrType {
     Call,
     Ret,
     Jump(Option<ConditionCode>),
+    Set(ConditionCode),
 }
 
 #[derive(PartialEq, Debug, Clone)]

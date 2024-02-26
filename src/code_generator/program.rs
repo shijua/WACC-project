@@ -1,10 +1,7 @@
 use crate::ast::{Function, Program, Type};
 use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::Register::{Rbp, Rsp};
-use crate::code_generator::asm::{
-    AsmLine, BinaryInstruction, GeneratedCode, Instr, InstrOperand, InstrType, Register, Scale,
-    UnaryInstruction, RESULT_REG,
-};
+use crate::code_generator::asm::{AsmLine, BinaryInstruction, GeneratedCode, Instr, InstrOperand, InstrType, Register, Scale, UnaryInstruction, RESULT_REG, get_rbp_size};
 use crate::code_generator::def_libary::{Directives, MAIN_FUNCTION_TITLE};
 use crate::code_generator::x86_generate::{Generator, DEFAULT_EXIT_CODE};
 use crate::new_spanned;
@@ -49,16 +46,17 @@ impl Generator for Function {
         )));
 
         // allocate stack frame
-        // TODO value is wrong currently. Need to calculate the size of the stack frame
-        let body_allocated_size = self.body_symbol_table.size;
-        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Sub,
-                Scale::default(),
-                InstrOperand::Imm(body_allocated_size),
-                InstrOperand::Reg(Register::Rsp),
-            ),
-        )));
+        // we now put it after generate assembly code
+        // let body_allocated_size = self.body_symbol_table.size;
+        // code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        //     BinaryInstruction::new_single_scale(
+        //         InstrType::Sub,
+        //         Scale::default(),
+        //         InstrOperand::Imm(body_allocated_size),
+        //         InstrOperand::Reg(Register::Rsp),
+        //     ),
+        // )));
+        let pos = code.codes.len();
 
         // process parameter scope
         let mut scope = scope.make_scope(&self.param_symbol_table);
@@ -68,6 +66,17 @@ impl Generator for Function {
         // make body statements
         self.body.0.generate(&mut scope, code, regs, ());
 
+        // allocate stack frame for beginning
+        let size = get_rbp_size(regs);
+        code.codes.insert(pos, AsmLine::Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Sub,
+                Scale::default(),
+                InstrOperand::Imm(size),
+                InstrOperand::Reg(Register::Rsp),
+            ),
+        )));
+
         // main function will exit by exit-code 0, (or does it involve manipulating exit?)
         if aux {
             // deallocate stack for main function
@@ -75,7 +84,7 @@ impl Generator for Function {
                 BinaryInstruction::new_single_scale(
                     InstrType::Add,
                     Scale::default(),
-                    InstrOperand::Imm(body_allocated_size),
+                    InstrOperand::Imm(size),
                     InstrOperand::Reg(Register::Rsp),
                 ),
             )));

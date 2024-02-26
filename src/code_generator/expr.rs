@@ -1,9 +1,12 @@
 use crate::ast::{BinaryOperator, Expr, Ident, UnaryOperator};
 use crate::code_generator::asm::AsmLine::Instruction;
-use crate::code_generator::asm::Instr::BinaryInstr;
+use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
 use crate::code_generator::asm::Scale::Quad;
-use crate::code_generator::asm::{AsmLine, BinaryInstruction, GeneratedCode, get_next_register, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale, UnaryInstruction};
+use crate::code_generator::asm::{
+    get_next_register, AsmLine, BinaryInstruction, ConditionCode, GeneratedCode, Instr,
+    InstrOperand, InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled,
+};
 use crate::code_generator::x86_generate::Generator;
 use crate::symbol_table::ScopeTranslator;
 use crate::Spanned;
@@ -34,45 +37,105 @@ impl Generator for Expr {
                 let rhs_reg = rhs_exp.generate(scope, code, regs, ());
 
                 match op {
-                    BinaryOperator::Mul => {todo!()}
-                    BinaryOperator::Div => {todo!()}
-                    BinaryOperator::Modulo => {todo!()}
+                    BinaryOperator::Mul => {
+                        todo!()
+                    }
+                    BinaryOperator::Div => {
+                        todo!()
+                    }
+                    BinaryOperator::Modulo => {
+                        todo!()
+                    }
                     BinaryOperator::Add => {
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
                                 InstrType::Add,
-                                Scale::default(),
+                                Scale::Long,
                                 InstrOperand::Reg(rhs_reg),
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
                         lhs_reg
                     }
-                    BinaryOperator::Sub => {todo!()}
-                    BinaryOperator::Gt => {todo!()}
-                    BinaryOperator::Gte => {todo!()}
-                    BinaryOperator::Lt => {todo!()}
-                    BinaryOperator::Lte => {todo!()}
-                    BinaryOperator::Eq => {todo!()}
-                    BinaryOperator::Neq => {todo!()}
-                    BinaryOperator::And => {todo!()}
-                    BinaryOperator::Or => {todo!()
-                        // code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryOperator::Sub => {
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Sub,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        lhs_reg
+                    }
+                    BinaryOperator::Gt => {
+                        todo!()
+                    }
+                    BinaryOperator::Gte => {
+                        todo!()
+                    }
+                    BinaryOperator::Lt => {
+                        todo!()
+                    }
+                    BinaryOperator::Lte => {
+                        todo!()
+                    }
+                    BinaryOperator::Eq => {
+                        // todo!()
+                        // cmpq lhs rhs
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Cmp,
+                                Scale::default(),
+                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
+                        // sete %al
+                        code.codes
+                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                                InstrType::Set(ConditionCode::EQ),
+                                InstrOperand::RegVariant(Register::lhs_reg, Scale::Byte),
+                            ))));
+                        // movsbq lhs
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_double_scale(
+                                InstrType::MovS,
+                                Scale::Byte,
+                                InstrOperand::Reg(Register::lhs_reg),
+                                Scale::Quad,
+                                InstrOperand::Reg(Register::lhs_reg),
+                            ),
+                        )));
+                        lhs_reg
+                    }
+                    BinaryOperator::Neq => {
+                        todo!()
+                    }
+                    BinaryOperator::And => {
+                        todo!()
+                    }
+                    BinaryOperator::Or => {
+                        todo!()
+                        // code.codes.push(Instruction(BinaryInstr(
                         //     BinaryInstruction::new_single_scale(
                         //         InstrType::Or,
                         //         Scale::default(),
-                        //         InstrOperand::Reg(exp2_reg),
-                        //         InstrOperand::Reg(dst_reg),
+                        //         InstrOperand::Reg(rhs_reg),
+                        //         InstrOperand::Reg(lhs_reg),
                         //     ),
                         // )));
+                        // lhs_reg
                     }
                 }
             }
-            Expr::PairLiter => {todo!()}
-            Expr::Ident(id) => {
-                Self::generate_expr_ident(scope, code, regs, id)
+            Expr::PairLiter => {
+                todo!()
             }
-            Expr::ArrayElem(_) => {todo!()}
+            Expr::Ident(id) => Self::generate_expr_ident(scope, code, regs, id),
+            Expr::ArrayElem(_) => {
+                todo!()
+            }
         }
     }
 }
@@ -94,7 +157,8 @@ impl Expr {
         match op {
             UnaryOperator::Bang => Self::generate_unary_app_bang(code, reg),
             UnaryOperator::Negative => Self::generate_unary_app_negation(code, reg),
-            UnaryOperator::Len => { todo!()
+            UnaryOperator::Len => {
+                todo!()
                 // for design of arrays, all the data are shifted for 4 bytes in order to account for
                 // the length (stored in the first position)
                 // therefore, when we are attempting to get the length of something,
@@ -106,11 +170,14 @@ impl Expr {
             // there's no need to particularly handle ord and chr functions
             // as internally char are stored as integers inside assembly
             // therefore a forced cast would not influence anything at the backend.
-            UnaryOperator::Ord => {todo!()},
+            UnaryOperator::Ord => {
+                todo!()
+            }
             // however, when it comes to the terms of using the 'chr' function
             // we would still have to test whether it is implemented on a function that is
             // within the range of standard ASCII codes
-            UnaryOperator::Chr => {todo!()
+            UnaryOperator::Chr => {
+                todo!()
                 // todo:
                 // (well, not necessarily rax but a general form of register representation)
                 // testq $-128, %rax
@@ -166,7 +233,11 @@ impl Expr {
     }
 }
 
-fn generate_int_liter(code: &mut GeneratedCode, regs: &mut Vec<Register>, int_val: &i32) -> Register {
+fn generate_int_liter(
+    code: &mut GeneratedCode,
+    regs: &mut Vec<Register>,
+    int_val: &i32,
+) -> Register {
     let next_reg = get_next_register(regs, 4);
     code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
         BinaryInstruction::new_single_scale(
@@ -179,7 +250,11 @@ fn generate_int_liter(code: &mut GeneratedCode, regs: &mut Vec<Register>, int_va
     next_reg
 }
 
-fn generate_bool_liter(code: &mut GeneratedCode, regs: &mut Vec<Register>, bool_val: &bool) -> Register {
+fn generate_bool_liter(
+    code: &mut GeneratedCode,
+    regs: &mut Vec<Register>,
+    bool_val: &bool,
+) -> Register {
     let next_reg = get_next_register(regs, 1);
     let move_val = match bool_val {
         true => 1,
@@ -196,7 +271,11 @@ fn generate_bool_liter(code: &mut GeneratedCode, regs: &mut Vec<Register>, bool_
     next_reg
 }
 
-fn generate_char_liter(code: &mut GeneratedCode, regs: &mut Vec<Register>, char_val: &char) -> Register {
+fn generate_char_liter(
+    code: &mut GeneratedCode,
+    regs: &mut Vec<Register>,
+    char_val: &char,
+) -> Register {
     let next_reg = get_next_register(regs, 1);
     let char_imm = *char_val as u8;
 
@@ -211,7 +290,11 @@ fn generate_char_liter(code: &mut GeneratedCode, regs: &mut Vec<Register>, char_
     next_reg
 }
 
-fn generate_string_liter(code: &mut GeneratedCode, regs: &mut Vec<Register>, str_val: String) -> Register {
+fn generate_string_liter(
+    code: &mut GeneratedCode,
+    regs: &mut Vec<Register>,
+    str_val: String,
+) -> Register {
     let next_reg = get_next_register(regs, 4);
     // string must be referred to as a global dereference
     let str_label = code.get_next_string_label(&str_val);
