@@ -104,7 +104,7 @@ pub enum CLibFunctions {
     // PrintRefs,
 
     ReadInt,
-    // ReadCar,
+    ReadChar,
 
     SystemExit,
 

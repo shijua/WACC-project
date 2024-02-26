@@ -33,12 +33,12 @@ pub const READ_CHAR_LABEL: &str = ".L._readc_str0";
 pub const READ_LABEL_FOR_CHAR: &str = "_readc";
 
 pub const SYS_EXIT_LABEL: &str = "_exit";
-pub const PRINTLN_LABEL: &str = "_println";
 
 pub const CONTENT_STRING_LITERAL: &str = "%.*s";
 pub const CONTENT_INT_LITERAL: &str = "%d";
 pub const CONTENT_EMPTY: &str = "";
 pub const CONTENT_CHAR_LITERAL: &str = "%c";
+pub const CONTENT_READ_CHAR_LITERAL: &str = " %c";
 pub const CONTENT_BOOL_LITERAL_TRUE: &str = "true";
 pub const CONTENT_BOOL_LITERAL_FALSE: &str = "false";
 
@@ -84,9 +84,9 @@ impl Generator for CLibFunctions {
                 Self::generate_read_int(code);
             }
 
-            // CLibFunctions::ReadChar => {
-            //     Self::generate_read_char(code);
-            // }
+            CLibFunctions::ReadChar => {
+                Self::generate_read_char(code);
+            }
 
             CLibFunctions::SystemExit => {
                 Self::generate_sys_exit(code);
@@ -147,19 +147,19 @@ impl CLibFunctions {
             .push(Directive(Directives::ReadOnlyStrings));
     }
 
-    // .int 4, length of formatter string
+    // .int <length>
     fn length_of_formatter_string(code: &mut GeneratedCode, length: i32) {
         code.lib_functions
             .push(Directive(Directives::IntLabel(length as usize)));
     }
 
-    // .L._print{}_str0:
+    // .<label>:
     fn print_label(code: &mut GeneratedCode, label: &str) {
         code.lib_functions
             .push(Directive(Directives::Label(String::from(label))));
     }
 
-    // .asciz "{}"
+    // .asciz "<content>"
     fn print_ascii_string(code: &mut GeneratedCode, content: &str) {
         code.lib_functions
             .push(Directive(Directives::FormattedString(
@@ -174,11 +174,7 @@ impl CLibFunctions {
             .push(Directive(Directives::AssemblerText));
     }
 
-    fn syscall_sub_function_label(code: &mut GeneratedCode, label_str: &str) {
-        code.lib_functions
-            .push(Directive(Directives::Label(String::from(label_str))));
-    }
-
+    /* Needless -> replaced by print_label, which considers a rename -- mc */
     // _readi:
     fn readi_label(code: &mut GeneratedCode) {
         code.lib_functions
@@ -209,7 +205,7 @@ impl CLibFunctions {
        ==========================================================
     */
 
-    // mov{} %reg1 %reg2
+    // mov<scale> %<reg1> %<reg2>
     fn mov_registers(code: &mut GeneratedCode, scale: Scale, reg1: Register, reg2: Register) {
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
@@ -222,7 +218,7 @@ impl CLibFunctions {
             )));
     }
 
-    // mov{} $offset %reg
+    // mov<scale> $<offset> %<reg>
     fn mov_offset(code: &mut GeneratedCode, scale: Scale, offset: i32, reg: Register) {
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
@@ -236,6 +232,7 @@ impl CLibFunctions {
     }
 
     // movq %rsp, %rbp
+    /* Useless -- mc */
     fn movq_rbp_rsp(code: &mut GeneratedCode) {
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
@@ -249,6 +246,7 @@ impl CLibFunctions {
     }
 
     // movq %rdi, %rdx
+    /* Useless -- mc */
     fn movq_rdx_rdi(code: &mut GeneratedCode) {
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
@@ -261,7 +259,41 @@ impl CLibFunctions {
             )));
     }
 
-    // movl <offset>(%reg1) %reg2
+    // memory_ref1 == true: mov<scale> <offset?>(%<reg1>) %<reg2>
+    // memory_ref2 == true: mov<scale> %<reg1> (%<reg2>)
+    fn mov_memory_ref_reg(code: &mut GeneratedCode, scale: Scale, offset: i32,
+        memory_ref1: bool, reg1: Register, memory_ref2: bool, reg2: Register) {
+        let src = if memory_ref1 {
+            InstrOperand::Reference(MemoryReference::new(
+                Some(MemoryReferenceImmediate::OffsetImm(offset)),
+                Some(reg1),
+                None,
+                None,
+            ))
+        } else {
+            reg1
+        };
+        let dst = if memory_ref2 {
+            InstrOperand::Reference(MemoryReference::new(
+                None,
+                Some(reg2),
+                None,
+                None,
+            ))
+        } else {
+            reg2
+        };
+        code.lib_functions.push(Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                scale,
+                src,
+                dst,
+            ),
+        )));
+    }
+
+    // movl <offset>(%<reg1>) %<reg2>
     fn movl_offset_on_reg(code: &mut GeneratedCode, offset: i32, reg1: Register, reg2: Register) {
         code.lib_functions.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
@@ -279,6 +311,7 @@ impl CLibFunctions {
     }
 
     // movl -4(%rdi), %esi
+    /* Useless -- mc */
     fn movl_esi_rdi(code: &mut GeneratedCode, offset: i32) {
         code.lib_functions.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
@@ -296,12 +329,8 @@ impl CLibFunctions {
     }
 
     // movb $0, %al
+    /* Useless -- mc */
     fn movb_rax(code: &mut GeneratedCode, offset: i32) {
-        // code.lib_functions.push(Instruction(Instr::Mov(
-        //     Scale::Byte,
-        //     InstrOperand::Imm(offset),
-        //     InstrOperand::RegVariant(Rax, Scale::Byte),
-        // )));
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
@@ -314,12 +343,8 @@ impl CLibFunctions {
     }
 
     // movq $offset, %rdi
+    /* Useless -- mc */
     fn movq_rdi(code: &mut GeneratedCode, offset: i32) {
-        // code.lib_functions.push(Instruction(Instr::Mov(
-        //     Scale::default(),
-        //     InstrOperand::Imm(offset),
-        //     InstrOperand::Reg(Rdi),
-        // )));
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
@@ -332,12 +357,8 @@ impl CLibFunctions {
     }
 
     // movq %rbp, %rsp
+    /* Useless -- mc */
     fn movq_rsp_rbp(code: &mut GeneratedCode) {
-        // code.lib_functions.push(Instruction(Instr::Mov(
-        //     Scale::default(),
-        //     InstrOperand::Reg(Rbp),
-        //     InstrOperand::Reg(Rsp),
-        // )));
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
@@ -350,12 +371,8 @@ impl CLibFunctions {
     }
 
     // 	movl %rdi, %rdx
+    /* Useless -- mc */
     fn movl_rdi_rdx(code: &mut GeneratedCode) {
-        // code.lib_functions.push(Instruction(Instr::Mov(
-        //     Long,
-        //     InstrOperand::Reg(Rdi),
-        //     InstrOperand::Reg(Rdx),
-        // )));
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
@@ -368,13 +385,8 @@ impl CLibFunctions {
     }
 
     // movslq (%rsp), %rax
+    /* Need generalized -- mc */
     fn movslq_rsp_rax(code: &mut GeneratedCode) {
-        // code.lib_functions.push(Instruction(Instr::MovS(
-        //     Scale::Long,
-        //     Scale::Long,
-        //     InstrOperand::Reference(MemoryReference::new(None, Some(Rsp), None, None)),
-        //     InstrOperand::RegVariant(Rax, Scale::Long),
-        // )));
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_double_scale(
@@ -388,6 +400,7 @@ impl CLibFunctions {
     }
 
     // movsbq (%rsp), %rax
+    /* Useless -- mc */
     fn movsbq_rsp_rax(code: &mut GeneratedCode) {
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
@@ -408,6 +421,7 @@ impl CLibFunctions {
     */
 
     // andq $-16, %rsp
+    /* Need generalized -- mc */
     fn andq_rsp(code: &mut GeneratedCode) {
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
@@ -425,9 +439,11 @@ impl CLibFunctions {
                                  Lea
        ==========================================================
     */
+    // Note here we use MemoryReference to indicate we generate parentheses
+    // out of our first register, not actually access to the memory inside.
 
-    // leaq <label>(%rip), %reg
-    fn leaq_rip(code: &mut GeneratedCode, label: &str, reg: Register) {
+    // leaq <label>(%rip), %<reg>
+    fn leaq_rip_with_label(code: &mut GeneratedCode, label: &str, reg: Register) {
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
@@ -444,20 +460,22 @@ impl CLibFunctions {
             )));
     }
 
+    // leaq (%<reg1>) %<reg2>
+    fn leaq_registers(code: &mut GeneratedCode, reg1: Register, reg2: Register) {
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Lea,
+                    Scale::default(),
+                    InstrOperand::Reference(MemoryReference::new(None, Some(reg1), None, None)),
+                    InstrOperand::Reg(reg2),
+                ),
+            )));
+    }
+
     // leaq <string>(%rip), %rdi
+    /* Useless -- mc */
     fn leaq_rdi_rip(code: &mut GeneratedCode, string: &str) {
-        // code.lib_functions.push(Instruction(Instr::Lea(
-        //     Scale::Quad,
-        //     InstrOperand::Reference(MemoryReference::new(
-        //         Some(MemoryReferenceImmediate::LabelledImm(String::from(
-        //             PRINT_STRING_LABEL,
-        //         ))),
-        //         Some(Rsp),
-        //         None,
-        //         None,
-        //     )),
-        //     InstrOperand::Reg(Rdi),
-        // )));
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
@@ -475,12 +493,8 @@ impl CLibFunctions {
     }
 
     // 	leaq (%rsp), %rsi
+    /* Useless -- mc */
     fn leaq_rsi_rsp(code: &mut GeneratedCode) {
-        // code.lib_functions.push(Instruction(Instr::Lea(
-        //     Scale::default(),
-        //     InstrOperand::Reference(MemoryReference::new(None, Some(Rsp), None, None)),
-        //     InstrOperand::Reg(Rsi),
-        // )));
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
@@ -497,7 +511,7 @@ impl CLibFunctions {
                                  Call
        ==========================================================
     */
-
+    // call <plt_label>
     fn call_plt(code: &mut GeneratedCode, plt_label: &str) {
         code.lib_functions
             .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
@@ -512,7 +526,6 @@ impl CLibFunctions {
                                  Pop
        ==========================================================
     */
-
     // popq %rbp
     fn popq_rbp(code: &mut GeneratedCode) {
         code.lib_functions
@@ -528,7 +541,6 @@ impl CLibFunctions {
                                   Ret
         ==========================================================
     */
-
     fn ret(code: &mut GeneratedCode) {
         code.lib_functions.push(Instruction(Instr::Ret));
     }
@@ -538,14 +550,9 @@ impl CLibFunctions {
                                   Add
         ==========================================================
     */
-
     // addq $16, %rsp
+    /* Need generalized -- mc */
     fn addq_rsp(code: &mut GeneratedCode) {
-        // code.lib_functions.push(Instruction(Instr::Add(
-        //     Scale::default(),
-        //     InstrOperand::Imm(16),
-        //     InstrOperand::Reg(Rsp),
-        // )));
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
@@ -563,12 +570,8 @@ impl CLibFunctions {
         ==========================================================
     */
     // subq $16, %rsp
+    /* Need generalized -- mc */
     fn subq_rsp(code: &mut GeneratedCode) {
-        // code.lib_functions.push(Instruction(Instr::Sub(
-        //     Scale::default(),
-        //     InstrOperand::Imm(16),
-        //     InstrOperand::Reg(Rsp),
-        // )));
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
@@ -586,12 +589,8 @@ impl CLibFunctions {
         ==========================================================
     */
     // cmpb $0, %dil
+    /* Need generalized -- mc */
     fn cmpb_rdx(code: &mut GeneratedCode) {
-        // code.lib_functions.push(Instruction(Instr::Sub(
-        //     Scale::default(),
-        //     InstrOperand::Imm(16),
-        //     InstrOperand::Reg(Rsp),
-        // )));
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
@@ -652,11 +651,13 @@ impl CLibFunctions {
                             Print After Structure
         ==========================================================
     */
+    /* need refactor -> delete the first two lines -- mc */
     fn print_after_structure(code: &mut GeneratedCode) {
         // (_print?:)
         // ......
         //   movq $0, %rdi
         //   call fflush@plt
+
         //   movq %rbp, %rsp
         //   popq %rbp
         //   ret
@@ -680,25 +681,6 @@ impl CLibFunctions {
         //   .asciz "%.*s"
         // .text
         // _prints:
-
-        //   pushq %rbp
-        //   movq %rsp, %rbp
-        //   # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
-        //   andq $-16, %rsp
-
-        //   movq %rdi, %rdx
-        //   movl -4(%rdi), %esi
-        //   leaq .L._prints_str0(%rip), %rdi
-        //   # on x86, al represents the number of SIMD registers used as variadic arguments
-        //   movb $0, %al
-        //   call printf@plt
-
-        //   movq $0, %rdi
-        //   call fflush@plt
-        //   movq %rbp, %rsp
-        //   popq %rbp
-        //   ret
-
         Self::read_only_strings(code);
         Self::length_of_formatter_string(code, 4);
         Self::print_label(code, PRINT_STRING_LABEL);
@@ -708,11 +690,15 @@ impl CLibFunctions {
 
         Self::print_before_structure(code);
 
+        //   movq %rdi, %rdx
+        //   movl -4(%rdi), %esi
+        //   leaq .L._prints_str0(%rip), %rdi
+        //   # on x86, al represents the number of SIMD registers used as variadic arguments
+        //   movb $0, %al
+        //   call printf@plt
         Self::movq_rdx_rdi(code);
         Self::movl_esi_rdi(code, -4);
-        /* wait for fixing: */
         Self::leaq_rdi_rip(code, PRINT_STRING_LABEL);
-        /* */
         Self::movb_rax(code, 0);
         Self::call_plt(code, PRINTF_PLT);
 
@@ -743,9 +729,7 @@ impl CLibFunctions {
 
         //   leaq .L._println_str0(%rip), %rdi
         //   call puts@plt
-        /* wait for fixing: */
         Self::leaq_rdi_rip(code, PRINT_STRING_LINE_LABEL);
-        /* */
         Self::call_plt(code, PUTS_PLT);
 
         Self::print_after_structure(code);
@@ -779,9 +763,7 @@ impl CLibFunctions {
         //   movb $0, %al
         //   call printf@plt
         Self::mov_registers(code, Long, Rdi, Rsi);
-        /* wait for fixing: */
         Self::leaq_rdi_rip(code, PRINT_INT_LABEL);
-        /* */
         Self::mov_offset(code, Byte, 0, Rax);
         Self::call_plt(code, PRINTF_PLT);
 
@@ -876,15 +858,15 @@ impl CLibFunctions {
         //   call printf@plt
         Self::cmpb_rdx(code);
         Self::jne(code);
-        Self::leaq_rip(code, PRINT_BOOL_LABEL_0, Rdx);
+        Self::leaq_rip_with_label(code, PRINT_BOOL_LABEL_0, Rdx);
         Self::jmp(code);
 
         Self::print_label(code, PRINT_LABEL_FOR_BOOL_0);
-        Self::leaq_rip(code, PRINT_BOOL_LABEL_1, Rdx);
+        Self::leaq_rip_with_label(code, PRINT_BOOL_LABEL_1, Rdx);
 
         Self::print_label(code, PRINT_LABEL_FOR_BOOL_1);
         Self::movl_offset_on_reg(code, -4, Rdx, Rsi);
-        Self::leaq_rip(code, PRINT_BOOL_LABEL_2, Rdi);
+        Self::leaq_rip_with_label(code, PRINT_BOOL_LABEL_2, Rdi);
         Self::movb_rax(code, 0);
         Self::call_plt(code, PRINTF_PLT);
 
@@ -893,180 +875,119 @@ impl CLibFunctions {
 
     /*
        ==========================================================
-       ==========================================================
                            Generate Read Int
        ==========================================================
-       ==========================================================
     */
-
     fn generate_read_int(code: &mut GeneratedCode) {
         // .section .rodata
-        Self::read_only_strings(code);
-
-        // .int 2, length of formatter string
-        Self::length_of_formatter_string(code, 2);
-
+        // # length of .L._readi_str0
+        //   .int 2
         // .L._readi_str0:
-        Self::print_label(code, READ_INT_LABEL);
-
-        // .asciz "%d"
-        Self::print_ascii_string(code, CONTENT_INT_LITERAL);
-
+        //   .asciz "%d"
         // .text
-        Self::assembler_text(code);
-
         // _readi:
+        Self::read_only_strings(code);
+        Self::length_of_formatter_string(code, 2);
+        Self::print_label(code, READ_INT_LABEL);
+        Self::print_ascii_string(code, CONTENT_INT_LITERAL);
+        Self::assembler_text(code);
         Self::syscall_sub_function_label(code, READ_LABEL_FOR_INT);
 
-        // 	pushq %rbp
-        Self::pushq_rbp(code);
+        Self::print_before_structure(code);
 
-        // 	movq %rsp, %rbp
-        Self::movq_rbp_rsp(code);
-
-        // 	# external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
-        // 	andq $-16, %rsp
-        Self::andq_rsp(code);
-
-        //  subq $16, %rsp
+        //   # RDI contains the "original" value of the destination of the read
+        //   # allocate space on the stack to store the read: preserve alignment!
+        //   # the passed default argument should be stored in case of EOF
+        //   subq $16, %rsp
+        //   movl %edi, (%rsp)
+        //   leaq (%rsp), %rsi
+        //   leaq .L._readi_str0(%rip), %rdi
+        //   # on x86, al represents the number of SIMD registers used as variadic arguments
+        //   movb $0, %al
+        //   call scanf@plt
+        //   movslq (%rsp), %rax
+        //   addq $16, %rsp
+        //   movq %rbp, %rsp
+        //   popq %rbp
+        //   ret
         Self::subq_rsp(code);
-
-        // 	movl %rdi, %rdx
-        Self::movl_rdi_rdx(code);
-
-        // 	leaq (%rsp), %rsi
-        Self::leaq_rsi_rsp(code);
-
-        // 	leaq .L._readi_str0(%rip), %rdi
-        Self::leaq_rdi_rip(code, READ_INT_LABEL);
-
-        // 	# on x86, al represents the number of SIMD registers used as variadic arguments
-        // 	movb $0, %al
-        Self::movb_rax(code, 0);
-
-        // 	call scanf@plt
+        Self::mov_memory_ref_reg(code, Long, 0, false, Rdi, true, Rsp);
+        Self::leaq_registers(code, Rsp, Rsi);
+        Self::leaq_rip_with_label(code, READ_INT_LABEL, Rdi);
+        Self::mov_offset(code, Byte, 0, Rax);
         Self::call_plt(code, SCANF_PLT);
 
         //  movslq (%rsp), %rax
         Self::movslq_rsp_rax(code);
-
-        //  addq $16, %rsp
         Self::addq_rsp(code);
 
-        // 	movq %rbp, %rsp
-        Self::movq_rsp_rbp(code);
-
-        // 	popq %rbp
-        Self::popq_rbp(code);
-
-        // 	ret
-        Self::ret(code);
+        Self::print_after_structure(code);
     }
 
     /*
-       ==========================================================
        ==========================================================
                            Generate Read Char
        ==========================================================
-       ==========================================================
     */
-
     fn generate_read_char(code: &mut GeneratedCode) {
         // .section .rodata
-        Self::read_only_strings(code);
-
-        // .int 2, length of formatter string
-        Self::length_of_formatter_string(code, 2);
-
+        // # length of .L._readc_str0
+        //   .int 3
         // .L._readc_str0:
-        Self::print_label(code, READ_CHAR_LABEL);
-
-        // .asciz "%c"
-        Self::print_ascii_string(code, CONTENT_CHAR_LITERAL);
-
+        //   .asciz " %c"
         // .text
-        Self::assembler_text(code);
-
         // _readc:
+        Self::read_only_strings(code);
+        Self::length_of_formatter_string(code, 3);
+        Self::print_label(code, READ_CHAR_LABEL);
+        Self::print_ascii_string(code, CONTENT_READ_CHAR_LITERAL);
+        Self::assembler_text(code);
         Self::syscall_sub_function_label(code, READ_LABEL_FOR_CHAR);
 
-        // 	pushq %rbp
-        Self::pushq_rbp(code);
+        Self::print_before_structure(code);
 
-        // 	movq %rsp, %rbp
-        Self::movq_rbp_rsp(code);
-
-        // 	# external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
-        // 	andq $-16, %rsp
-        Self::andq_rsp(code);
-
-        //  subq $16, %rsp
+        //   # RDI contains the "original" value of the destination of the read
+        //   # allocate space on the stack to store the read: preserve alignment!
+        //   # the passed default argument should be stored in case of EOF
+        //   subq $16, %rsp
+        //   movb %dil, (%rsp)
+        //   leaq (%rsp), %rsi
+        //   leaq .L._readc_str0(%rip), %rdi
+        //   # on x86, al represents the number of SIMD registers used as variadic arguments
+        //   movb $0, %al
+        //   call scanf@plt
+        //   movsbq (%rsp), %rax
+        //   addq $16, %rsp
         Self::subq_rsp(code);
-
-        // 	movl %rdi, %rdx
-        Self::movl_rdi_rdx(code);
-
-        // 	leaq (%rsp), %rsi
-        Self::leaq_rsi_rsp(code);
-
-        // 	leaq .L._readi_str0(%rip), %rdi
-        Self::leaq_rdi_rip(code, READ_CHAR_LABEL);
-
-        // 	# on x86, al represents the number of SIMD registers used as variadic arguments
-        // 	movb $0, %al
-        Self::movb_rax(code, 0);
-
-        // 	call scanf@plt
+        Self::mov_memory_ref_reg(code, Byte, 0, true, Rsp, false, Rsi);
+        Self::leaq_registers(code, Rsp, Rsi);
+        Self::leaq_rip_with_label(code, READ_CHAR_LABEL, Rdi);
+        Self::mov_offset(code, Byte, 0, Rax);
         Self::call_plt(code, SCANF_PLT);
-
-        //  movsbq (%rsp), %rax
         Self::movsbq_rsp_rax(code);
-
-        //  addq $16, %rsp
         Self::addq_rsp(code);
 
-        // 	movq %rbp, %rsp
-        Self::movq_rsp_rbp(code);
-
-        // 	popq %rbp
-        Self::popq_rbp(code);
-
-        // 	ret
-        Self::ret(code);
+        Self::print_after_structure(code);
     }
 
     /*
        ==========================================================
-       ==========================================================
                            Generate Exit Syscall
        ==========================================================
-       ==========================================================
     */
-
     fn generate_sys_exit(code: &mut GeneratedCode) {
-        //  _exit:
-        Self::syscall_sub_function_label(code, SYS_EXIT_LABEL);
-
-        //  pushq %rbp
-        Self::pushq_rbp(code);
-
-        //  movq %rsp, %rbp
-        Self::movq_rsp_rbp(code);
-
-        //  # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
-        //  andq $-16, %rsp
-        Self::andq_rsp(code);
-
-        //  call exit@plt
+        // _exit:
+        //   pushq %rbp
+        //   movq %rsp, %rbp
+        //   # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        //   andq $-16, %rsp
+        //   call exit@plt
+        //   movq %rbp, %rsp
+        //   popq %rbp
+        //   ret
+        Self::print_label(code, SYS_EXIT_LABEL);
+        Self::print_before_structure(code);
         Self::call_plt(code, SYS_EXIT_PLT);
-
-        //  movq %rbp, %rsp
-        Self::movq_rbp_rsp(code);
-
-        //  popq %rbp
-        Self::popq_rbp(code);
-
-        //  ret
-        Self::ret(code);
+        Self::print_after_structure(code);
     }
 }
