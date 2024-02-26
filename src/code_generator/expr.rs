@@ -37,7 +37,6 @@ impl Generator for Expr {
                 let rhs_reg = rhs_exp.generate(scope, code, regs, ());
 
                 match op {
-
                     // addl, jo _errOverflow, movslq
                     BinaryOperator::Add => {
                         code.codes.push(Instruction(BinaryInstr(
@@ -51,10 +50,11 @@ impl Generator for Expr {
                         // TODO: 1. check overflow
                         // TODO: 2. movslq (currently movsl)
                         code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
+                            BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
                                 Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                                Scale::Quad,
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
@@ -74,10 +74,11 @@ impl Generator for Expr {
                         // TODO: 1. check overflow
                         // TODO: 2. movslq (currently movsl)
                         code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
+                            BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
                                 Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                                Scale::Quad,
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
@@ -97,10 +98,11 @@ impl Generator for Expr {
                         // TODO: 1. check overflow
                         // TODO: 2. movslq (currently movsl)
                         code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
+                            BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
                                 Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
+                                Scale::Quad,
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
@@ -113,7 +115,7 @@ impl Generator for Expr {
                             BinaryInstruction::new_single_scale(
                                 InstrType::Div,
                                 Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
+                                InstrOperand::Reg(lhs_reg),
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
@@ -424,12 +426,17 @@ fn generate_string_liter(
     next_reg
 }
 
-
 impl Generator for ArrayElem {
     type Input = ();
     type Output = ();
 
-    fn generate(&self, scope: &mut ScopeTranslator, code: &mut GeneratedCode, regs: &mut Vec<Register>, aux: Self::Input) -> Self::Output {
+    fn generate(
+        &self,
+        scope: &mut ScopeTranslator,
+        code: &mut GeneratedCode,
+        regs: &mut Vec<Register>,
+        aux: Self::Input,
+    ) -> Self::Output {
         todo!()
     }
 }
@@ -438,7 +445,13 @@ impl Generator for ArrayLiter {
     type Input = ();
     type Output = ();
 
-    fn generate(&self, scope: &mut ScopeTranslator, code: &mut GeneratedCode, regs: &mut Vec<Register>, aux: Self::Input) -> Self::Output {
+    fn generate(
+        &self,
+        scope: &mut ScopeTranslator,
+        code: &mut GeneratedCode,
+        regs: &mut Vec<Register>,
+        aux: Self::Input,
+    ) -> Self::Output {
         todo!()
     }
 }

@@ -25,7 +25,7 @@ impl SemanticType for Ident {
     fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
         match scope.get_type(self) {
             Some((t, renamed_id)) => {
-                *self = renamed_id;
+                // *self = renamed_id; // TODO renaming may be needed
                 Ok(t.clone())
             }
             None => Err(format!("identifier {} undeclared", self)),
@@ -55,7 +55,7 @@ impl SemanticType for ArrayElem {
             array_elem_type = match array_elem_type {
                 Type::Array(t) => t.0,
                 _ => {
-                    return Err("There is more indices than the dimension of the array".to_string())
+                    return Err("There is more indices than the dimension of the array".to_string());
                 }
             }
         }
@@ -162,7 +162,9 @@ impl Compatible for Type {
     fn unify(self, t: Type) -> Option<Type> {
         match (self.clone(), t.clone()) {
             // we will only check this first recursion
-            (Type::StringType, Type::Array(inner)) if (*inner).0 == Type::CharType => Some(Type::StringType),
+            (Type::StringType, Type::Array(inner)) if (*inner).0 == Type::CharType => {
+                Some(Type::StringType)
+            }
             _ => self.unify_help(t),
         }
     }

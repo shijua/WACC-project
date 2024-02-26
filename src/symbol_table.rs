@@ -1,8 +1,8 @@
 use crate::ast::{Ident, Type};
 
+use crate::code_generator::asm::Register;
 use crate::MessageResult;
 use std::collections::HashMap;
-use crate::code_generator::asm::Register;
 
 // pub type Label = String;
 
@@ -76,15 +76,12 @@ impl ScopeInfo<'_> {
         // manage new offset of the given variable
         // let offset = self.symbol_table.size;
 
-        match self
-            .symbol_table
-            .table
-            .insert(ident.clone(), (type_, None))
-        {
+        match self.symbol_table.table.insert(ident.clone(), (type_, None)) {
             // not allowing duplicated definition
             Some(_) => Err("This identifier already exist.".to_string()),
             // allow first time usage, including renaming
-            None => Ok(format!("{}", self.symbol_table.prefix)),
+            // None => Ok(format!("{}{}", self.symbol_table.prefix, ident)),
+            None => Ok(ident.clone()),
         }
     }
 
@@ -171,7 +168,8 @@ impl ScopeTranslator<'_> {
             // not allowing duplicated definition
             Some(_) => Err("This identifier already exist.".to_string()),
             // allow first time usage, including renaming
-            None => Ok(format!("{}", self.symbol_table.prefix)),
+            // None => Ok(format!("{}", self.symbol_table.prefix)),
+            None => Ok(ident.clone()),
         }
     }
 

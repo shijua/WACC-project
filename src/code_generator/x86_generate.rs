@@ -23,7 +23,7 @@ pub trait Generator: Debug {
 
 pub fn gen_x86_for_program(ast: &Program) -> GeneratedCode {
     let mut asm = GeneratedCode::default();
-
+    println!("{:?}", ast);
     let base_symbol_table = SymbolTable::default();
     let mut base_scope = ScopeTranslator::new(&base_symbol_table);
     // ast.generate(&mut asm);

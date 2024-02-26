@@ -4,17 +4,21 @@ use crate::code_generator::asm::InstrOperand::{Imm, Reg};
 use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rbp, Rdi, Rsp};
-use crate::code_generator::asm::{AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, RESULT_REG, get_next_register};
+use crate::code_generator::asm::{
+    get_next_register, AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode,
+    Instr, InstrOperand, InstrType, MemoryReference, Register, Scale, UnaryInstruction,
+    UnaryNotScaled, RESULT_REG,
+};
 use crate::code_generator::clib_functions::{
-    PRINT_LABEL_FOR_STRING_LINE, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_STRING,
+    PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_STRING, PRINT_LABEL_FOR_STRING_LINE,
     SYS_EXIT_LABEL,
 };
 use crate::code_generator::def_libary::Directives;
 use crate::code_generator::x86_generate::Generator;
 use crate::symbol_table::{Offset, ScopeTranslator};
 use crate::{new_spanned, Spanned};
-use std::process::exit;
 use chumsky::prelude::todo;
+use std::process::exit;
 
 impl Generator for ScopedStmt {
     type Input = ();
@@ -66,12 +70,13 @@ impl Generator for Lvalue {
         aux: Self::Input,
     ) -> Self::Output {
         match self {
-            Lvalue::LIdent((id, _)) => (
-                scope.get_register(id).unwrap(),
-                aux.size(),
-            ),
-            Lvalue::LArrElem(arr_elem) => {todo!()},
-            Lvalue::LPairElem(arr_elem) => {todo!()},
+            Lvalue::LIdent((id, _)) => (scope.get_register(id).unwrap(), aux.size()),
+            Lvalue::LArrElem(arr_elem) => {
+                todo!()
+            }
+            Lvalue::LPairElem(arr_elem) => {
+                todo!()
+            }
         }
     }
 }
@@ -89,14 +94,21 @@ impl Generator for Rvalue {
     ) -> Self::Output {
         match self {
             Rvalue::RExpr(boxed_expr) => boxed_expr.0.generate(scope, code, regs, aux),
-            Rvalue::RArrLit(boxed_arrlit) => {todo!()},
-            Rvalue::RNewPair(boxed_pair1, boxed_pair2) => {todo!()},
-            Rvalue::RPairElem(_) => {todo!()},
-            Rvalue::RCall(_, _) => {todo!()},
+            Rvalue::RArrLit(boxed_arrlit) => {
+                todo!()
+            }
+            Rvalue::RNewPair(boxed_pair1, boxed_pair2) => {
+                todo!()
+            }
+            Rvalue::RPairElem(_) => {
+                todo!()
+            }
+            Rvalue::RCall(_, _) => {
+                todo!()
             }
         }
     }
-
+}
 
 impl Generator for Stmt {
     type Input = ();
@@ -165,8 +177,7 @@ impl Stmt {
         print_type: &Type,
         exp: &Expr,
     ) {
-        let next_reg = regs[0].clone();
-        exp.generate(scope, code, regs, aux);
+        let next_reg = exp.generate(scope, code, regs, aux);
         match print_type {
             Type::StringType => code.required_clib.insert(CLibFunctions::PrintString),
             Type::IntType => code.required_clib.insert(CLibFunctions::PrintInt),
@@ -214,7 +225,7 @@ impl Stmt {
         let exit_if_label = code.get_control_label();
 
         // r[0] = evaluate if-condition
-        cond.generate(scope, code, regs, aux);
+        let next_reg = cond.generate(scope, code, regs, aux);
 
         // cmpq $1, r[0]
         code.codes.push(Instruction(Instr::BinaryInstr(
@@ -222,7 +233,7 @@ impl Stmt {
                 InstrType::Cmp,
                 Scale::default(),
                 InstrOperand::Imm(1),
-                InstrOperand::Reg(regs[0]),
+                InstrOperand::Reg(next_reg),
             ),
         )));
 
@@ -263,6 +274,7 @@ impl Stmt {
         rvalue: &Rvalue,
     ) {
         // regs[0] = rvalue
+        // todo dealing with rvalue
         rvalue.generate(scope, code, regs, aux);
 
         // store value in regs[0] to that of lvalue
@@ -399,12 +411,7 @@ impl Stmt {
         let res = cond.generate(scope, code, regs, aux);
         // cmpq $1, cond_reg => check if condition is true
         code.codes.push(Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Cmp,
-                Scale::default(),
-                Imm(1),
-                Reg(res),
-            ),
+            BinaryInstruction::new_single_scale(InstrType::Cmp, Scale::default(), Imm(1), Reg(res)),
         )));
         // je body_label
         code.codes
@@ -457,7 +464,13 @@ impl Generator for PairElem {
     type Input = ();
     type Output = ();
 
-    fn generate(&self, scope: &mut ScopeTranslator, code: &mut GeneratedCode, regs: &mut Vec<Register>, aux: Self::Input) -> Self::Output {
+    fn generate(
+        &self,
+        scope: &mut ScopeTranslator,
+        code: &mut GeneratedCode,
+        regs: &mut Vec<Register>,
+        aux: Self::Input,
+    ) -> Self::Output {
         todo!()
     }
 }
