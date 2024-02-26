@@ -6,7 +6,7 @@ use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rbp, Rdi, Rsp};
 use crate::code_generator::asm::{AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, RESULT_REG, get_next_register};
 use crate::code_generator::clib_functions::{
-    PRINTLN_LABEL, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_STRING,
+    PRINT_LABEL_FOR_STRING_LINE, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_STRING,
     SYS_EXIT_LABEL,
 };
 use crate::code_generator::def_libary::Directives;
@@ -120,7 +120,7 @@ impl Generator for Stmt {
                     .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
                         InstrType::Call,
                         Scale::default(),
-                        InstrOperand::LabelRef(String::from(PRINTLN_LABEL)),
+                        InstrOperand::LabelRef(String::from(PRINT_LABEL_FOR_STRING_LINE)),
                     ))));
             }
             Stmt::Read(read_type, (lvalue, _)) => {

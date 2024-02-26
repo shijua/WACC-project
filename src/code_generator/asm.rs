@@ -117,15 +117,12 @@ pub enum CLibFunctions {
     PrintLn,
     PrintInt,
     PrintChar,
-
-    // PrintBool,
-    // ReadChar,
-    SystemExit,
-    // PrintBool,
-    // PrintRefs,
-
+    PrintBool,
+    PrintRefs,
     ReadInt,
-    // ReadChar,
+    ReadChar,
+    SystemExit,
+
     // RuntimeError,
     // OverflowError,
     // DivideByZeroError,
