@@ -26,6 +26,9 @@ pub const PRINT_LABEL_FOR_BOOL: &str = "_printb";
 pub const PRINT_LABEL_FOR_BOOL_0: &str = ".L_printb0";
 pub const PRINT_LABEL_FOR_BOOL_1: &str = ".L_printb1";
 
+pub const PRINT_REF_LABEL: &str = ".L._printp_str0";
+pub const PRINT_LABEL_FOR_REF: &str = "_printp";
+
 pub const READ_INT_LABEL: &str = ".L._readi_str0";
 pub const READ_LABEL_FOR_INT: &str = "_readi";
 
@@ -41,6 +44,7 @@ pub const CONTENT_CHAR_LITERAL: &str = "%c";
 pub const CONTENT_READ_CHAR_LITERAL: &str = " %c";
 pub const CONTENT_BOOL_LITERAL_TRUE: &str = "true";
 pub const CONTENT_BOOL_LITERAL_FALSE: &str = "false";
+pub const CONTENT_REF_LITERAL: &str = "%p";
 
 pub const PRINTF_PLT: &str = "printf@plt";
 pub const PUTS_PLT: &str = "puts@plt";
@@ -78,6 +82,10 @@ impl Generator for CLibFunctions {
 
             CLibFunctions::PrintBool => {
                 Self::generate_print_bool(code);
+            }
+
+            CLibFunctions::PrintRefs => {
+                Self::generate_print_reference(code);
             }
 
             CLibFunctions::ReadInt => {
@@ -721,6 +729,28 @@ impl CLibFunctions {
 
         //   movq $0, %rdi
         //   call fflush@plt
+        Self::mov_offset(code, Quad, 0, Rdi);
+        Self::call_plt(code, F_FLUSH_PLT);
+
+        Self::set_back_stack(code);
+    }
+
+    fn generate_print_reference(code: &mut GeneratedCode) {
+        Self::general_set_up(code, 2,
+                             PRINT_REF_LABEL, CONTENT_REF_LITERAL, PRINT_LABEL_FOR_REF);
+        Self::set_up_stack(code);
+
+        //   movq %rdi, %rsi
+        //   leaq .L._printp_str0(%rip), %rdi
+        //   # on x86, al represents the number of SIMD registers used as variadic arguments
+        //   movb $0, %al
+        //   call printf@plt
+        //   movq $0, %rdi
+        //   call fflush@plt
+        Self::mov_registers(code, Quad, Rdi, Rsi);
+        Self::leaq_rip_with_label(code, PRINT_REF_LABEL, Rdi);
+        Self::mov_offset(code, Byte, 0, Rax);
+        Self::call_plt(code, PRINTF_PLT);
         Self::mov_offset(code, Quad, 0, Rdi);
         Self::call_plt(code, F_FLUSH_PLT);
 
