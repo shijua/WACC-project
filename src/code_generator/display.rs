@@ -155,6 +155,7 @@ impl Display for Instr {
             Instr::UnaryInstr(unary_ins) => write!(f, "{}", unary_ins),
             Instr::BinaryInstr(bin_ins) => write!(f, "{}", bin_ins),
             Instr::UnaryControl(unary_control) => write!(f, "{}", unary_control),
+            Instr::CltdInstr(instr) => write!(f, "{}", instr),
         }
     }
 }

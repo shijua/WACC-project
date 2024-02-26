@@ -363,9 +363,11 @@ pub enum Instr {
     // Pop(Scale, Register),
     // Neg(Scale, Register),
     // Call(String),
+
     UnaryControl(UnaryNotScaled),
     UnaryInstr(UnaryInstruction),
     BinaryInstr(BinaryInstruction),
+    CltdInstr(InstrType),
     Ret,
 }
 
