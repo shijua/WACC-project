@@ -1,12 +1,13 @@
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
-use crate::code_generator::asm::CLibFunctions::{OutOfMemoryError, PrintString};
+use crate::code_generator::asm::CLibFunctions::{OutOfBoundsError, OutOfMemoryError, PrintString};
+use crate::code_generator::asm::ConditionCode::{GTE, LT};
 use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl};
 use crate::code_generator::asm::Register::*;
 use crate::code_generator::asm::Scale::{Byte, Long, Quad};
 use crate::code_generator::asm::{
-    AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand,
-    InstrType, MemoryReference, MemoryReferenceImmediate, Register, Scale, UnaryInstruction,
-    UnaryNotScaled, RESULT_REG,
+    AsmLine, BinaryControl, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr,
+    InstrOperand, InstrType, MemoryReference, MemoryReferenceImmediate, Register, Scale,
+    UnaryInstruction, UnaryNotScaled, RESULT_REG,
 };
 use crate::code_generator::def_libary::{Directives, FormatLabel};
 use crate::code_generator::x86_generate::Generator;
@@ -44,8 +45,15 @@ pub const SYS_EXIT_LABEL: &str = "_exit";
 
 pub const MALLOC_LABEL: &str = "_malloc";
 
+pub const ARRAY_LOAD_LABEL: &str = "_arrLoad";
+
+pub const ARRAY_STORE_LABEL: &str = "_arrStore";
+
 pub const OUT_OF_MEMORY_LABEL: &str = ".L._errOutOfMemory_str0";
 pub const ERROR_LABEL_FOR_OUT_OF_MEMORY: &str = "_errOutOfMemory";
+
+pub const OUT_OF_BOUNDS_LABEL: &str = ".L._errOutOfBounds_str0";
+pub const ERROR_LABEL_FOR_OUT_OF_BOUNDS: &str = "_errOutOfBounds";
 
 pub const CONTENT_STRING_LITERAL: &str = "%.*s";
 pub const CONTENT_INT_LITERAL: &str = "%d";
@@ -79,6 +87,9 @@ impl CLibFunctions {
             CLibFunctions::Malloc => {
                 code.required_clib.insert(PrintString);
                 code.required_clib.insert(OutOfMemoryError);
+            }
+            CLibFunctions::ArrayStore(_) | CLibFunctions::ArrayLoad(_) => {
+                code.required_clib.insert(OutOfBoundsError);
             }
             _ => (),
         }
@@ -132,11 +143,23 @@ impl Generator for CLibFunctions {
             CLibFunctions::SystemExit => {
                 Self::generate_sys_exit(code);
             }
+
             CLibFunctions::Malloc => {
                 Self::generate_sys_malloc(code);
             }
+
             CLibFunctions::OutOfMemoryError => {
                 Self::generate_out_of_memory_error(code);
+            }
+
+            CLibFunctions::OutOfBoundsError => {
+                Self::generate_out_of_bounds_error(code);
+            }
+            CLibFunctions::ArrayLoad(_) => {
+                todo!()
+            }
+            CLibFunctions::ArrayStore(_) => {
+                todo!()
             }
         }
     }
@@ -469,6 +492,14 @@ impl CLibFunctions {
             )));
     }
 
+    fn jump_on_condition(code: &mut GeneratedCode, condition_code: ConditionCode, label: &str) {
+        code.lib_functions
+            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                InstrType::Jump(Some(condition_code)),
+                InstrOperand::LabelRef(String::from(label)),
+            ))));
+    }
+
     /*
        ==========================================================
                                  Call
@@ -500,6 +531,16 @@ impl CLibFunctions {
             ))));
     }
 
+    // pushq &rbx
+    fn pushq_rbx(code: &mut GeneratedCode) {
+        code.lib_functions
+            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                InstrType::Push,
+                Scale::default(),
+                InstrOperand::Reg(Rbx),
+            ))));
+    }
+
     /*
        ==========================================================
                                  Pop
@@ -513,6 +554,15 @@ impl CLibFunctions {
                 InstrType::Pop,
                 Scale::default(),
                 InstrOperand::Reg(Rbp),
+            ))));
+    }
+
+    fn popq_rbx(code: &mut GeneratedCode) {
+        code.lib_functions
+            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                InstrType::Pop,
+                Scale::default(),
+                InstrOperand::Reg(Rbx),
             ))));
     }
 
@@ -982,5 +1032,297 @@ impl CLibFunctions {
         Self::mov_immediate(code, Byte, -1, Rdi);
         // call exit@plt
         Self::call_func(code, SYS_EXIT_PLT);
+    }
+
+    fn generate_out_of_bounds_error(code: &mut GeneratedCode) {
+        // .section .rodata
+        // # length of .L._errOutOfBounds_str0
+        //     .int 42
+        //     .L._errOutOfBounds_str0:
+        // .asciz "fatal error: array index %d out of bounds\n"
+        //     .text
+        // _errOutOfBounds:
+        Self::general_set_up(
+            code,
+            41,
+            OUT_OF_BOUNDS_LABEL,
+            "fatal error: array index %d out of bounds",
+            ERROR_LABEL_FOR_OUT_OF_BOUNDS,
+        );
+
+        // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        // andq $-16, %rsp
+        Self::andq_rsp(code);
+        // leaq .L._errOutOfBounds_str0(%rip), %rdi
+        Self::leaq_rip_with_label(code, OUT_OF_BOUNDS_LABEL, Rdi);
+        // # on x86, al represents the number of SIMD registers used as variadic arguments
+        // movb $0, %al
+        Self::mov_immediate(code, Byte, 0, Rax);
+        // call printf@plt
+        Self::call_func(code, PRINTF_PLT);
+        // movq $0, %rdi
+        Self::mov_immediate(code, Quad, 0, Rdi);
+        // call fflush@plt
+        Self::call_func(code, F_FLUSH_PLT);
+        // movb $-1, %dil
+        Self::mov_immediate(code, Byte, -1, Rdi);
+        // call exit@plt
+        Self::call_func(code, SYS_EXIT_PLT);
+    }
+
+    fn generate_array_load(code: &mut GeneratedCode, scale: Scale) {
+        // _arrLoad4:
+        // # Special calling convention: array ptr passed in R9, index in R10, and return into R9
+        // pushq %rbx
+        // cmpl $0, %r10d
+        // cmovl %r10, %rsi
+        // jl _errOutOfBounds
+        // movl -4(%r9), %ebx
+
+        // cmpl %ebx, %r10d
+        // cmovge %r10, %rsi
+        // jge _errOutOfBounds
+        // Byte: movsbq (%r9,%r10), %r9 // Long: movslq (%r9,%r10,4), %r9 // Quad: movq (%r9,%r10,8), %r9
+        // popq %rbx
+        // ret
+        let load_label = Self::get_array_load_label(&scale);
+        Self::labelling(code, load_label.as_str());
+        Self::pushq_rbx(code);
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Cmp,
+                    Long,
+                    InstrOperand::Imm(0),
+                    InstrOperand::Reg(R10),
+                ),
+            )));
+        // cmovl %r10, %rsi
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryControl(
+                BinaryControl::new(
+                    InstrType::CMov(LT),
+                    Quad,
+                    InstrOperand::Reg(R10),
+                    InstrOperand::Reg(Rsi),
+                ),
+            )));
+        // jl
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::UnaryControl(
+                UnaryNotScaled::new(
+                    InstrType::Jump(Some(ConditionCode::LT)),
+                    InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OUT_OF_BOUNDS)),
+                ),
+            )));
+        Self::mov_memory_ref_reg(code, Long, -4, true, R9, false, Rbx);
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Cmp,
+                    Long,
+                    InstrOperand::Reg(Rbx),
+                    InstrOperand::Reg(R10),
+                ),
+            )));
+        // cmovge %r10, %rsi
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryControl(
+                BinaryControl::new(
+                    InstrType::CMov(GTE),
+                    Quad,
+                    InstrOperand::Reg(R10),
+                    InstrOperand::Reg(Rsi),
+                ),
+            )));
+        // jge
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::UnaryControl(
+                UnaryNotScaled::new(
+                    InstrType::Jump(Some(ConditionCode::GTE)),
+                    InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OUT_OF_BOUNDS)),
+                ),
+            )));
+        // Byte: movsbq (%r9,%r10), %r9 // Long: movslq (%r9,%r10,4), %r9 // Quad: movq (%r9,%r10,8), %r9
+        code.lib_functions.push(Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_double_scale(
+                InstrType::MovS,
+                scale.clone(),
+                InstrOperand::Reference(MemoryReference::new(None, Some(R9), Some(R10), Some(4))),
+                Quad,
+                InstrOperand::Reg(R9),
+            ),
+        )));
+        match scale {
+            Byte => {
+                code.lib_functions.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_double_scale(
+                        InstrType::MovS,
+                        Byte,
+                        InstrOperand::Reference(MemoryReference::new(
+                            None,
+                            Some(R9),
+                            Some(R10),
+                            None,
+                        )),
+                        Quad,
+                        InstrOperand::Reg(R9),
+                    ),
+                )));
+            }
+            Long => {
+                code.lib_functions.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_double_scale(
+                        InstrType::MovS,
+                        Long,
+                        InstrOperand::Reference(MemoryReference::new(
+                            None,
+                            Some(R9),
+                            Some(R10),
+                            Some(4),
+                        )),
+                        Quad,
+                        InstrOperand::Reg(R9),
+                    ),
+                )));
+            }
+            Quad => {
+                code.lib_functions.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Quad,
+                        InstrOperand::Reference(MemoryReference::new(
+                            None,
+                            Some(R9),
+                            Some(R10),
+                            Some(8),
+                        )),
+                        InstrOperand::Reg(R9),
+                    ),
+                )));
+            }
+            _ => unreachable!("Detect 'Word' scale in array loading"),
+        }
+        Self::popq_rbx(code);
+        Self::ret(code);
+    }
+
+    fn generate_array_store(code: &mut GeneratedCode, scale: Scale) {
+        // _arrStore4:
+        // # Special calling convention: array ptr passed in R9, index in R10, value to store in RAX
+        // pushq %rbx
+
+        let store_label = Self::get_array_store_label(scale);
+        Self::labelling(code, store_label.as_str());
+        Self::pushq_rbx(code);
+        // cmpl $0, %r10d
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Cmp,
+                    Long,
+                    InstrOperand::Imm(0),
+                    InstrOperand::Reg(R10),
+                ),
+            )));
+        // cmovl %r10, %rsi
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryControl(
+                BinaryControl::new(
+                    InstrType::CMov(LT),
+                    Scale::default(),
+                    InstrOperand::Reg(R10),
+                    InstrOperand::Reg(Rsi),
+                ),
+            )));
+
+        // jl _errOutOfBounds
+        Self::jump_on_condition(code, LT, ERROR_LABEL_FOR_OUT_OF_BOUNDS);
+        // movl -4(%r9), %ebx
+        Self::mov_memory_ref_reg(code, Long, -4, true, R9, false, Rbx);
+        // cmpl %ebx, %r10d
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Cmp,
+                    Long,
+                    InstrOperand::Reg(Rbx),
+                    InstrOperand::Reg(R10),
+                ),
+            )));
+        // cmovge %r10, %rsi
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryControl(
+                BinaryControl::new(
+                    InstrType::CMov(GTE),
+                    Scale::default(),
+                    InstrOperand::Reg(R10),
+                    InstrOperand::Reg(Rsi),
+                ),
+            )));
+        // jge _errOutOfBounds
+        Self::jump_on_condition(code, ConditionCode::GTE, ERROR_LABEL_FOR_OUT_OF_BOUNDS);
+
+        // Byte: movb %al, (%r9,%r10) // Long: movl %eax, (%r9,%r10,4) // Quad: movq %rax, (%r9,%r10,8)
+        match scale {
+            Byte => {
+                code.lib_functions.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Byte,
+                        InstrOperand::Reg(Rax),
+                        InstrOperand::Reference(MemoryReference::new(
+                            None,
+                            Some(R9),
+                            Some(R10),
+                            None,
+                        )),
+                    ),
+                )));
+            }
+            Long => {
+                code.lib_functions.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Long,
+                        InstrOperand::Reg(Rax),
+                        InstrOperand::Reference(MemoryReference::new(
+                            None,
+                            Some(R9),
+                            Some(R10),
+                            Some(4),
+                        )),
+                    ),
+                )));
+            }
+            Quad => {
+                code.lib_functions.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Quad,
+                        InstrOperand::Reg(Rax),
+                        InstrOperand::Reference(MemoryReference::new(
+                            None,
+                            Some(R9),
+                            Some(R10),
+                            Some(8),
+                        )),
+                    ),
+                )));
+            }
+            _ => unreachable!("Detect 'Word' scale in array storing"),
+        }
+        // popq %rbx
+        Self::popq_rbx(code);
+        // ret
+        Self::ret(code);
+    }
+
+    fn get_array_store_label(scale: Scale) -> String {
+        format!("{}{}", ARRAY_STORE_LABEL, scale)
+    }
+
+    fn get_array_load_label(scale: &Scale) -> String {
+        format!("{}{}", ARRAY_LOAD_LABEL, scale)
     }
 }

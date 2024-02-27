@@ -1,7 +1,7 @@
 use crate::code_generator::asm::{
-    AsmLine, BinaryInstruction, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
-    MemoryReference, MemoryReferenceImmediate, Register, Scale, ScaledRegister, UnaryInstruction,
-    UnaryNotScaled,
+    AsmLine, BinaryControl, BinaryInstruction, ConditionCode, GeneratedCode, Instr, InstrOperand,
+    InstrType, MemoryReference, MemoryReferenceImmediate, Register, Scale, ScaledRegister,
+    UnaryInstruction, UnaryNotScaled,
 };
 use crate::code_generator::def_libary::{Directives, FormatLabel};
 use std::fmt::{Display, Formatter};
@@ -78,6 +78,11 @@ impl Display for ConditionCode {
         match self {
             ConditionCode::EQ => write!(f, "e"),
             ConditionCode::NEQ => write!(f, "ne"),
+            ConditionCode::LT => write!(f, "l"),
+            ConditionCode::LTE => write!(f, "le"),
+            ConditionCode::GT => write!(f, "g"),
+            ConditionCode::GTE => write!(f, "ge"),
+            ConditionCode::OverFlow => write!(f, "o"),
         }
     }
 }
@@ -107,6 +112,7 @@ impl Display for InstrType {
             InstrType::IMul => write!(f, "imul"),
             InstrType::Div => write!(f, "idiv"),
             InstrType::Cltd => write!(f, "cltd"),
+            InstrType::CMov(condition_code) => write!(f, "cmov{}", condition_code),
         }
     }
 }
@@ -147,6 +153,16 @@ impl Display for BinaryInstruction {
     }
 }
 
+impl Display for BinaryControl {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {}, {}",
+            self.instr_type, self.src_operand, self.dst_operand
+        )
+    }
+}
+
 impl Display for Instr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "\t")?;
@@ -156,6 +172,7 @@ impl Display for Instr {
             Instr::BinaryInstr(bin_ins) => write!(f, "{}", bin_ins),
             Instr::UnaryControl(unary_control) => write!(f, "{}", unary_control),
             Instr::CltdInstr(instr) => write!(f, "{}", instr),
+            Instr::BinaryControl(bin_control) => write!(f, "{}", bin_control),
         }
     }
 }

@@ -150,9 +150,11 @@ pub enum CLibFunctions {
     // FreePair -> Unsure
     // FreeArray -> Unsure
     Malloc,
+    ArrayLoad(Scale),
+    ArrayStore(Scale),
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Copy, Hash, Eq)]
 pub enum Scale {
     Byte,
     // 1 byte
@@ -294,6 +296,7 @@ pub enum InstrType {
     IMul,
     Div,
     Cltd,
+    CMov(ConditionCode),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -307,6 +310,34 @@ pub struct UnaryInstruction {
     pub instr_type: InstrType,
     pub scale: Scale,
     pub operand: InstrOperand,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct BinaryControl {
+    pub instr_type: InstrType,
+    pub src_operand: InstrOperand,
+    pub dst_operand: InstrOperand,
+}
+
+impl BinaryControl {
+    pub fn new(
+        instr_type: InstrType,
+        scale: Scale,
+        src_operand: InstrOperand,
+        dst_operand: InstrOperand,
+    ) -> Self {
+        let vary_operand = |old_operand| match old_operand {
+            InstrOperand::Reg(reg) => InstrOperand::RegVariant(reg, scale),
+            otherwise => otherwise,
+        };
+        let lhs_operand = vary_operand(src_operand);
+        let rhs_operand = vary_operand(dst_operand);
+        Self {
+            instr_type,
+            src_operand: lhs_operand,
+            dst_operand: rhs_operand,
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, Clone)]
