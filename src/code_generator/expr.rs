@@ -1,6 +1,6 @@
 use crate::ast::{ArrayElem, ArrayLiter, BinaryOperator, Expr, Ident, UnaryOperator};
 use crate::code_generator::asm::AsmLine::Instruction;
-use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl, UnaryInstr};
+use crate::code_generator::asm::Instr::{BinaryInstr, CltdInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::LabelledImm;
 use crate::code_generator::asm::Scale::Quad;
 use crate::code_generator::asm::{
@@ -99,7 +99,7 @@ impl Generator for Expr {
                                 InstrType::MovS,
                                 Scale::Long,
                                 InstrOperand::Reg(lhs_reg),
-                                Scale::Quad,
+                                Quad,
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
@@ -117,17 +117,13 @@ impl Generator for Expr {
                             ),
                         )));
                         // TODO: 1. check divide by zero
-                        code.codes
-                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                                InstrType::Cltd,
-                                InstrOperand::Reg(rhs_reg),
-                            ))));
-                        code.codes
-                            .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
-                                InstrType::Div,
-                                Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
-                            ))));
+                        code.codes.push(Instruction(CltdInstr(InstrType::Cltd)));
+                        code.codes.push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
+                            InstrType::Div,
+                            Scale::Long,
+                            InstrOperand::Reg(lhs_reg)
+                            ),
+                        )));
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
                                 InstrType::Mov,
@@ -167,17 +163,13 @@ impl Generator for Expr {
                             ),
                         )));
                         // TODO: 1. check divide by zero
-                        code.codes
-                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                                InstrType::Cltd,
-                                InstrOperand::Reg(rhs_reg),
-                            ))));
-                        code.codes
-                            .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
-                                InstrType::Div,
-                                Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
-                            ))));
+                        code.codes.push(Instruction(CltdInstr(InstrType::Cltd)));
+                        code.codes.push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
+                            InstrType::Div,
+                            Scale::Long,
+                            InstrOperand::Reg(lhs_reg),
+                            ),
+                        )));
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
                                 InstrType::Mov,
