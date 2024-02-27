@@ -1,6 +1,6 @@
 use crate::ast::{ArrayElem, BinaryOperator, Expr, Ident, UnaryOperator};
 use crate::code_generator::asm::AsmLine::Instruction;
-use crate::code_generator::asm::CLibFunctions::OverflowError;
+use crate::code_generator::asm::CLibFunctions::{BadCharError, DivZeroError, OverflowError};
 use crate::code_generator::asm::ConditionCode::GTE;
 use crate::code_generator::asm::Instr::{BinaryInstr, CltdInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
@@ -120,7 +120,7 @@ impl Generator for Expr {
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
-                        // TODO: 1. check divide by zero
+                        code.required_clib.insert(DivZeroError);
                         code.codes.push(Instruction(CltdInstr(InstrType::Cltd)));
                         code.codes
                             .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
@@ -166,7 +166,7 @@ impl Generator for Expr {
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
-                        // TODO: 1. check divide by zero
+                        code.required_clib.insert(DivZeroError);
                         code.codes.push(Instruction(CltdInstr(InstrType::Cltd)));
                         code.codes
                             .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
@@ -500,6 +500,7 @@ impl Expr {
                         InstrOperand::Reg(R10),
                         InstrOperand::Reg(Rsi),
                     ))));
+                code.required_clib.insert(BadCharError);
                 reg
             }
         }
