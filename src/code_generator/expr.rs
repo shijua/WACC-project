@@ -1,5 +1,6 @@
 use crate::ast::{ArrayElem, BinaryOperator, Expr, Ident, UnaryOperator};
 use crate::code_generator::asm::AsmLine::Instruction;
+use crate::code_generator::asm::CLibFunctions::OverflowError;
 use crate::code_generator::asm::Instr::{BinaryInstr, CltdInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
 use crate::code_generator::asm::Register::Rax;
@@ -49,7 +50,7 @@ impl Generator for Expr {
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
-                        // TODO: 1. check overflow
+                        code.required_clib.insert(OverflowError);
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
@@ -72,7 +73,7 @@ impl Generator for Expr {
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
-                        // TODO: 1. check overflow
+                        code.required_clib.insert(OverflowError);
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
@@ -95,7 +96,7 @@ impl Generator for Expr {
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
-                        // TODO: 1. check overflow
+                        code.required_clib.insert(OverflowError);
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
