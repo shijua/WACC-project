@@ -145,17 +145,11 @@ impl Generator for Stmt {
         match self {
             Stmt::Skip => (),
             Stmt::Print(print_type, (exp, _)) => {
-                Self::generate_stmt_print(scope, code, regs, aux, print_type, exp)
+                Self::generate_stmt_print(scope, code, regs, aux, print_type, exp, false)
             }
             Stmt::Println(print_type, (exp, _)) => {
-                Self::generate_stmt_print(scope, code, regs, aux, print_type, exp);
+                Self::generate_stmt_print(scope, code, regs, aux, print_type, exp, true);
                 code.required_clib.insert(CLibFunctions::PrintLn);
-                code.codes
-                    .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-                        InstrType::Call,
-                        Scale::default(),
-                        InstrOperand::LabelRef(String::from(PRINT_LABEL_FOR_STRING_LINE)),
-                    ))));
             }
             Stmt::Read(read_type, (lvalue, _)) => {
                 todo!()
@@ -197,6 +191,7 @@ impl Stmt {
         aux: (),
         print_type: &Type,
         exp: &mut Expr,
+        is_println: bool,
     ) {
         match print_type {
             Type::StringType => {
@@ -245,6 +240,14 @@ impl Stmt {
                 InstrType::Call,
                 InstrOperand::LabelRef(String::from(print_label)),
             ))));
+        if is_println {
+            code.codes
+                .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                    InstrType::Call,
+                    Scale::default(),
+                    InstrOperand::LabelRef(String::from(PRINT_LABEL_FOR_STRING_LINE)),
+                ))));
+        }
         pop_arg_regs(code);
     }
 
