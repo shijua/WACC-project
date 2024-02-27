@@ -1,13 +1,14 @@
 use crate::ast::{ArrayElem, BinaryOperator, Expr, Ident, UnaryOperator};
 use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::CLibFunctions::OverflowError;
+use crate::code_generator::asm::ConditionCode::GTE;
 use crate::code_generator::asm::Instr::{BinaryInstr, CltdInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
-use crate::code_generator::asm::Register::Rax;
+use crate::code_generator::asm::Register::{Rax, Rsi, R10};
 use crate::code_generator::asm::Scale::Quad;
 use crate::code_generator::asm::{
-    get_next_register, next_to_rax, rax_to_next, AsmLine, BinaryInstruction, ConditionCode,
-    GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
+    get_next_register, next_to_rax, rax_to_next, AsmLine, BinaryControl, BinaryInstruction,
+    ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
     UnaryInstruction, UnaryNotScaled,
 };
 use crate::code_generator::x86_generate::Generator;
@@ -487,12 +488,19 @@ impl Expr {
             // we would still have to test whether it is implemented on a function that is
             // within the range of standard ASCII codes
             UnaryOperator::Chr => {
-                todo!()
-                // todo:
+                // TODO:
                 // (well, not necessarily rax but a general form of register representation)
                 // testq $-128, %rax
                 // cmovne %rax, %rsi
                 // jne _errBadChar
+                code.codes
+                    .push(Instruction(Instr::BinaryControl(BinaryControl::new(
+                        InstrType::CMov(GTE),
+                        Quad,
+                        InstrOperand::Reg(R10),
+                        InstrOperand::Reg(Rsi),
+                    ))));
+                reg
             }
         }
     }
