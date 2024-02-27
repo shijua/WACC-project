@@ -43,6 +43,7 @@ pub fn new_spanned<T>(elem: T) -> Spanned<T> {
 pub fn empty_span() -> Span {
     Span::new(0, 0)
 }
+
 // create a span for type(span is not important here as it is ok)
 pub fn create_span<T>(elem: T, span: Span) -> Spanned<T> {
     (elem, span)
@@ -168,7 +169,7 @@ fn main() {
         exit(SEMANTIC_ERROR_CODE);
     }
 
-    let code = code_generator::x86_generate::gen_x86_for_program(&program);
+    let code = code_generator::x86_generate::gen_x86_for_program(&mut program);
 
     let mut asm_output = String::new();
 
@@ -182,7 +183,7 @@ fn main() {
         let mut output_assembly =
             String::from(input_path.to_str().unwrap().strip_suffix(".wacc").unwrap());
         output_assembly.push_str(".s");
-        /// skip.s
+        // skip.s
         fs::write(&output_assembly, asm_output).unwrap();
     } else {
         // we have an output path

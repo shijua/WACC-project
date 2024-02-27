@@ -23,7 +23,7 @@ impl<T: SemanticType> SemanticType for Box<T> {
 
 impl SemanticType for Ident {
     fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
-        match scope.get_type(self) {
+        match scope.get_type_ident(self) {
             Some((t, renamed_id)) => {
                 // *self = renamed_id; // TODO renaming may be needed
                 Ok(t.clone())

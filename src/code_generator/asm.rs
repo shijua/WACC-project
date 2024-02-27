@@ -1,9 +1,7 @@
 use crate::code_generator::def_libary::Directives;
 use lazy_static::lazy_static;
 use std::collections::HashSet;
-use std::fs::OpenOptions;
 use std::sync::Mutex;
-use crate::ast::Type;
 
 lazy_static! {
     static ref STR_LABEL: Mutex<usize> = Mutex::new(0);
@@ -16,7 +14,7 @@ lazy_static! {
 pub type Label = String;
 
 pub fn get_rbp_size(regs: &Vec<Register>) -> i32 {
-    match regs[regs.len()-1] {
+    match regs[regs.len() - 1] {
         Register::Stack(i) => -i,
         _ => 0,
     }
@@ -24,7 +22,7 @@ pub fn get_rbp_size(regs: &Vec<Register>) -> i32 {
 
 // first register is for indicating the last register used so that we can record current stack location
 pub fn get_next_register(regs: &mut Vec<Register>, size: i32) -> Register {
-    if (regs.len() == 1) {
+    if regs.len() == 1 {
         match regs[0] {
             Register::Stack(i) => regs.push(Register::Stack(i - size)),
             _ => regs.push(Register::Stack(-size)),
@@ -88,6 +86,7 @@ pub enum Register {
 
 const ARG_REGS_N: usize = 6;
 const REGS_N: usize = 10;
+const CALLEE_SAVED_N: usize = 6;
 
 pub const RESULT_REG: Register = Register::Rax;
 
@@ -103,6 +102,15 @@ pub const ARG_REGS: [Register; ARG_REGS_N] = [
 // const ARG_REGS: [&str; ARG_REGS_N] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
 // const ARG_REGS8: [&str; ARG_REGS_N] = ["dil", "sil", "dl", "cl", "r8b", "r9b"];
 // const ARG_REGS32: [&str; ARG_REGS_N] = ["edi", "esi", "edx", "ecx", "r8d", "r9d"];
+
+pub const CALLEE_SAVED_REGS: [Register; CALLEE_SAVED_N] = [
+    Register::Rbx,
+    Register::Rbp,
+    Register::R12,
+    Register::R13,
+    Register::R14,
+    Register::R15,
+];
 
 pub const GENERAL_REGS: [Register; REGS_N] = [
     Register::R12,
@@ -130,7 +138,6 @@ pub enum CLibFunctions {
     ReadInt,
     ReadChar,
     SystemExit,
-
     // RuntimeError,
     // OverflowError,
     // DivideByZeroError,
@@ -144,9 +151,12 @@ pub enum CLibFunctions {
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Scale {
-    Byte, // 1 byte
-    Word, // 2 bytes
-    Long, // 4 bytes
+    Byte,
+    // 1 byte
+    Word,
+    // 2 bytes
+    Long,
+    // 4 bytes
     Quad, // 8 bytes
 }
 
@@ -377,7 +387,8 @@ pub enum AsmLine {
 
 #[derive(PartialEq, Debug)]
 pub struct GeneratedCode {
-    pub pre_defined: Vec<AsmLine>, // read-only data
+    pub pre_defined: Vec<AsmLine>,
+    // read-only data
     pub codes: Vec<AsmLine>,
     pub required_clib: HashSet<CLibFunctions>,
     pub lib_functions: Vec<AsmLine>,
@@ -407,6 +418,10 @@ impl GeneratedCode {
         let control_label = format!(".L_control_{}", *CONTROL_LABEL.lock().unwrap());
         *CONTROL_LABEL.lock().unwrap() += 1;
         control_label
+    }
+
+    pub fn get_function_label(&mut self, name: &str) -> Label {
+        format!("wacc_{}", name)
     }
 }
 

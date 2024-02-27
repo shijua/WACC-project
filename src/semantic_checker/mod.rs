@@ -1,4 +1,4 @@
 mod expr;
 pub mod program;
 mod stmt;
-mod util;
+pub(crate) mod util;

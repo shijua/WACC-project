@@ -4,7 +4,7 @@ use crate::code_generator::asm::{
     UnaryNotScaled,
 };
 use crate::code_generator::def_libary::{Directives, FormatLabel};
-use std::fmt::{write, Display, Formatter};
+use std::fmt::{Display, Formatter};
 
 impl Display for GeneratedCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -81,6 +81,7 @@ impl Display for ConditionCode {
         }
     }
 }
+
 impl Display for InstrType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -106,7 +107,6 @@ impl Display for InstrType {
             InstrType::IMul => write!(f, "imul"),
             InstrType::Div => write!(f, "idiv"),
             InstrType::Cltd => write!(f, "cltd"),
-
         }
     }
 }
@@ -171,7 +171,7 @@ impl Display for InstrOperand {
                 "{}",
                 ScaledRegister {
                     reg: reg.clone(),
-                    scale: scale.clone()
+                    scale: scale.clone(),
                 }
             ),
             InstrOperand::LabelRef(label) => write!(f, "{}", label),
@@ -271,49 +271,49 @@ impl Display for ScaledRegister {
                 Scale::Word => write!(f, "r8w"),
                 Scale::Long => write!(f, "r8d"),
                 Scale::Quad => write!(f, "r8"),
-            }
+            },
             R9 => match self.scale {
                 Scale::Byte => write!(f, "r9b"),
                 Scale::Word => write!(f, "r9w"),
                 Scale::Long => write!(f, "r9d"),
                 Scale::Quad => write!(f, "r9"),
-            }
+            },
             R10 => match self.scale {
                 Scale::Byte => write!(f, "r10b"),
                 Scale::Word => write!(f, "r10w"),
                 Scale::Long => write!(f, "r10d"),
                 Scale::Quad => write!(f, "r10"),
-            }
+            },
             R11 => match self.scale {
                 Scale::Byte => write!(f, "r11b"),
                 Scale::Word => write!(f, "r11w"),
                 Scale::Long => write!(f, "r11d"),
                 Scale::Quad => write!(f, "r11"),
-            }
+            },
             R12 => match self.scale {
                 Scale::Byte => write!(f, "r12b"),
                 Scale::Word => write!(f, "r12w"),
                 Scale::Long => write!(f, "r12d"),
                 Scale::Quad => write!(f, "r12"),
-            }
+            },
             R13 => match self.scale {
                 Scale::Byte => write!(f, "r13b"),
                 Scale::Word => write!(f, "r13w"),
                 Scale::Long => write!(f, "r13d"),
                 Scale::Quad => write!(f, "r13"),
-            }
+            },
             R14 => match self.scale {
                 Scale::Byte => write!(f, "r14b"),
                 Scale::Word => write!(f, "r14w"),
                 Scale::Long => write!(f, "r14d"),
                 Scale::Quad => write!(f, "r14"),
-            }
+            },
             R15 => match self.scale {
                 Scale::Byte => write!(f, "r15b"),
                 Scale::Word => write!(f, "r15w"),
                 Scale::Long => write!(f, "r15d"),
                 Scale::Quad => write!(f, "r15"),
-            }
+            },
             Rip => match self.scale.clone() {
                 Scale::Quad => write!(f, "rdi"),
                 other_scale => write!(f, "Cannot bind scale {} with RIP", other_scale),

@@ -1,14 +1,14 @@
 use crate::ast::{ArrayElem, ArrayLiter, BinaryOperator, Expr, Ident, UnaryOperator};
 use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl, UnaryInstr};
-use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
+use crate::code_generator::asm::MemoryReferenceImmediate::LabelledImm;
 use crate::code_generator::asm::Scale::Quad;
 use crate::code_generator::asm::{
     get_next_register, AsmLine, BinaryInstruction, ConditionCode, GeneratedCode, Instr,
     InstrOperand, InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled,
 };
 use crate::code_generator::x86_generate::Generator;
-use crate::symbol_table::ScopeTranslator;
+use crate::symbol_table::ScopeInfo;
 use crate::Spanned;
 
 impl Generator for Expr {
@@ -16,8 +16,8 @@ impl Generator for Expr {
     type Output = Register;
 
     fn generate(
-        &self,
-        scope: &mut ScopeTranslator,
+        &mut self,
+        scope: &mut ScopeInfo,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: Self::Input,
@@ -31,8 +31,8 @@ impl Generator for Expr {
                 Self::generate_unary_app(scope, code, regs, aux, op, inner)
             }
             Expr::BinaryApp(boxed_lhs, op, boxed_rhs) => {
-                let lhs_exp = &boxed_lhs.0;
-                let rhs_exp = &boxed_rhs.0;
+                let mut lhs_exp = &mut boxed_lhs.0;
+                let mut rhs_exp = &mut boxed_rhs.0;
                 let lhs_reg = lhs_exp.generate(scope, code, regs, ());
                 let rhs_reg = rhs_exp.generate(scope, code, regs, ());
 
@@ -117,17 +117,17 @@ impl Generator for Expr {
                             ),
                         )));
                         // TODO: 1. check divide by zero
-                        code.codes.push(Instruction(UnaryControl(UnaryNotScaled::new(
-                            InstrType::Cltd,
-                            InstrOperand::Reg(rhs_reg),
-                            ),
-                        )));
-                        code.codes.push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
-                            InstrType::Div,
-                            Scale::Long,
-                            InstrOperand::Reg(rhs_reg),
-                            ),
-                        )));
+                        code.codes
+                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                                InstrType::Cltd,
+                                InstrOperand::Reg(rhs_reg),
+                            ))));
+                        code.codes
+                            .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
+                                InstrType::Div,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                            ))));
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
                                 InstrType::Mov,
@@ -142,7 +142,7 @@ impl Generator for Expr {
                                 Scale::Long,
                                 InstrOperand::Reg(lhs_reg),
                                 InstrOperand::Reg(lhs_reg),
-                            )
+                            ),
                         )));
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
@@ -167,17 +167,17 @@ impl Generator for Expr {
                             ),
                         )));
                         // TODO: 1. check divide by zero
-                        code.codes.push(Instruction(UnaryControl(UnaryNotScaled::new(
-                            InstrType::Cltd,
-                            InstrOperand::Reg(rhs_reg),
-                        ),
-                        )));
-                        code.codes.push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
-                            InstrType::Div,
-                            Scale::Long,
-                            InstrOperand::Reg(rhs_reg),
-                        ),
-                        )));
+                        code.codes
+                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                                InstrType::Cltd,
+                                InstrOperand::Reg(rhs_reg),
+                            ))));
+                        code.codes
+                            .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
+                                InstrType::Div,
+                                Scale::Long,
+                                InstrOperand::Reg(rhs_reg),
+                            ))));
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
                                 InstrType::Mov,
@@ -192,7 +192,7 @@ impl Generator for Expr {
                                 Scale::Long,
                                 InstrOperand::Reg(lhs_reg),
                                 InstrOperand::Reg(lhs_reg),
-                            )
+                            ),
                         )));
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
@@ -308,7 +308,8 @@ impl Generator for Expr {
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
-                        code.codes.push(Instruction(UnaryControl(UnaryNotScaled::new(
+                        code.codes
+                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
                                 InstrType::Set(ConditionCode::EQ),
                                 InstrOperand::RegVariant(lhs_reg, Scale::Byte),
                             ))));
@@ -326,14 +327,16 @@ impl Generator for Expr {
 
                     // cmpq, sete, movsbq
                     BinaryOperator::Neq => {
-                        code.codes.push(Instruction(BinaryInstr(BinaryInstruction::new_single_scale(
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
                                 InstrType::Cmp,
                                 Scale::default(),
                                 InstrOperand::Reg(rhs_reg),
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
-                        code.codes.push(Instruction(UnaryControl(UnaryNotScaled::new(
+                        code.codes
+                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
                                 InstrType::Set(ConditionCode::NEQ),
                                 InstrOperand::RegVariant(lhs_reg, Scale::Byte),
                             ))));
@@ -439,7 +442,7 @@ impl Generator for Expr {
 
 impl Expr {
     fn generate_unary_app(
-        scope: &mut ScopeTranslator,
+        scope: &mut ScopeInfo,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: (),
@@ -447,7 +450,7 @@ impl Expr {
         inner: &Box<Spanned<Expr>>,
     ) -> Register {
         // store the result of generating the inner register (to reg[0])
-        let inner_exp = inner.0.clone();
+        let mut inner_exp = inner.0.clone();
         let reg = inner_exp.generate(scope, code, regs, aux);
 
         // use the result from expression for bang and negative
@@ -510,7 +513,7 @@ impl Expr {
     }
 
     fn generate_expr_ident(
-        scope: &ScopeTranslator,
+        scope: &ScopeInfo,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         id: &Ident,
@@ -617,8 +620,8 @@ impl Generator for ArrayElem {
     type Output = ();
 
     fn generate(
-        &self,
-        scope: &mut ScopeTranslator,
+        &mut self,
+        scope: &mut ScopeInfo,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: Self::Input,
@@ -632,8 +635,8 @@ impl Generator for ArrayLiter {
     type Output = ();
 
     fn generate(
-        &self,
-        scope: &mut ScopeTranslator,
+        &mut self,
+        scope: &mut ScopeInfo,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
         aux: Self::Input,
