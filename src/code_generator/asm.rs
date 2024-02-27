@@ -303,6 +303,7 @@ pub enum CLibFunctions {
     // CheckNullPointer,
     OutOfMemoryError,
     OutOfBoundsError,
+    OverflowError,
 
     // FreePair -> Unsure
     // FreeArray -> Unsure

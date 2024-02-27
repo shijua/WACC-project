@@ -55,6 +55,9 @@ pub const ERROR_LABEL_FOR_OUT_OF_MEMORY: &str = "_errOutOfMemory";
 pub const OUT_OF_BOUNDS_LABEL: &str = ".L._errOutOfBounds_str0";
 pub const ERROR_LABEL_FOR_OUT_OF_BOUNDS: &str = "_errOutOfBounds";
 
+pub const OVERFLOW_LABEL: &str = ".L._errOverflow_str0";
+pub const ERROR_LABEL_FOR_OVERFLOW: &str = "_errOverflow";
+
 pub const CONTENT_STRING_LITERAL: &str = "%.*s";
 pub const CONTENT_INT_LITERAL: &str = "%d";
 pub const CONTENT_EMPTY: &str = "";
@@ -154,6 +157,9 @@ impl Generator for CLibFunctions {
 
             CLibFunctions::OutOfBoundsError => {
                 Self::generate_out_of_bounds_error(code);
+            }
+            CLibFunctions::OverflowError => {
+                Self::generate_overflow_error(code);
             }
             CLibFunctions::ArrayLoad(_) => {
                 todo!()
@@ -1064,6 +1070,34 @@ impl CLibFunctions {
         Self::mov_immediate(code, Quad, 0, Rdi);
         // call fflush@plt
         Self::call_func(code, F_FLUSH_PLT);
+        // movb $-1, %dil
+        Self::mov_immediate(code, Byte, -1, Rdi);
+        // call exit@plt
+        Self::call_func(code, SYS_EXIT_PLT);
+    }
+
+    fn generate_overflow_error(code: &mut GeneratedCode) {
+        // .section .rodata
+        // # length of .L._errOverflow_str0
+        //     .int 52
+        //     .L._errOverflow_str0:
+        // .asciz "fatal error: integer overflow or underflow occurred\n"
+        //     .text
+        // _errOverflow:
+        Self::general_set_up(
+            code,
+            51,
+            OVERFLOW_LABEL,
+            "fatal error: integer overflow or underflow occurred",
+            ERROR_LABEL_FOR_OVERFLOW,
+        );
+        // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        // andq $-16, %rsp
+        Self::andq_rsp(code);
+        // leaq .L._errOverflow_str0(%rip), %rdi
+        Self::leaq_rip_with_label(code, OVERFLOW_LABEL, Rdi);
+        // call _prints
+        Self::call_func(code, PRINT_LABEL_FOR_STRING);
         // movb $-1, %dil
         Self::mov_immediate(code, Byte, -1, Rdi);
         // call exit@plt
