@@ -1,6 +1,6 @@
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
 use crate::code_generator::asm::CLibFunctions::{
-    OutOfBoundsError, OutOfMemoryError, OverflowError, PrintString,
+    NullPairError, OutOfBoundsError, OutOfMemoryError, OverflowError, PrintString,
 };
 use crate::code_generator::asm::ConditionCode::{GTE, LT};
 use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl};
@@ -51,6 +51,8 @@ pub const ARRAY_LOAD_LABEL: &str = "_arrLoad";
 
 pub const ARRAY_STORE_LABEL: &str = "_arrStore";
 
+pub const FREE_PAIR_LABEL: &str = "_freepair";
+
 pub const OUT_OF_MEMORY_LABEL: &str = ".L._errOutOfMemory_str0";
 pub const ERROR_LABEL_FOR_OUT_OF_MEMORY: &str = "_errOutOfMemory";
 
@@ -66,6 +68,9 @@ pub const ERROR_LABEL_FOR_BAD_CHAR: &str = "_errBadChar";
 pub const DIV_ZERO_LABEL: &str = ".L._errDivZero_str0";
 pub const ERROR_LABEL_FOR_DIV_ZERO: &str = "_errDivZero";
 
+pub const NULL_PAIR_LABEL: &str = ".L._errNull_str0";
+pub const ERROR_LABEL_FOR_NULL_PAIR: &str = "_errNull";
+
 pub const CONTENT_STRING_LITERAL: &str = "%.*s";
 pub const CONTENT_INT_LITERAL: &str = "%d";
 pub const CONTENT_EMPTY: &str = "";
@@ -80,8 +85,8 @@ pub const PUTS_PLT: &str = "puts@plt";
 pub const SCANF_PLT: &str = "scanf@plt";
 pub const F_FLUSH_PLT: &str = "fflush@plt";
 pub const SYS_EXIT_PLT: &str = "exit@plt";
-
 pub const MALLOC_PLT: &str = "malloc@plt";
+pub const FREE_PLT: &str = "free@plt";
 
 impl CLibFunctions {
     pub fn generate_dependency(&self, code: &mut GeneratedCode) {
@@ -98,15 +103,24 @@ impl CLibFunctions {
             CLibFunctions::OverflowError => {
                 code.required_clib.insert(OverflowError);
             }
+
             CLibFunctions::Malloc => {
                 code.required_clib.insert(PrintString);
                 code.required_clib.insert(OutOfMemoryError);
             }
+
+            CLibFunctions::FreePair => {
+                code.required_clib.insert(PrintString);
+                code.required_clib.insert(NullPairError);
+            }
+
             CLibFunctions::OutOfMemoryError
             | CLibFunctions::OverflowError
-            | CLibFunctions::DivZeroError => {
+            | CLibFunctions::DivZeroError
+            | CLibFunctions::NullPairError => {
                 code.required_clib.insert(PrintString);
             }
+
             CLibFunctions::ArrayStore(_) | CLibFunctions::ArrayLoad(_) => {
                 code.required_clib.insert(OutOfBoundsError);
             }
@@ -167,6 +181,10 @@ impl Generator for CLibFunctions {
                 Self::generate_sys_malloc(code);
             }
 
+            CLibFunctions::FreePair => {
+                Self::generate_free_pair(code);
+            }
+
             CLibFunctions::OutOfMemoryError => {
                 Self::generate_out_of_memory_error(code);
             }
@@ -185,6 +203,10 @@ impl Generator for CLibFunctions {
 
             CLibFunctions::DivZeroError => {
                 Self::generate_div_zero_error(code);
+            }
+
+            CLibFunctions::NullPairError => {
+                Self::generate_null_pair_error(code);
             }
 
             CLibFunctions::ArrayLoad(_) => {
@@ -1048,9 +1070,9 @@ impl CLibFunctions {
         // _errOutOfMemory:
         Self::general_set_up(
             code,
-            26,
+            27,
             OUT_OF_MEMORY_LABEL,
-            "fatal error: out of memory",
+            "fatal error: out of memory\n",
             ERROR_LABEL_FOR_OUT_OF_MEMORY,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1076,9 +1098,9 @@ impl CLibFunctions {
         // _errOutOfBounds:
         Self::general_set_up(
             code,
-            41,
+            42,
             OUT_OF_BOUNDS_LABEL,
-            "fatal error: array index %d out of bounds",
+            "fatal error: array index %d out of bounds\n",
             ERROR_LABEL_FOR_OUT_OF_BOUNDS,
         );
 
@@ -1112,9 +1134,9 @@ impl CLibFunctions {
         // _errOverflow:
         Self::general_set_up(
             code,
-            51,
+            52,
             OVERFLOW_LABEL,
-            "fatal error: integer overflow or underflow occurred",
+            "fatal error: integer overflow or underflow occurred\n",
             ERROR_LABEL_FOR_OVERFLOW,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1140,9 +1162,9 @@ impl CLibFunctions {
         // _errBadChar:
         Self::general_set_up(
             code,
-            49,
+            50,
             BAD_CHAR_LABEL,
-            "fatal error: int %d is not ascii character 0-127 ",
+            "fatal error: int %d is not ascii character 0-127 \n",
             ERROR_LABEL_FOR_BAD_CHAR,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1175,9 +1197,9 @@ impl CLibFunctions {
         // _errDivZero:
         Self::general_set_up(
             code,
-            39,
+            40,
             DIV_ZERO_LABEL,
-            "fatal error: division or modulo by zero",
+            "fatal error: division or modulo by zero\n",
             ERROR_LABEL_FOR_DIV_ZERO,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1185,6 +1207,34 @@ impl CLibFunctions {
         Self::andq_rsp(code);
         // leaq .L._errDivZero_str0(%rip), %rdi
         Self::leaq_rip_with_label(code, DIV_ZERO_LABEL, Rdi);
+        // call _prints
+        Self::call_func(code, PRINT_LABEL_FOR_STRING);
+        // movb $-1, %dil
+        Self::mov_immediate(code, Byte, -1, Rdi);
+        // call exit@plt
+        Self::call_func(code, SYS_EXIT_PLT);
+    }
+
+    fn generate_null_pair_error(code: &mut GeneratedCode) {
+        // .section .rodata
+        // # length of .L._errNull_str0
+        //     .int 45
+        //     .L._errNull_str0:
+        // .asciz "fatal error: null pair dereferenced or freed\n"
+        //     .text
+        // _errNull:
+        Self::general_set_up(
+            code,
+            45,
+            NULL_PAIR_LABEL,
+            "fatal error: null pair dereferenced or freed\n",
+            ERROR_LABEL_FOR_NULL_PAIR,
+        );
+        // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        // andq $-16, %rsp
+        Self::andq_rsp(code);
+        // leaq .L._errNull_str0(%rip), %rdi
+        Self::leaq_rip_with_label(code, NULL_PAIR_LABEL, Rdi);
         // call _prints
         Self::call_func(code, PRINT_LABEL_FOR_STRING);
         // movb $-1, %dil
@@ -1447,5 +1497,33 @@ impl CLibFunctions {
 
     fn get_array_load_label(scale: &Scale) -> String {
         format!("{}{}", ARRAY_LOAD_LABEL, scale)
+    }
+
+    fn generate_free_pair(code: &mut GeneratedCode) {
+        // _freepair:
+        Self::labelling(code, FREE_PAIR_LABEL);
+        //     pushq %rbp
+        // movq %rsp, %rbp
+        // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        // andq $-16, %rsp
+        Self::set_up_stack(code);
+        // cmpq $0, %rdi
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Cmp,
+                    Quad,
+                    InstrOperand::Imm(0),
+                    InstrOperand::Reg(Rdi),
+                ),
+            )));
+        // je _errNull
+        Self::jump_on_condition(code, ConditionCode::EQ, NULL_PAIR_LABEL);
+        // call free@plt
+        Self::call_func(code, FREE_PLT);
+        // movq %rbp, %rsp
+        // popq %rbp
+        // ret
+        Self::set_back_stack(code);
     }
 }
