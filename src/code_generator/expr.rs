@@ -2,6 +2,7 @@ use crate::ast::{ArrayElem, BinaryOperator, Expr, Ident, UnaryOperator};
 use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::Instr::{BinaryInstr, CltdInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
+use crate::code_generator::asm::Register::Rax;
 use crate::code_generator::asm::Scale::Quad;
 use crate::code_generator::asm::{
     get_next_register, AsmLine, BinaryInstruction, ConditionCode, GeneratedCode, Instr,
@@ -534,6 +535,15 @@ impl Expr {
                 InstrType::Mov,
                 Scale::from_size(_type.size() as i32),
                 InstrOperand::Reg(id_reg),
+                InstrOperand::Reg(Rax),
+            ),
+        )));
+
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Scale::from_size(_type.size() as i32),
+                InstrOperand::Reg(Rax),
                 InstrOperand::Reg(next_reg),
             ),
         )));
@@ -550,7 +560,7 @@ fn generate_int_liter(
     code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
         BinaryInstruction::new_single_scale(
             InstrType::Mov,
-            Scale::default(),
+            Scale::Long,
             InstrOperand::Imm(*int_val),
             InstrOperand::Reg(next_reg),
         ),

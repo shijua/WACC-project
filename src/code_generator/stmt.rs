@@ -6,9 +6,10 @@ use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rax, Rdi};
 use crate::code_generator::asm::{
-    get_next_register, AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode,
-    Instr, InstrOperand, InstrType, MemoryReference, Register, Scale, UnaryInstruction,
-    UnaryNotScaled, ADDR_REG, ARG_REGS, RESULT_REG,
+    arg_register_mapping, get_next_register, pop_arg_regs, push_arg_regs, AsmLine,
+    BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
+    MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, ARG_REGS,
+    RESULT_REG,
 };
 use crate::code_generator::clib_functions::{
     MALLOC_LABEL, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_STRING,
@@ -197,8 +198,6 @@ impl Stmt {
         print_type: &Type,
         exp: &mut Expr,
     ) {
-        let next_reg = exp.generate(scope, code, regs, aux);
-        let _type = exp.analyse(scope).unwrap();
         match print_type {
             Type::StringType => code.required_clib.insert(CLibFunctions::PrintString),
             Type::IntType => code.required_clib.insert(CLibFunctions::PrintInt),
@@ -210,6 +209,12 @@ impl Stmt {
         // Does we need to push and pop rdi? Don't quite know for know
         // now we'll just use a placeholder, direct move
         // this is just a temporary placeholder for carrot marks!
+
+        // not sure the comment below is essential or not
+        // # Set up R11 as a temporary second base pointer for the caller saved things
+        let next_reg = arg_register_mapping(exp.generate(scope, code, regs, aux));
+        let _type = exp.analyse(scope).unwrap();
+        push_arg_regs(code);
         code.codes.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
                 InstrType::Mov,
@@ -240,6 +245,7 @@ impl Stmt {
                 InstrType::Call,
                 InstrOperand::LabelRef(String::from(print_label)),
             ))));
+        pop_arg_regs(code);
     }
 
     fn generate_stmt_if(

@@ -107,6 +107,7 @@ impl Display for InstrType {
             InstrType::IMul => write!(f, "imul"),
             InstrType::Div => write!(f, "idiv"),
             InstrType::Cltd => write!(f, "cltd"),
+            InstrType::MovZ => write!(f, "movz"),
         }
     }
 }
@@ -183,7 +184,7 @@ impl Display for InstrOperand {
 impl Display for Register {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Register::Stack(_) => (),
+            Register::Stack(_) | Register::RspStack(_) => (),
             _ => write!(f, "%")?,
         }
         match self {
@@ -204,7 +205,8 @@ impl Display for Register {
             Register::R14 => write!(f, "r14"),
             Register::R15 => write!(f, "r15"),
             Register::Rip => write!(f, "rip"),
-            Register::Stack(ipos) => write!(f, "{}(%rsp)", ipos),
+            Register::Stack(ipos) => write!(f, "{}(%rbp)", ipos),
+            Register::RspStack(ipos) => write!(f, "{}(%rsp)", ipos),
         }
     }
 }
@@ -213,7 +215,7 @@ impl Display for ScaledRegister {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use crate::code_generator::asm::Register::*;
         match self.reg {
-            Stack(_) => (),
+            Stack(_) | Register::RspStack(_) => (),
             _ => write!(f, "%")?,
         }
 
@@ -319,7 +321,8 @@ impl Display for ScaledRegister {
                 Scale::Quad => write!(f, "rdi"),
                 other_scale => write!(f, "Cannot bind scale {} with RIP", other_scale),
             },
-            Stack(ipos) => write!(f, "{}(%rsp)", ipos),
+            Stack(ipos) => write!(f, "{}(%rbp)", ipos),
+            RspStack(ipos) => write!(f, "{}(%rsp)", ipos),
         }
     }
 }

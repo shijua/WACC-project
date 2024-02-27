@@ -33,6 +33,79 @@ pub fn get_next_register(regs: &mut Vec<Register>, size: i32) -> Register {
     ret
 }
 
+// push argument registers push all registers currently
+pub fn push_arg_regs(code: &mut GeneratedCode) {
+    let mut count: i32 = 0;
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Sub,
+            Scale::default(),
+            InstrOperand::Imm(48),
+            InstrOperand::Reg(Register::Rsp),
+        ),
+    )));
+
+    ARG_REGS.iter().for_each(|reg| {
+        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Scale::default(),
+                InstrOperand::Reg(*reg),
+                InstrOperand::Reference(MemoryReference::new(
+                    Some(MemoryReferenceImmediate::OffsetImm(count)),
+                    Some(Register::Rsp),
+                    None,
+                    None,
+                )),
+            ),
+        )));
+        count += 8;
+    });
+}
+
+// pop argument registers
+pub fn pop_arg_regs(code: &mut GeneratedCode) {
+    let mut count: i32 = 0;
+    ARG_REGS.iter().for_each(|reg| {
+        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Scale::default(),
+                InstrOperand::Reference(MemoryReference::new(
+                    Some(MemoryReferenceImmediate::OffsetImm(count)),
+                    Some(Register::Rsp),
+                    None,
+                    None,
+                )),
+                InstrOperand::Reg(*reg),
+            ),
+        )));
+        count += 8;
+    });
+
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Add,
+            Scale::default(),
+            InstrOperand::Imm(48),
+            InstrOperand::Reg(Register::Rsp),
+        ),
+    )));
+}
+
+// register mapping used when we want value from pushed registers
+pub fn arg_register_mapping(reg: Register) -> Register {
+    match reg {
+        Register::Rdi => Register::RspStack(0),
+        Register::Rsi => Register::RspStack(8),
+        Register::Rdx => Register::RspStack(16),
+        Register::Rcx => Register::RspStack(24),
+        Register::R8 => Register::RspStack(32),
+        Register::R9 => Register::RspStack(40),
+        reg => reg,
+    }
+}
+
 pub fn revert_escape_char(ch: char) -> Option<&'static str> {
     match ch {
         '\0' => Some("\\0"),
@@ -82,11 +155,12 @@ pub enum Register {
     R15,
     Rip,
     Stack(i32),
+    RspStack(i32),
 }
 
 const ARG_REGS_N: usize = 6;
 const REGS_N: usize = 10;
-const CALLEE_SAVED_N: usize = 6;
+const CALLEE_SAVED_N: usize = 5;
 
 pub const ADDR_REG: Register = Register::R11;
 
@@ -107,24 +181,23 @@ pub const ARG_REGS: [Register; ARG_REGS_N] = [
 
 pub const CALLEE_SAVED_REGS: [Register; CALLEE_SAVED_N] = [
     Register::Rbx,
-    Register::Rbp,
     Register::R12,
     Register::R13,
     Register::R14,
     Register::R15,
 ];
 
-pub const GENERAL_REGS: [Register; REGS_N] = [
+pub const GENERAL_REGS: [Register; 4] = [
     Register::R12,
     Register::R13,
     Register::R14,
     Register::R15,
-    Register::Rcx,
-    Register::Rdx,
-    Register::Rsi,
-    Register::Rdi,
-    Register::R8,
-    Register::R9,
+    // Register::Rcx,
+    // Register::Rdx,
+    // Register::Rsi,
+    // Register::Rdi,
+    // Register::R8,
+    // Register::R9,
 ];
 // const REGS8: [&str; REGS_N] = ["r10b", "r11b", "bl", "r12b", "r13b", "r14b", "r15b"];
 // const REGS32: [&str; REGS_N] = ["r10d", "r11d", "ebx", "r12d", "r13d", "r14d", "r15d"];
@@ -294,6 +367,7 @@ pub enum InstrType {
     IMul,
     Div,
     Cltd,
+    MovZ,
 }
 
 #[derive(PartialEq, Debug, Clone)]
