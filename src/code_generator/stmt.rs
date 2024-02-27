@@ -10,7 +10,7 @@ use crate::code_generator::asm::Register::{Rbp, Rdi, Rsp};
 use crate::code_generator::asm::{
     get_next_register, AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode,
     Instr, InstrOperand, InstrType, MemoryReference, Register, Scale, UnaryInstruction,
-    UnaryNotScaled, ARG_REGS, RESULT_REG,
+    UnaryNotScaled, ADDR_REG, ARG_REGS, RESULT_REG,
 };
 use crate::code_generator::clib_functions::{
     MALLOC_LABEL, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_STRING,
@@ -536,19 +536,24 @@ impl Generator for ArrayLiter {
         let reg = get_next_register(regs, 8);
         let arr_len = self.val.len();
         let arr_size = (arr_len * aux.size() + 4) as i32;
-        generate_malloc(code, arr_size, reg);
+        generate_malloc(code, arr_size, ADDR_REG);
         // put array size
         code.codes.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
                 InstrType::Mov,
                 Scale::Long,
                 Imm(arr_len as i32),
-                Reference(MemoryReference::new(None, Some(reg), None, None)),
+                Reference(MemoryReference::new(None, Some(ADDR_REG), None, None)),
             ),
         )));
         // shift forward 4 bytes to adhere to array conventions
         code.codes.push(Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(InstrType::Add, Scale::default(), Imm(4), Reg(reg)),
+            BinaryInstruction::new_single_scale(
+                InstrType::Add,
+                Scale::default(),
+                Imm(4),
+                Reg(ADDR_REG),
+            ),
         )));
 
         // push all array elements into it
@@ -557,17 +562,34 @@ impl Generator for ArrayLiter {
             code.codes.push(Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
                     InstrType::Mov,
-                    Scale::from_size(aux.size() as i32),
+                    Scale::default(),
                     Reg(expr_reg),
+                    Reg(RESULT_REG),
+                ),
+            )));
+            code.codes.push(Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Mov,
+                    Scale::from_size(aux.size() as i32),
+                    Reg(RESULT_REG),
                     Reference(MemoryReference::new(
                         Some(OffsetImm((aux.size() * arr_index) as i32)),
-                        Some(reg),
+                        Some(ADDR_REG),
                         None,
                         None,
                     )),
                 ),
             )));
         }
+
+        code.codes.push(Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Scale::default(),
+                Reg(ADDR_REG),
+                Reg(reg),
+            ),
+        )));
         reg
     }
 }

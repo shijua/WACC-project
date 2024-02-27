@@ -89,6 +89,8 @@ pub enum Register {
 const ARG_REGS_N: usize = 6;
 const REGS_N: usize = 10;
 
+pub const ADDR_REG: Register = Register::R11;
+
 pub const RESULT_REG: Register = Register::Rax;
 
 pub const ARG_REGS: [Register; ARG_REGS_N] = [
