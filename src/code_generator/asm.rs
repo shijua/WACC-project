@@ -1,3 +1,5 @@
+use crate::code_generator::asm::AsmLine::Instruction;
+use crate::code_generator::asm::Register::{Rbp, Rsp};
 use crate::code_generator::def_libary::Directives;
 use lazy_static::lazy_static;
 use std::collections::HashSet;
@@ -104,6 +106,87 @@ pub fn arg_register_mapping(reg: Register) -> Register {
         Register::R9 => Register::RspStack(40),
         reg => reg,
     }
+}
+
+pub fn push_callee_saved_regs(code: &mut GeneratedCode) {
+    // push RBP and link RBP with RSP
+    code.codes
+        .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+            InstrType::Push,
+            Scale::default(),
+            InstrOperand::Reg(Rbp),
+        ))));
+
+    CALLEE_SAVED_REGS.iter().for_each(|reg| {
+        code.codes
+            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                InstrType::Push,
+                Scale::default(),
+                InstrOperand::Reg(*reg),
+            ))));
+    });
+
+    // movq rsp to rbp
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            Scale::default(),
+            InstrOperand::Reg(Rsp),
+            InstrOperand::Reg(Rbp),
+        ),
+    )));
+}
+
+pub fn pop_callee_saved_regs(code: &mut GeneratedCode) {
+    // movq rbp to rsp
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            Scale::default(),
+            InstrOperand::Reg(Rbp),
+            InstrOperand::Reg(Rsp),
+        ),
+    )));
+
+    // pop callee saved registers
+    CALLEE_SAVED_REGS.iter().rev().for_each(|reg| {
+        code.codes
+            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                InstrType::Pop,
+                Scale::default(),
+                InstrOperand::Reg(*reg),
+            ))));
+    });
+
+    // pop RBP
+    code.codes
+        .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+            InstrType::Pop,
+            Scale::default(),
+            InstrOperand::Reg(Rbp),
+        ))));
+}
+
+pub fn next_to_rax(code: &mut GeneratedCode, next: Register, scale: Scale) {
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            scale,
+            InstrOperand::Reg(next),
+            InstrOperand::Reg(RESULT_REG),
+        ),
+    )));
+}
+
+pub fn rax_to_next(code: &mut GeneratedCode, next: Register, scale: Scale) {
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            scale,
+            InstrOperand::Reg(RESULT_REG),
+            InstrOperand::Reg(next),
+        ),
+    )));
 }
 
 pub fn revert_escape_char(ch: char) -> Option<&'static str> {

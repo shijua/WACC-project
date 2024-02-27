@@ -6,10 +6,10 @@ use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rax, Rdi};
 use crate::code_generator::asm::{
-    arg_register_mapping, get_next_register, pop_arg_regs, push_arg_regs, AsmLine,
-    BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
-    MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, ARG_REGS,
-    RESULT_REG,
+    arg_register_mapping, get_next_register, next_to_rax, pop_arg_regs, push_arg_regs, rax_to_next,
+    AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand,
+    InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG,
+    ARG_REGS, RESULT_REG,
 };
 use crate::code_generator::clib_functions::{
     MALLOC_LABEL, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_STRING,
@@ -125,7 +125,7 @@ impl Generator for Rvalue {
                         InstrOperand::LabelRef(func_name),
                     ))));
                 // return Rax as the result
-                Register::Rax
+                RESULT_REG
             }
         }
     }
@@ -215,22 +215,10 @@ impl Stmt {
         let next_reg = arg_register_mapping(exp.generate(scope, code, regs, aux));
         let _type = exp.analyse(scope).unwrap();
         push_arg_regs(code);
-        code.codes.push(Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                Scale::from_size(_type.size() as i32),
-                InstrOperand::Reg(next_reg),
-                InstrOperand::Reg(Rax),
-            ),
-        )));
-        code.codes.push(Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                Scale::from_size(_type.size() as i32),
-                InstrOperand::Reg(Rax),
-                InstrOperand::Reg(Rdi),
-            ),
-        )));
+
+        next_to_rax(code, next_reg, Scale::from_size(_type.size() as i32));
+
+        rax_to_next(code, Rdi, Scale::from_size(_type.size() as i32));
 
         // call relevant print statements
         let print_label = match print_type {
@@ -346,22 +334,11 @@ impl Stmt {
         let res = rvalue.0.generate(scope, code, regs, type_.clone());
         let sto = get_next_register(regs, type_.size() as i32);
         let scale = Scale::from_size(type_.size() as i32);
-        code.codes.push(Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                scale.clone(),
-                Reg(res),
-                Reg(Register::Rax),
-            ),
-        )));
-        code.codes.push(Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                scale.clone(),
-                Reg(Register::Rax),
-                Reg(sto),
-            ),
-        )));
+
+        next_to_rax(code, res, scale.clone());
+
+        rax_to_next(code, sto, scale.clone());
+
         let _add_result = scope.add_with_reg(lvalue_, type_.clone(), sto);
     }
 

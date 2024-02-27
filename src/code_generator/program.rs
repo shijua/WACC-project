@@ -3,9 +3,9 @@ use crate::ast::{Function, Program, Type};
 use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::Register::{Rbp, Rsp};
 use crate::code_generator::asm::{
-    get_next_register, get_rbp_size, AsmLine, BinaryInstruction, GeneratedCode, Instr,
-    InstrOperand, InstrType, Register, Scale, UnaryInstruction, ARG_REGS, CALLEE_SAVED_REGS,
-    GENERAL_REGS, RESULT_REG,
+    get_next_register, get_rbp_size, pop_callee_saved_regs, push_callee_saved_regs, AsmLine,
+    BinaryInstruction, GeneratedCode, Instr, InstrOperand, InstrType, Register, Scale,
+    UnaryInstruction, ARG_REGS, CALLEE_SAVED_REGS, GENERAL_REGS, RESULT_REG,
 };
 use crate::code_generator::def_libary::{Directives, MAIN_FUNCTION_TITLE};
 use crate::code_generator::x86_generate::{Generator, DEFAULT_EXIT_CODE};
@@ -33,47 +33,12 @@ impl Generator for Function {
         code.codes
             .push(AsmLine::Directive(Directives::Label(function_label_string)));
 
-        // push RBP and link RBP with RSP
-        code.codes
-            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-                InstrType::Push,
-                Scale::default(),
-                InstrOperand::Reg(Rbp),
-            ))));
+        push_callee_saved_regs(code);
 
-        CALLEE_SAVED_REGS.iter().for_each(|reg| {
-            code.codes
-                .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-                    InstrType::Push,
-                    Scale::default(),
-                    InstrOperand::Reg(*reg),
-                ))));
-        });
-
-        // movq rsp to rbp
-        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                Scale::default(),
-                InstrOperand::Reg(Rsp),
-                InstrOperand::Reg(Rbp),
-            ),
-        )));
-
-        // allocate stack frame
-        // we now put it after generate assembly code
-        // let body_allocated_size = self.body_symbol_table.size;
-        // code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-        //     BinaryInstruction::new_single_scale(
-        //         InstrType::Sub,
-        //         Scale::default(),
-        //         InstrOperand::Imm(body_allocated_size),
-        //         InstrOperand::Reg(Register::Rsp),
-        //     ),
-        // )));
+        // record the location for allocating stack frame
         let pos = code.codes.len();
 
-        // process parameter scope
+        // process parameter scope to move it into other register
         let mut arg_regs: Vec<Register> = ARG_REGS.iter().cloned().collect();
         assert!(self.parameters.len() <= ARG_REGS.len()); // current restriction
         let mut scope = scope.make_scope(&mut self.param_symbol_table);
@@ -132,24 +97,7 @@ impl Generator for Function {
             )));
         }
 
-        // pop callee saved registers
-        CALLEE_SAVED_REGS.iter().rev().for_each(|reg| {
-            code.codes
-                .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-                    InstrType::Pop,
-                    Scale::default(),
-                    InstrOperand::Reg(*reg),
-                ))));
-        });
-
-        // pop RBP
-        code.codes
-            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-                InstrType::Pop,
-                Scale::default(),
-                InstrOperand::Reg(Rbp),
-            ))));
-
+        pop_callee_saved_regs(code);
         // return
         code.codes.push(AsmLine::Instruction(Instr::Ret));
     }
@@ -188,7 +136,7 @@ impl Generator for Program {
             param_symbol_table: Default::default(),
             body_symbol_table: self.body.symbol_table.clone(),
         }
-        .generate(&mut scope, code, regs, true);
+            .generate(&mut scope, code, regs, true);
 
         // todo: generate assembly for the functions
 

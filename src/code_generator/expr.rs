@@ -5,8 +5,9 @@ use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetIm
 use crate::code_generator::asm::Register::Rax;
 use crate::code_generator::asm::Scale::Quad;
 use crate::code_generator::asm::{
-    get_next_register, AsmLine, BinaryInstruction, ConditionCode, GeneratedCode, Instr,
-    InstrOperand, InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled,
+    get_next_register, next_to_rax, rax_to_next, AsmLine, BinaryInstruction, ConditionCode,
+    GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
+    UnaryInstruction, UnaryNotScaled,
 };
 use crate::code_generator::x86_generate::Generator;
 use crate::symbol_table::ScopeInfo;
@@ -530,23 +531,10 @@ impl Expr {
         let next_reg = get_next_register(regs, _type.size() as i32);
         let id_reg = scope.get_register(id).unwrap();
 
-        code.codes.push(Instruction(BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                Scale::from_size(_type.size() as i32),
-                InstrOperand::Reg(id_reg),
-                InstrOperand::Reg(Rax),
-            ),
-        )));
+        next_to_rax(code, id_reg, Scale::from_size(_type.size() as i32));
 
-        code.codes.push(Instruction(BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                Scale::from_size(_type.size() as i32),
-                InstrOperand::Reg(Rax),
-                InstrOperand::Reg(next_reg),
-            ),
-        )));
+        rax_to_next(code, next_reg, Scale::from_size(_type.size() as i32));
+
         next_reg
     }
 }
@@ -617,6 +605,7 @@ fn generate_string_liter(
     // string must be referred to as a global dereference
     let str_label = code.get_next_string_label(&str_val);
 
+    // put result of lea to Rax first to prevent lea between two stack
     code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
         BinaryInstruction::new_single_scale(
             InstrType::Lea,
@@ -627,9 +616,12 @@ fn generate_string_liter(
                 None,
                 None,
             )),
-            InstrOperand::Reg(next_reg),
+            InstrOperand::Reg(Rax),
         ),
     )));
+    // then move to next_reg
+    rax_to_next(code, next_reg, Quad);
+
     next_reg
 }
 
