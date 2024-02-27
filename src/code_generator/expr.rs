@@ -1,4 +1,4 @@
-use crate::ast::{ArrayElem, ArrayLiter, BinaryOperator, Expr, Ident, Type, UnaryOperator};
+use crate::ast::{ArrayElem, BinaryOperator, Expr, Ident, UnaryOperator};
 use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::Instr::{BinaryInstr, CltdInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};

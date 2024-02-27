@@ -1,4 +1,3 @@
-use crate::ast::Type;
 use crate::code_generator::def_libary::Directives;
 use lazy_static::lazy_static;
 use std::collections::HashSet;

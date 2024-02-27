@@ -1,4 +1,3 @@
-use crate::ast::Type::{IntType, NestedPair};
 use crate::from_span;
 use crate::symbol_table::SymbolTable;
 use crate::Spanned;

@@ -1,13 +1,10 @@
 use crate::ast::ArgList::Arg;
-use crate::ast::{
-    ArrayElem, ArrayLiter, Expr, Ident, Lvalue, PairElem, Rvalue, ScopedStmt, Stmt, Type,
-};
+use crate::ast::{ArrayLiter, Expr, Ident, Lvalue, PairElem, Rvalue, ScopedStmt, Stmt, Type};
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
-use crate::code_generator::asm::Instr::BinaryInstr;
 use crate::code_generator::asm::InstrOperand::{Imm, Reference, Reg};
 use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
-use crate::code_generator::asm::Register::{Rdi, Rsp};
+use crate::code_generator::asm::Register::{Rax, Rdi};
 use crate::code_generator::asm::{
     get_next_register, AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode,
     Instr, InstrOperand, InstrType, MemoryReference, Register, Scale, UnaryInstruction,
@@ -36,28 +33,28 @@ impl Generator for ScopedStmt {
     ) -> Self::Output {
         // Allocate relevant space onto the stack for new variables declared within the scope
         let new_offset = self.symbol_table.size;
-        code.codes.push(Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Sub,
-                Scale::default(),
-                Imm(new_offset),
-                Reg(Rsp),
-            ),
-        )));
+        // code.codes.push(Instruction(Instr::BinaryInstr(
+        //     BinaryInstruction::new_single_scale(
+        //         InstrType::Sub,
+        //         Scale::default(),
+        //         Imm(new_offset),
+        //         Reg(Rsp),
+        //     ),
+        // )));
 
         // enter the new scope
         let mut scope = scope.make_scope(&mut self.symbol_table);
 
         self.stmt.0.generate(&mut scope, code, regs, aux);
 
-        code.codes.push(Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Add,
-                Scale::default(),
-                Imm(new_offset),
-                Reg(Rsp),
-            ),
-        )));
+        // code.codes.push(Instruction(Instr::BinaryInstr(
+        //     BinaryInstruction::new_single_scale(
+        //         InstrType::Add,
+        //         Scale::default(),
+        //         Imm(new_offset),
+        //         Reg(Rsp),
+        //     ),
+        // )));
     }
 }
 
@@ -201,6 +198,7 @@ impl Stmt {
         exp: &mut Expr,
     ) {
         let next_reg = exp.generate(scope, code, regs, aux);
+        let _type = exp.analyse(scope).unwrap();
         match print_type {
             Type::StringType => code.required_clib.insert(CLibFunctions::PrintString),
             Type::IntType => code.required_clib.insert(CLibFunctions::PrintInt),
@@ -215,8 +213,16 @@ impl Stmt {
         code.codes.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
                 InstrType::Mov,
-                Scale::default(),
+                Scale::from_size(_type.size() as i32),
                 InstrOperand::Reg(next_reg),
+                InstrOperand::Reg(Rax),
+            ),
+        )));
+        code.codes.push(Instruction(Instr::BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Scale::from_size(_type.size() as i32),
+                InstrOperand::Reg(Rax),
                 InstrOperand::Reg(Rdi),
             ),
         )));
