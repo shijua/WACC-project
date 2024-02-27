@@ -1,4 +1,4 @@
-use crate::ast::{ArrayElem, ArrayLiter, BinaryOperator, Expr, Ident, UnaryOperator};
+use crate::ast::{ArrayElem, ArrayLiter, BinaryOperator, Expr, Ident, Type, UnaryOperator};
 use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::Instr::{BinaryInstr, CltdInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
@@ -118,12 +118,12 @@ impl Generator for Expr {
                         )));
                         // TODO: 1. check divide by zero
                         code.codes.push(Instruction(CltdInstr(InstrType::Cltd)));
-                        code.codes.push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
-                            InstrType::Div,
-                            Scale::Long,
-                            InstrOperand::Reg(lhs_reg)
-                            ),
-                        )));
+                        code.codes
+                            .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
+                                InstrType::Div,
+                                Scale::Long,
+                                InstrOperand::Reg(lhs_reg),
+                            ))));
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
                                 InstrType::Mov,
@@ -138,7 +138,7 @@ impl Generator for Expr {
                                 Scale::Long,
                                 InstrOperand::Reg(lhs_reg),
                                 InstrOperand::Reg(lhs_reg),
-                            )
+                            ),
                         )));
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
@@ -164,12 +164,12 @@ impl Generator for Expr {
                         )));
                         // TODO: 1. check divide by zero
                         code.codes.push(Instruction(CltdInstr(InstrType::Cltd)));
-                        code.codes.push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
-                            InstrType::Div,
-                            Scale::Long,
-                            InstrOperand::Reg(lhs_reg),
-                            ),
-                        )));
+                        code.codes
+                            .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
+                                InstrType::Div,
+                                Scale::Long,
+                                InstrOperand::Reg(lhs_reg),
+                            ))));
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
                                 InstrType::Mov,
@@ -184,7 +184,7 @@ impl Generator for Expr {
                                 Scale::Long,
                                 InstrOperand::Reg(lhs_reg),
                                 InstrOperand::Reg(lhs_reg),
-                            )
+                            ),
                         )));
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
@@ -300,7 +300,8 @@ impl Generator for Expr {
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
-                        code.codes.push(Instruction(UnaryControl(UnaryNotScaled::new(
+                        code.codes
+                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
                                 InstrType::Set(ConditionCode::EQ),
                                 InstrOperand::RegVariant(lhs_reg, Scale::Byte),
                             ))));
@@ -318,14 +319,16 @@ impl Generator for Expr {
 
                     // cmpq, sete, movsbq
                     BinaryOperator::Neq => {
-                        code.codes.push(Instruction(BinaryInstr(BinaryInstruction::new_single_scale(
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
                                 InstrType::Cmp,
                                 Scale::default(),
                                 InstrOperand::Reg(rhs_reg),
                                 InstrOperand::Reg(lhs_reg),
                             ),
                         )));
-                        code.codes.push(Instruction(UnaryControl(UnaryNotScaled::new(
+                        code.codes
+                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
                                 InstrType::Set(ConditionCode::NEQ),
                                 InstrOperand::RegVariant(lhs_reg, Scale::Byte),
                             ))));
@@ -447,14 +450,29 @@ impl Expr {
             UnaryOperator::Bang => Self::generate_unary_app_bang(code, reg),
             UnaryOperator::Negative => Self::generate_unary_app_negation(code, reg),
             UnaryOperator::Len => {
-                todo!()
                 // for design of arrays, all the data are shifted for 4 bytes in order to account for
                 // the length (stored in the first position)
                 // therefore, when we are attempting to get the length of something,
                 // we only need to fetch the first 4 bytes stored in the location specified by the register
                 // as arrays would have been malloced.
                 //
-                // Hence, if the array is stored at position (%r_array), then its length is at position -4(%r_array)
+                // the length of array is stored 4 bytes before the given location as -4(something)
+                let dst_reg = get_next_register(regs, 4);
+                code.codes.push(Instruction(BinaryInstr(
+                    BinaryInstruction::new_double_scale(
+                        InstrType::MovS,
+                        Scale::Long,
+                        InstrOperand::Reference(MemoryReference {
+                            imm: Some(OffsetImm(-4)),
+                            base_reg: Some(reg),
+                            shift_unit_reg: None,
+                            shift_cnt: None,
+                        }),
+                        Scale::default(),
+                        InstrOperand::Reg(dst_reg),
+                    ),
+                )));
+                dst_reg
             }
             // there's no need to particularly handle ord and chr functions
             // as internally char are stored as integers inside assembly
@@ -507,7 +525,7 @@ impl Expr {
         regs: &mut Vec<Register>,
         id: &Ident,
     ) -> Register {
-        let next_reg = get_next_register(regs, scope.get_type(id).unwrap().size());
+        let next_reg = get_next_register(regs, scope.get_type(id).unwrap().size() as i32);
         let id_reg = scope.get_register(id).unwrap();
 
         code.codes.push(Instruction(BinaryInstr(
@@ -605,21 +623,6 @@ fn generate_string_liter(
 }
 
 impl Generator for ArrayElem {
-    type Input = ();
-    type Output = ();
-
-    fn generate(
-        &self,
-        scope: &mut ScopeTranslator,
-        code: &mut GeneratedCode,
-        regs: &mut Vec<Register>,
-        aux: Self::Input,
-    ) -> Self::Output {
-        todo!()
-    }
-}
-
-impl Generator for ArrayLiter {
     type Input = ();
     type Output = ();
 

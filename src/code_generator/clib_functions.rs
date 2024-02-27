@@ -967,9 +967,9 @@ impl CLibFunctions {
         // _errOutOfMemory:
         Self::general_set_up(
             code,
-            27,
+            26,
             OUT_OF_MEMORY_LABEL,
-            "fatal error: out of memory\n",
+            "fatal error: out of memory",
             ERROR_LABEL_FOR_OUT_OF_MEMORY,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0

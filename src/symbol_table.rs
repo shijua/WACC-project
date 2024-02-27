@@ -71,7 +71,7 @@ impl ScopeInfo<'_> {
 
     pub fn add(&mut self, ident: &Ident, type_: Type) -> MessageResult<Ident> {
         // increase the space needed by the stack frame by the size of the given type
-        self.symbol_table.size += type_.size();
+        self.symbol_table.size += type_.size() as i32;
 
         // manage new offset of the given variable
         // let offset = self.symbol_table.size;
@@ -158,7 +158,7 @@ impl ScopeTranslator<'_> {
 
     pub fn add(&mut self, ident: &Ident, type_: Type, reg: Register) -> MessageResult<Ident> {
         // increase the space needed by the stack frame by the size of the given type
-        self.symbol_table.size += type_.size();
+        self.symbol_table.size += type_.size() as i32;
 
         match self
             .symbol_table
