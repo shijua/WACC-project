@@ -91,6 +91,9 @@ impl CLibFunctions {
                 code.required_clib.insert(PrintString);
                 code.required_clib.insert(OutOfMemoryError);
             }
+            CLibFunctions::OutOfMemoryError | CLibFunctions::OverflowError => {
+                code.required_clib.insert(PrintString);
+            }
             CLibFunctions::ArrayStore(_) | CLibFunctions::ArrayLoad(_) => {
                 code.required_clib.insert(OutOfBoundsError);
             }
