@@ -189,6 +189,28 @@ pub fn rax_to_next(code: &mut GeneratedCode, next: Register, scale: Scale) {
     )));
 }
 
+pub fn next_to_r11(code: &mut GeneratedCode, next: Register, scale: Scale) {
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            scale,
+            InstrOperand::Reg(next),
+            InstrOperand::Reg(Register::R11),
+        ),
+    )));
+}
+
+pub fn r11_to_next(code: &mut GeneratedCode, next: Register, scale: Scale) {
+    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            scale,
+            InstrOperand::Reg(Register::R11),
+            InstrOperand::Reg(next),
+        ),
+    )));
+}
+
 pub fn revert_escape_char(ch: char) -> Option<&'static str> {
     match ch {
         '\0' => Some("\\0"),
@@ -270,17 +292,17 @@ pub const CALLEE_SAVED_REGS: [Register; CALLEE_SAVED_N] = [
     Register::R15,
 ];
 
-pub const GENERAL_REGS: [Register; 4] = [
+pub const GENERAL_REGS: [Register; REGS_N] = [
     Register::R12,
     Register::R13,
     Register::R14,
     Register::R15,
-    // Register::Rcx,
-    // Register::Rdx,
-    // Register::Rsi,
-    // Register::Rdi,
-    // Register::R8,
-    // Register::R9,
+    Register::Rcx,
+    Register::Rdx,
+    Register::Rsi,
+    Register::Rdi,
+    Register::R8,
+    Register::R9,
 ];
 // const REGS8: [&str; REGS_N] = ["r10b", "r11b", "bl", "r12b", "r13b", "r14b", "r15b"];
 // const REGS32: [&str; REGS_N] = ["r10d", "r11d", "ebx", "r12d", "r13d", "r14d", "r15d"];

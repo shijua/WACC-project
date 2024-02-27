@@ -125,7 +125,13 @@ impl Display for UnaryNotScaled {
 
 impl Display for UnaryInstruction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{} {}", self.instr_type, self.scale, self.operand)
+        write!(
+            f,
+            "{}{} {}",
+            self.instr_type,
+            self.scale,
+            self.operand.combine_scale(self.scale.clone())
+        )
     }
 }
 
