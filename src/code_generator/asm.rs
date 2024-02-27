@@ -35,6 +35,13 @@ pub fn get_next_register(regs: &mut Vec<Register>, size: i32) -> Register {
     ret
 }
 
+pub fn push_back_register(regs: &mut Vec<Register>, killed: Register) {
+    if !matches!(killed, Register::Stack(_)) {
+        let back_to_available = killed.clone();
+        regs.insert(0, back_to_available);
+    }
+}
+
 // push argument registers push all registers currently
 pub fn push_arg_regs(code: &mut GeneratedCode) {
     let mut count: i32 = 0;

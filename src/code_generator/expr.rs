@@ -5,8 +5,8 @@ use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetIm
 use crate::code_generator::asm::Register::Rax;
 use crate::code_generator::asm::Scale::Quad;
 use crate::code_generator::asm::{
-    get_next_register, next_to_rax, rax_to_next, AsmLine, BinaryInstruction, ConditionCode,
-    GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
+    get_next_register, next_to_rax, push_back_register, rax_to_next, AsmLine, BinaryInstruction,
+    ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
     UnaryInstruction, UnaryNotScaled,
 };
 use crate::code_generator::x86_generate::Generator;
@@ -38,7 +38,7 @@ impl Generator for Expr {
                 let lhs_reg = lhs_exp.generate(scope, code, regs, ());
                 let rhs_reg = rhs_exp.generate(scope, code, regs, ());
 
-                match op {
+                let final_reg = match op {
                     // addl, jo _errOverflow, movslq
                     BinaryOperator::Add => {
                         code.codes.push(Instruction(BinaryInstr(
@@ -348,39 +348,7 @@ impl Generator for Expr {
 
                     // cmpq, and, movq, cmpq
                     BinaryOperator::And => {
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Cmp,
-                                Scale::default(),
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
-                            ),
-                        )));
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::And,
-                                Scale::default(),
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
-                            ),
-                        )));
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Mov,
-                                Scale::default(),
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
-                            ),
-                        )));
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Cmp,
-                                Scale::default(),
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
-                            ),
-                        )));
-                        lhs_reg
+                        Self::generate_expr_binary_logical_and(code, lhs_reg, rhs_reg)
                     }
 
                     // cmpq, or, movq, cmpq
@@ -419,7 +387,11 @@ impl Generator for Expr {
                         )));
                         lhs_reg
                     }
-                }
+                };
+
+                push_back_register(regs, rhs_reg);
+
+                final_reg
             }
 
             Expr::PairLiter => {
@@ -536,6 +508,52 @@ impl Expr {
         rax_to_next(code, next_reg, Scale::from_size(_type.size() as i32));
 
         next_reg
+    }
+
+    fn generate_expr_binary_logical_and(
+        code: &mut GeneratedCode,
+        lhs_reg: Register,
+        rhs_reg: Register,
+    ) -> Register {
+        // code.codes.push(Instruction(BinaryInstr(
+        //     BinaryInstruction::new_single_scale(
+        //         InstrType::Cmp,
+        //         Scale::default(),
+        //         InstrOperand::Reg(rhs_reg),
+        //         InstrOperand::Reg(lhs_reg),
+        //     ),
+        // )));
+        // code.codes.push(Instruction(BinaryInstr(
+        //     BinaryInstruction::new_single_scale(
+        //         InstrType::And,
+        //         Scale::default(),
+        //         InstrOperand::Reg(rhs_reg),
+        //         InstrOperand::Reg(lhs_reg),
+        //     ),
+        // )));
+        // code.codes.push(Instruction(BinaryInstr(
+        //     BinaryInstruction::new_single_scale(
+        //         InstrType::Mov,
+        //         Scale::default(),
+        //         InstrOperand::Reg(rhs_reg),
+        //         InstrOperand::Reg(lhs_reg),
+        //     ),
+        // )));
+        // code.codes.push(Instruction(BinaryInstr(
+        //     BinaryInstruction::new_single_scale(
+        //         InstrType::Cmp,
+        //         Scale::default(),
+        //         InstrOperand::Reg(rhs_reg),
+        //         InstrOperand::Reg(lhs_reg),
+        //     ),
+        // )));
+        // mov lhs rax
+        // cmp $1 rax
+        // jne NEW_CONTROL
+        // mov rhs rax
+        // cmp $1 rax
+        // NEW_CONTROL
+        lhs_reg
     }
 }
 

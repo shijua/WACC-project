@@ -6,10 +6,10 @@ use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rax, Rdi};
 use crate::code_generator::asm::{
-    arg_register_mapping, get_next_register, next_to_rax, pop_arg_regs, push_arg_regs, rax_to_next,
-    AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand,
-    InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG,
-    ARG_REGS, RESULT_REG,
+    arg_register_mapping, get_next_register, next_to_rax, pop_arg_regs, push_arg_regs,
+    push_back_register, rax_to_next, AsmLine, BinaryInstruction, CLibFunctions, ConditionCode,
+    GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
+    UnaryInstruction, UnaryNotScaled, ADDR_REG, ARG_REGS, RESULT_REG,
 };
 use crate::code_generator::clib_functions::{
     MALLOC_LABEL, PRINT_LABEL_FOR_BOOL, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT,
@@ -323,6 +323,8 @@ impl Stmt {
                 Reg(dst_reg),
             ),
         )));
+
+        push_back_register(regs, src_reg);
     }
 
     fn generate_stmt_declare(
@@ -444,6 +446,7 @@ impl Stmt {
                 InstrOperand::LabelRef(body_label.clone()),
             ))));
         // if false: break from the loop
+        push_back_register(regs, res);
     }
 
     fn generate_stmt_return(
@@ -603,6 +606,7 @@ impl Generator for ArrayLiter {
                     )),
                 ),
             )));
+            push_back_register(regs, expr_reg);
         }
 
         code.codes.push(Instruction(Instr::BinaryInstr(
