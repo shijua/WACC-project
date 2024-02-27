@@ -11,8 +11,8 @@ use crate::code_generator::asm::{
     UnaryNotScaled, ADDR_REG, ARG_REGS, RESULT_REG,
 };
 use crate::code_generator::clib_functions::{
-    MALLOC_LABEL, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_STRING,
-    PRINT_LABEL_FOR_STRING_LINE, SYS_EXIT_LABEL,
+    MALLOC_LABEL, PRINT_LABEL_FOR_BOOL, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT,
+    PRINT_LABEL_FOR_REF, PRINT_LABEL_FOR_STRING, PRINT_LABEL_FOR_STRING_LINE, SYS_EXIT_LABEL,
 };
 use crate::code_generator::def_libary::Directives;
 use crate::code_generator::x86_generate::Generator;
@@ -200,11 +200,22 @@ impl Stmt {
         let next_reg = exp.generate(scope, code, regs, aux);
         let _type = exp.analyse(scope).unwrap();
         match print_type {
-            Type::StringType => code.required_clib.insert(CLibFunctions::PrintString),
-            Type::IntType => code.required_clib.insert(CLibFunctions::PrintInt),
-            Type::CharType => code.required_clib.insert(CLibFunctions::PrintChar),
-            Type::BoolType => code.required_clib.insert(CLibFunctions::PrintBool),
-            _ => todo!(),
+            Type::StringType => {
+                code.required_clib.insert(CLibFunctions::PrintString);
+            }
+            Type::IntType => {
+                code.required_clib.insert(CLibFunctions::PrintInt);
+            }
+            Type::CharType => {
+                code.required_clib.insert(CLibFunctions::PrintChar);
+            }
+            Type::BoolType => {
+                code.required_clib.insert(CLibFunctions::PrintBool);
+            }
+            Type::Array(_) | Type::Pair(_, _) | Type::NestedPair | Type::Any => {
+                code.required_clib.insert(CLibFunctions::PrintRefs);
+            }
+            Type::Func(_) => (),
         };
         // todo:
         // Does we need to push and pop rdi? Don't quite know for know
@@ -232,8 +243,9 @@ impl Stmt {
             Type::StringType => PRINT_LABEL_FOR_STRING,
             Type::IntType => PRINT_LABEL_FOR_INT,
             Type::CharType => PRINT_LABEL_FOR_CHAR,
-            Type::BoolType => todo!(),
-            _ => todo!(),
+            Type::BoolType => PRINT_LABEL_FOR_BOOL,
+            Type::Array(_) | Type::Pair(_, _) | Type::NestedPair | Type::Any => PRINT_LABEL_FOR_REF,
+            Type::Func(_) => unreachable!("Cannot print functions"),
         };
         code.codes
             .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
