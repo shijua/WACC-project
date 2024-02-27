@@ -1,5 +1,7 @@
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
-use crate::code_generator::asm::CLibFunctions::{OutOfBoundsError, OutOfMemoryError, PrintString};
+use crate::code_generator::asm::CLibFunctions::{
+    OutOfBoundsError, OutOfMemoryError, OverflowError, PrintString,
+};
 use crate::code_generator::asm::ConditionCode::{GTE, LT};
 use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl};
 use crate::code_generator::asm::Register::*;
@@ -93,6 +95,9 @@ impl CLibFunctions {
             // CLibFunctions::ReadInt => {}
             // CLibFunctions::ReadChar => {}
             // CLibFunctions::SystemExit => {}
+            CLibFunctions::OverflowError => {
+                code.required_clib.insert(OverflowError);
+            }
             CLibFunctions::Malloc => {
                 code.required_clib.insert(PrintString);
                 code.required_clib.insert(OutOfMemoryError);
