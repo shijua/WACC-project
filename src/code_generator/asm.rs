@@ -146,6 +146,7 @@ pub enum CLibFunctions {
     // ArrayBoundsError,
     // CheckNullPointer,
     OutOfMemoryError,
+    OutOfBoundsError,
 
     // FreePair -> Unsure
     // FreeArray -> Unsure
@@ -273,6 +274,11 @@ impl InstrOperand {
 pub enum ConditionCode {
     EQ,
     NEQ,
+    LT,
+    LTE,
+    GT,
+    GTE,
+    OverFlow,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -410,6 +416,7 @@ pub enum Instr {
     UnaryControl(UnaryNotScaled),
     UnaryInstr(UnaryInstruction),
     BinaryInstr(BinaryInstruction),
+    BinaryControl(BinaryControl),
     CltdInstr(InstrType),
     Ret,
 }

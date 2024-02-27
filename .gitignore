@@ -13,3 +13,9 @@ wacc-compiler
 
 /target
 out/
+
+.DS_Store
+
+# ignore generated draft files and temporary assembly files
+draft
+*.s
