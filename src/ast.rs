@@ -1,3 +1,4 @@
+use crate::ast::Type::{IntType, NestedPair};
 use crate::from_span;
 use crate::symbol_table::SymbolTable;
 use crate::Spanned;
@@ -69,6 +70,7 @@ pub enum Type {
     Any,
     Func(Box<FuncSig>),
 }
+
 impl Debug for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -93,12 +95,14 @@ impl Default for Type {
 
 impl Type {
     // size of a given type, in bytes
-    pub fn size(&self) -> i32 {
+
+    pub fn size(&self) -> usize {
         use Type::*;
         match self {
+            IntType => 4,
             BoolType | CharType => 1,
+            StringType | Array(_) | Func(_) | Pair(_, _) | NestedPair => 8,
             Any => panic!("Cannot evaluate size of an Any type"),
-            _ => 4,
         }
     }
 

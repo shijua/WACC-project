@@ -1,3 +1,4 @@
+use crate::ast::Type;
 use crate::code_generator::def_libary::Directives;
 use lazy_static::lazy_static;
 use std::collections::HashSet;
@@ -88,6 +89,8 @@ const ARG_REGS_N: usize = 6;
 const REGS_N: usize = 10;
 const CALLEE_SAVED_N: usize = 6;
 
+pub const ADDR_REG: Register = Register::R11;
+
 pub const RESULT_REG: Register = Register::Rax;
 
 pub const ARG_REGS: [Register; ARG_REGS_N] = [
@@ -143,10 +146,11 @@ pub enum CLibFunctions {
     // DivideByZeroError,
     // ArrayBoundsError,
     // CheckNullPointer,
+    OutOfMemoryError,
 
     // FreePair -> Unsure
     // FreeArray -> Unsure
-    // Malloc -> Unsure
+    Malloc,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -373,7 +377,6 @@ pub enum Instr {
     // Pop(Scale, Register),
     // Neg(Scale, Register),
     // Call(String),
-
     UnaryControl(UnaryNotScaled),
     UnaryInstr(UnaryInstruction),
     BinaryInstr(BinaryInstruction),

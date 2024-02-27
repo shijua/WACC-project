@@ -80,13 +80,13 @@ impl Generator for Function {
         self.parameters
             .iter()
             .for_each(|(Parameter((_type, _), (ident, _)), _)| {
-                let reg = get_next_register(regs, _type.size());
+                let reg = get_next_register(regs, _type.size() as i32);
                 scope.add_with_reg(&ident.clone(), _type.clone(), reg);
                 let arg_reg = arg_regs.pop().unwrap();
                 code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
                     BinaryInstruction::new_single_scale(
                         InstrType::Mov,
-                        Scale::from_size(_type.size()),
+                        Scale::from_size(_type.size() as i32),
                         InstrOperand::Reg(arg_reg),
                         InstrOperand::Reg(reg),
                     ),

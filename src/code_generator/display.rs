@@ -198,7 +198,7 @@ impl Display for Register {
             Register::R8 => write!(f, "r8"),
             Register::R9 => write!(f, "r9"),
             Register::R10 => write!(f, "r10"),
-            Register::R11 => write!(f, "r1"),
+            Register::R11 => write!(f, "r11"),
             Register::R12 => write!(f, "r12"),
             Register::R13 => write!(f, "r13"),
             Register::R14 => write!(f, "r14"),
