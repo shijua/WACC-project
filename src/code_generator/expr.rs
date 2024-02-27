@@ -1,15 +1,17 @@
 use crate::ast::{ArrayElem, BinaryOperator, Expr, Ident, UnaryOperator};
-use crate::code_generator::asm::AsmLine::Instruction;
+use crate::code_generator::asm::AsmLine::{Directive, Instruction};
 use crate::code_generator::asm::Instr::{BinaryInstr, CltdInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
 use crate::code_generator::asm::Register::Rax;
 use crate::code_generator::asm::Scale::Quad;
 use crate::code_generator::asm::{
-    get_next_register, next_to_rax, push_back_register, rax_to_next, AsmLine, BinaryInstruction,
-    ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
-    UnaryInstruction, UnaryNotScaled,
+    get_next_register, next_to_r11, next_to_rax, push_back_register, r11_to_next, rax_to_next,
+    AsmLine, BinaryInstruction, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
+    MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, RESULT_REG,
 };
+use crate::code_generator::def_libary::Directives;
 use crate::code_generator::x86_generate::Generator;
+use crate::semantic_checker::util::SemanticType;
 use crate::symbol_table::ScopeInfo;
 use crate::Spanned;
 
@@ -37,7 +39,10 @@ impl Generator for Expr {
                 let mut rhs_exp = &mut boxed_rhs.0;
                 let lhs_reg = lhs_exp.generate(scope, code, regs, ());
                 let rhs_reg = rhs_exp.generate(scope, code, regs, ());
+                let lhs_scale = Scale::from_size(lhs_exp.analyse(scope).unwrap().size() as i32);
+                next_to_r11(code, lhs_reg, lhs_scale);
 
+                // under the code we will put all the lhs_reg into rax
                 let final_reg = match op {
                     // addl, jo _errOverflow, movslq
                     BinaryOperator::Add => {
@@ -46,7 +51,7 @@ impl Generator for Expr {
                                 InstrType::Add,
                                 Scale::Long,
                                 InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
                         // TODO: 1. check overflow
@@ -54,11 +59,12 @@ impl Generator for Expr {
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
                                 Scale::Long,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                                 Scale::Quad,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
+                        r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
 
@@ -69,7 +75,7 @@ impl Generator for Expr {
                                 InstrType::Sub,
                                 Scale::Long,
                                 InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
                         // TODO: 1. check overflow
@@ -77,11 +83,12 @@ impl Generator for Expr {
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
                                 Scale::Long,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                                 Scale::Quad,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
+                        r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
 
@@ -92,7 +99,7 @@ impl Generator for Expr {
                                 InstrType::IMul,
                                 Scale::Long,
                                 InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
                         // TODO: 1. check overflow
@@ -100,104 +107,23 @@ impl Generator for Expr {
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
                                 Scale::Long,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                                 Quad,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
+                        r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
 
                     // cmpl, je _errDivZero, cltd, idivl, movl, movl, movslq
                     BinaryOperator::Div => {
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Cmp,
-                                Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
-                            ),
-                        )));
-                        // TODO: 1. check divide by zero
-                        code.codes.push(Instruction(CltdInstr(InstrType::Cltd)));
-                        code.codes
-                            .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
-                                InstrType::Div,
-                                Scale::Long,
-                                InstrOperand::Reg(lhs_reg),
-                            ))));
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Mov,
-                                Scale::Long,
-                                InstrOperand::Reg(lhs_reg),
-                                InstrOperand::Reg(lhs_reg),
-                            ),
-                        )));
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Mov,
-                                Scale::Long,
-                                InstrOperand::Reg(lhs_reg),
-                                InstrOperand::Reg(lhs_reg),
-                            ),
-                        )));
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_double_scale(
-                                InstrType::MovS,
-                                Scale::Long,
-                                InstrOperand::Reg(lhs_reg),
-                                Scale::Quad,
-                                InstrOperand::Reg(lhs_reg),
-                            ),
-                        )));
-                        lhs_reg
+                        Self::generate_expr_div_mod(code, lhs_reg, rhs_reg, lhs_scale, true)
                     }
 
                     // cmpl, je _errDivZero, cltd, idivl, movl, movl, movslq
                     BinaryOperator::Modulo => {
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Cmp,
-                                Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
-                            ),
-                        )));
-                        // TODO: 1. check divide by zero
-                        code.codes.push(Instruction(CltdInstr(InstrType::Cltd)));
-                        code.codes
-                            .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
-                                InstrType::Div,
-                                Scale::Long,
-                                InstrOperand::Reg(lhs_reg),
-                            ))));
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Mov,
-                                Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
-                            ),
-                        )));
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Mov,
-                                Scale::Long,
-                                InstrOperand::Reg(lhs_reg),
-                                InstrOperand::Reg(lhs_reg),
-                            ),
-                        )));
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_double_scale(
-                                InstrType::MovS,
-                                Scale::Long,
-                                InstrOperand::Reg(lhs_reg),
-                                Scale::Quad,
-                                InstrOperand::Reg(lhs_reg),
-                            ),
-                        )));
-                        lhs_reg
+                        Self::generate_expr_div_mod(code, lhs_reg, rhs_reg, lhs_scale, false)
                     }
 
                     // cmpq, setg, movsbq
@@ -207,7 +133,7 @@ impl Generator for Expr {
                                 InstrType::Cmp,
                                 Scale::Long,
                                 InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
                         // TODO: setg instruction
@@ -215,11 +141,12 @@ impl Generator for Expr {
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
                                 Scale::Byte,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                                 Scale::Quad,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
+                        r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
 
@@ -230,7 +157,7 @@ impl Generator for Expr {
                                 InstrType::Cmp,
                                 Scale::Long,
                                 InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
                         // TODO: setge instruction
@@ -238,11 +165,12 @@ impl Generator for Expr {
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
                                 Scale::Byte,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                                 Scale::Quad,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
+                        r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
 
@@ -253,7 +181,7 @@ impl Generator for Expr {
                                 InstrType::Cmp,
                                 Scale::Long,
                                 InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
                         // TODO: setl instruction
@@ -261,11 +189,12 @@ impl Generator for Expr {
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
                                 Scale::Byte,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                                 Scale::Quad,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
+                        r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
 
@@ -276,7 +205,7 @@ impl Generator for Expr {
                                 InstrType::Cmp,
                                 Scale::Long,
                                 InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
                         // TODO: setle instruction
@@ -284,11 +213,12 @@ impl Generator for Expr {
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
                                 Scale::Byte,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                                 Scale::Quad,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
+                        r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
 
@@ -299,23 +229,24 @@ impl Generator for Expr {
                                 InstrType::Cmp,
                                 Scale::default(),
                                 InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
                         code.codes
                             .push(Instruction(UnaryControl(UnaryNotScaled::new(
                                 InstrType::Set(ConditionCode::EQ),
-                                InstrOperand::RegVariant(lhs_reg, Scale::Byte),
+                                InstrOperand::RegVariant(ADDR_REG, Scale::Byte),
                             ))));
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
                                 Scale::Byte,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                                 Quad,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
+                        r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
 
@@ -326,27 +257,27 @@ impl Generator for Expr {
                                 InstrType::Cmp,
                                 Scale::default(),
                                 InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
                         code.codes
                             .push(Instruction(UnaryControl(UnaryNotScaled::new(
                                 InstrType::Set(ConditionCode::NEQ),
-                                InstrOperand::RegVariant(lhs_reg, Scale::Byte),
+                                InstrOperand::RegVariant(ADDR_REG, Scale::Byte),
                             ))));
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
                                 Scale::Byte,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                                 Quad,
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
+                        r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
 
-                    // cmpq, and, movq, cmpq
                     BinaryOperator::And => {
                         Self::generate_expr_binary_logical_and(code, lhs_reg, rhs_reg)
                     }
@@ -358,7 +289,7 @@ impl Generator for Expr {
                                 InstrType::Cmp,
                                 Scale::default(),
                                 InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
                         code.codes.push(Instruction(BinaryInstr(
@@ -366,7 +297,7 @@ impl Generator for Expr {
                                 InstrType::Or,
                                 Scale::default(),
                                 InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
                         code.codes.push(Instruction(BinaryInstr(
@@ -374,7 +305,7 @@ impl Generator for Expr {
                                 InstrType::Mov,
                                 Scale::default(),
                                 InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
                         code.codes.push(Instruction(BinaryInstr(
@@ -382,9 +313,10 @@ impl Generator for Expr {
                                 InstrType::Cmp,
                                 Scale::default(),
                                 InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(lhs_reg),
+                                InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
+                        r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
                 };
@@ -423,42 +355,20 @@ impl Expr {
         match op {
             UnaryOperator::Bang => Self::generate_unary_app_bang(code, reg),
             UnaryOperator::Negative => Self::generate_unary_app_negation(code, reg),
-            UnaryOperator::Len => {
-                // for design of arrays, all the data are shifted for 4 bytes in order to account for
-                // the length (stored in the first position)
-                // therefore, when we are attempting to get the length of something,
-                // we only need to fetch the first 4 bytes stored in the location specified by the register
-                // as arrays would have been malloced.
-                //
-                // the length of array is stored 4 bytes before the given location as -4(something)
-                let dst_reg = get_next_register(regs, 4);
-                code.codes.push(Instruction(BinaryInstr(
-                    BinaryInstruction::new_double_scale(
-                        InstrType::MovS,
-                        Scale::Long,
-                        InstrOperand::Reference(MemoryReference {
-                            imm: Some(OffsetImm(-4)),
-                            base_reg: Some(reg),
-                            shift_unit_reg: None,
-                            shift_cnt: None,
-                        }),
-                        Scale::default(),
-                        InstrOperand::Reg(dst_reg),
-                    ),
-                )));
-                dst_reg
-            }
+            UnaryOperator::Len => Self::generate_unary_length(code, regs, reg),
             // there's no need to particularly handle ord and chr functions
             // as internally char are stored as integers inside assembly
             // therefore a forced cast would not influence anything at the backend.
             UnaryOperator::Ord => {
-                todo!()
+                reg
+                // todo!()
             }
             // however, when it comes to the terms of using the 'chr' function
             // we would still have to test whether it is implemented on a function that is
             // within the range of standard ASCII codes
             UnaryOperator::Chr => {
-                todo!()
+                reg
+                // todo!()
                 // todo:
                 // (well, not necessarily rax but a general form of register representation)
                 // testq $-128, %rax
@@ -468,13 +378,63 @@ impl Expr {
         }
     }
 
-    fn generate_unary_app_bang(code: &mut GeneratedCode, reg: Register) -> Register {
-        code.codes
-            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-                InstrType::Not,
+    fn generate_unary_length(
+        code: &mut GeneratedCode,
+        regs: &mut Vec<Register>,
+        reg: Register,
+    ) -> Register {
+        // for design of arrays, all the data are shifted for 4 bytes in order to account for
+        // the length (stored in the first position)
+        // therefore, when we are attempting to get the length of something,
+        // we only need to fetch the first 4 bytes stored in the location specified by the register
+        // as arrays would have been malloced.
+        //
+        // the length of array is stored 4 bytes before the given location as -4(something)
+        let dst_reg = get_next_register(regs, 4);
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_double_scale(
+                InstrType::MovS,
+                Scale::Long,
+                InstrOperand::Reference(MemoryReference {
+                    imm: Some(OffsetImm(-4)),
+                    base_reg: Some(reg),
+                    shift_unit_reg: None,
+                    shift_cnt: None,
+                }),
                 Scale::default(),
+                InstrOperand::Reg(dst_reg),
+            ),
+        )));
+        dst_reg
+    }
+
+    fn generate_unary_app_bang(code: &mut GeneratedCode, reg: Register) -> Register {
+        // cmp $1, %(reg)
+        // sete %al
+        // movsbq %al, %rax
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Cmp,
+                Scale::Byte,
+                InstrOperand::Imm(1),
                 InstrOperand::Reg(reg),
+            ),
+        )));
+        code.codes
+            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                InstrType::Set(ConditionCode::NEQ),
+                InstrOperand::RegVariant(Rax, Scale::Byte),
             ))));
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_double_scale(
+                InstrType::MovS,
+                Scale::Byte,
+                InstrOperand::Reg(Rax),
+                Quad,
+                InstrOperand::Reg(Rax),
+            ),
+        )));
+        rax_to_next(code, reg, Scale::Quad);
         reg
     }
     fn generate_unary_app_negation(code: &mut GeneratedCode, reg: Register) -> Register {
@@ -484,13 +444,8 @@ impl Expr {
                 Scale::default(),
                 InstrOperand::Reg(reg),
             ))));
-        reg
         // todo: Add negation: overflow error check
-    }
-
-    fn generate_unary_app_length(code: &mut GeneratedCode, reg: Register) -> Register {
-        todo!()
-        // todo:
+        reg
     }
 
     fn generate_expr_ident(
@@ -515,44 +470,183 @@ impl Expr {
         lhs_reg: Register,
         rhs_reg: Register,
     ) -> Register {
-        // code.codes.push(Instruction(BinaryInstr(
-        //     BinaryInstruction::new_single_scale(
-        //         InstrType::Cmp,
-        //         Scale::default(),
-        //         InstrOperand::Reg(rhs_reg),
-        //         InstrOperand::Reg(lhs_reg),
-        //     ),
-        // )));
-        // code.codes.push(Instruction(BinaryInstr(
-        //     BinaryInstruction::new_single_scale(
-        //         InstrType::And,
-        //         Scale::default(),
-        //         InstrOperand::Reg(rhs_reg),
-        //         InstrOperand::Reg(lhs_reg),
-        //     ),
-        // )));
-        // code.codes.push(Instruction(BinaryInstr(
-        //     BinaryInstruction::new_single_scale(
-        //         InstrType::Mov,
-        //         Scale::default(),
-        //         InstrOperand::Reg(rhs_reg),
-        //         InstrOperand::Reg(lhs_reg),
-        //     ),
-        // )));
-        // code.codes.push(Instruction(BinaryInstr(
-        //     BinaryInstruction::new_single_scale(
-        //         InstrType::Cmp,
-        //         Scale::default(),
-        //         InstrOperand::Reg(rhs_reg),
-        //         InstrOperand::Reg(lhs_reg),
-        //     ),
-        // )));
         // mov lhs rax
-        // cmp $1 rax
+        next_to_rax(code, ADDR_REG, Scale::default());
+
+        // cmp q $1 rax
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Cmp,
+                Scale::Byte,
+                InstrOperand::Imm(1),
+                InstrOperand::RegVariant(RESULT_REG, Scale::Byte),
+            ),
+        )));
+
+        let false_label = code.get_control_label();
         // jne NEW_CONTROL
+        code.codes
+            .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
+                InstrType::Jump(Some(ConditionCode::NEQ)),
+                InstrOperand::LabelRef(false_label.clone()),
+            ))));
+
         // mov rhs rax
-        // cmp $1 rax
+        next_to_rax(code, rhs_reg, Scale::default());
+
+        // cmp q $1 rax
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Cmp,
+                Scale::Byte,
+                InstrOperand::Imm(1),
+                InstrOperand::RegVariant(RESULT_REG, Scale::Byte),
+            ),
+        )));
+
         // NEW_CONTROL
+        code.codes.push(Directive(Directives::Label(false_label)));
+
+        // sete %al
+        code.codes
+            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                InstrType::Set(ConditionCode::EQ),
+                InstrOperand::RegVariant(RESULT_REG, Scale::Byte),
+            ))));
+
+        // movsbq %al, %rax
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_double_scale(
+                InstrType::MovS,
+                Scale::Byte,
+                InstrOperand::Reg(RESULT_REG),
+                Scale::Quad,
+                InstrOperand::Reg(RESULT_REG),
+            ),
+        )));
+
+        rax_to_next(code, lhs_reg, Scale::default());
+        lhs_reg
+    }
+
+    fn generate_expr_binary_logical_or(
+        code: &mut GeneratedCode,
+        lhs_reg: Register,
+        rhs_reg: Register,
+    ) -> Register {
+        // mov lhs rax
+        next_to_rax(code, ADDR_REG, Scale::default());
+
+        // cmp q $1 rax
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Cmp,
+                Scale::Byte,
+                InstrOperand::Imm(1),
+                InstrOperand::RegVariant(RESULT_REG, Scale::Byte),
+            ),
+        )));
+
+        let true_label = code.get_control_label();
+        // je NEW_CONTROL
+        code.codes
+            .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
+                InstrType::Jump(Some(ConditionCode::EQ)),
+                InstrOperand::LabelRef(true_label.clone()),
+            ))));
+
+        // mov rhs rax
+        next_to_rax(code, rhs_reg, Scale::default());
+
+        // cmp q $1 rax
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Cmp,
+                Scale::Byte,
+                InstrOperand::Imm(1),
+                InstrOperand::RegVariant(RESULT_REG, Scale::Byte),
+            ),
+        )));
+
+        // NEW_CONTROL
+        code.codes.push(Directive(Directives::Label(true_label)));
+
+        // sete %al
+        code.codes
+            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                InstrType::Set(ConditionCode::EQ),
+                InstrOperand::RegVariant(RESULT_REG, Scale::Byte),
+            ))));
+
+        // movsbq %al, %rax
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_double_scale(
+                InstrType::MovS,
+                Scale::Byte,
+                InstrOperand::Reg(RESULT_REG),
+                Scale::Quad,
+                InstrOperand::Reg(RESULT_REG),
+            ),
+        )));
+
+        rax_to_next(code, lhs_reg, Scale::default());
+        lhs_reg
+    }
+
+    fn generate_expr_div_mod(
+        code: &mut GeneratedCode,
+        lhs_reg: Register,
+        rhs_reg: Register,
+        lhs_scale: Scale,
+        is_div: bool,
+    ) -> Register {
+        let res = if is_div { Register::Rax } else { Register::Rdx };
+        r11_to_next(code, lhs_reg, lhs_scale);
+        next_to_r11(code, rhs_reg, lhs_scale);
+        next_to_rax(code, lhs_reg, lhs_scale);
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Cmp,
+                Scale::Long,
+                InstrOperand::Imm(0),
+                InstrOperand::Reg(ADDR_REG),
+            ),
+        )));
+        // TODO: 1. check divide by zero
+        code.codes.push(Instruction(CltdInstr(InstrType::Cltd)));
+        code.codes
+            .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
+                InstrType::Div,
+                Scale::Long,
+                InstrOperand::Reg(ADDR_REG),
+            ))));
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Scale::Long,
+                InstrOperand::Reg(res),
+                InstrOperand::Reg(RESULT_REG),
+            ),
+        )));
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Scale::Long,
+                InstrOperand::Reg(RESULT_REG),
+                InstrOperand::Reg(RESULT_REG),
+            ),
+        )));
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_double_scale(
+                InstrType::MovS,
+                Scale::Long,
+                InstrOperand::Reg(RESULT_REG),
+                Scale::Quad,
+                InstrOperand::Reg(RESULT_REG),
+            ),
+        )));
+        // the result is rax
+        rax_to_next(code, lhs_reg, lhs_scale);
         lhs_reg
     }
 }
@@ -587,7 +681,7 @@ fn generate_bool_liter(
     code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
         BinaryInstruction::new_single_scale(
             InstrType::Mov,
-            Scale::default(),
+            Scale::Byte,
             InstrOperand::Imm(move_val),
             InstrOperand::Reg(next_reg),
         ),
@@ -606,7 +700,7 @@ fn generate_char_liter(
     code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
         BinaryInstruction::new_single_scale(
             InstrType::Mov,
-            Scale::default(),
+            Scale::Byte,
             InstrOperand::Imm(char_imm as i32),
             InstrOperand::Reg(next_reg),
         ),

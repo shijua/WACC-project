@@ -136,7 +136,7 @@ impl Generator for Program {
             param_symbol_table: Default::default(),
             body_symbol_table: self.body.symbol_table.clone(),
         }
-            .generate(&mut scope, code, regs, true);
+        .generate(&mut scope, code, regs, true);
 
         // todo: generate assembly for the functions
 

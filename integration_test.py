@@ -72,11 +72,11 @@ def get_output_content(path: str) -> str:
     content = get_file_content(path)
     index = content.find("Output:")
     index_end = content.find("Program:")
-    index_end_if_exit = content.find("Exit")
+    index_end_if_exit = content.find("Exit:")
     if index == -1:
         return ""
     # if there is an exit statement, we only want to get the output before the exit statement
-    if index_end_if_exit != -1 and index_end_if_exit < index_end:
+    if index_end_if_exit != -1 and (index_end_if_exit < index_end or index_end == -1):
         index_end = index_end_if_exit
     output = content[index + 7:index_end].replace("\n# ", "\n").replace("\n#", "\n").strip()
     return output
@@ -194,7 +194,6 @@ if __name__ == "__main__":
     arg_items = len(sys.argv)
     if arg_items < 2:
         exit(0)
-
     # ensure that the wacc_36 executable exists
     if not exists(WACC_PATH):
         print("running cargo build")

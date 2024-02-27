@@ -833,7 +833,7 @@ impl CLibFunctions {
         Self::leaq_rip_with_label(code, PRINT_BOOL_LABEL_1, Rdx);
 
         Self::labelling(code, PRINT_LABEL_FOR_BOOL_1);
-        Self::mov_memory_ref_reg(code, Long, -4, true, Rdx, false, Rdi);
+        Self::mov_memory_ref_reg(code, Long, -4, true, Rdx, false, Rsi);
         Self::leaq_rip_with_label(code, PRINT_BOOL_LABEL_2, Rdi);
         Self::mov_immediate(code, Byte, 0, Rax);
         Self::call_func(code, PRINTF_PLT);
