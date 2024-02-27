@@ -297,13 +297,14 @@ pub enum CLibFunctions {
     ReadChar,
     SystemExit,
     // RuntimeError,
-    // OverflowError,
     // DivideByZeroError,
     // ArrayBoundsError,
     // CheckNullPointer,
     OutOfMemoryError,
     OutOfBoundsError,
     OverflowError,
+    BadCharError,
+    DivZeroError,
 
     // FreePair -> Unsure
     // FreeArray -> Unsure

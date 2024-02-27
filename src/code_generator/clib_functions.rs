@@ -58,6 +58,12 @@ pub const ERROR_LABEL_FOR_OUT_OF_BOUNDS: &str = "_errOutOfBounds";
 pub const OVERFLOW_LABEL: &str = ".L._errOverflow_str0";
 pub const ERROR_LABEL_FOR_OVERFLOW: &str = "_errOverflow";
 
+pub const BAD_CHAR_LABEL: &str = ".L._errBadChar_str0";
+pub const ERROR_LABEL_FOR_BAD_CHAR: &str = "_errBadChar";
+
+pub const DIV_ZERO_LABEL: &str = ".L._errDivZero_str0";
+pub const ERROR_LABEL_FOR_DIV_ZERO: &str = "_errDivZero";
+
 pub const CONTENT_STRING_LITERAL: &str = "%.*s";
 pub const CONTENT_INT_LITERAL: &str = "%d";
 pub const CONTENT_EMPTY: &str = "";
@@ -91,7 +97,9 @@ impl CLibFunctions {
                 code.required_clib.insert(PrintString);
                 code.required_clib.insert(OutOfMemoryError);
             }
-            CLibFunctions::OutOfMemoryError | CLibFunctions::OverflowError => {
+            CLibFunctions::OutOfMemoryError
+            | CLibFunctions::OverflowError
+            | CLibFunctions::DivZeroError => {
                 code.required_clib.insert(PrintString);
             }
             CLibFunctions::ArrayStore(_) | CLibFunctions::ArrayLoad(_) => {
@@ -161,9 +169,19 @@ impl Generator for CLibFunctions {
             CLibFunctions::OutOfBoundsError => {
                 Self::generate_out_of_bounds_error(code);
             }
+
             CLibFunctions::OverflowError => {
                 Self::generate_overflow_error(code);
             }
+
+            CLibFunctions::BadCharError => {
+                Self::generate_bad_char_error(code);
+            }
+
+            CLibFunctions::DivZeroError => {
+                Self::generate_div_zero_error(code);
+            }
+
             CLibFunctions::ArrayLoad(_) => {
                 todo!()
             }
@@ -1099,6 +1117,69 @@ impl CLibFunctions {
         Self::andq_rsp(code);
         // leaq .L._errOverflow_str0(%rip), %rdi
         Self::leaq_rip_with_label(code, OVERFLOW_LABEL, Rdi);
+        // call _prints
+        Self::call_func(code, PRINT_LABEL_FOR_STRING);
+        // movb $-1, %dil
+        Self::mov_immediate(code, Byte, -1, Rdi);
+        // call exit@plt
+        Self::call_func(code, SYS_EXIT_PLT);
+    }
+
+    fn generate_bad_char_error(code: &mut GeneratedCode) {
+        // .section .rodata
+        // # length of .L._errBadChar_str0
+        //     .int 50
+        //     .L._errBadChar_str0:
+        // .asciz "fatal error: int %d is not ascii character 0-127 \n"
+        //     .text
+        // _errBadChar:
+        Self::general_set_up(
+            code,
+            49,
+            BAD_CHAR_LABEL,
+            "fatal error: int %d is not ascii character 0-127 ",
+            ERROR_LABEL_FOR_BAD_CHAR,
+        );
+        // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        // andq $-16, %rsp
+        Self::andq_rsp(code);
+        // leaq .L._errBadChar_str0(%rip), %rdi
+        Self::leaq_rip_with_label(code, BAD_CHAR_LABEL, Rdi);
+        // # on x86, al represents the number of SIMD registers used as variadic arguments
+        // movb $0, %al
+        Self::mov_immediate(code, Byte, 0, Rax);
+        // call printf@plt
+        Self::call_func(code, PRINTF_PLT);
+        // movq $0, %rdi
+        Self::mov_immediate(code, Quad, 0, Rdi);
+        // call fflush@plt
+        Self::call_func(code, F_FLUSH_PLT);
+        // movb $-1, %dil
+        Self::mov_immediate(code, Byte, -1, Rdi);
+        // call exit@plt
+        Self::call_func(code, SYS_EXIT_PLT);
+    }
+
+    fn generate_div_zero_error(code: &mut GeneratedCode) {
+        // .section .rodata
+        // # length of .L._errDivZero_str0
+        //     .int 40
+        //     .L._errDivZero_str0:
+        // .asciz "fatal error: division or modulo by zero\n"
+        //     .text
+        // _errDivZero:
+        Self::general_set_up(
+            code,
+            39,
+            DIV_ZERO_LABEL,
+            "fatal error: division or modulo by zero",
+            ERROR_LABEL_FOR_DIV_ZERO,
+        );
+        // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        // andq $-16, %rsp
+        Self::andq_rsp(code);
+        // leaq .L._errDivZero_str0(%rip), %rdi
+        Self::leaq_rip_with_label(code, DIV_ZERO_LABEL, Rdi);
         // call _prints
         Self::call_func(code, PRINT_LABEL_FOR_STRING);
         // movb $-1, %dil
