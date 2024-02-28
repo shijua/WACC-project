@@ -1,4 +1,5 @@
 use crate::code_generator::asm::AsmLine::Instruction;
+use crate::code_generator::asm::Instr::BinaryInstr;
 use crate::code_generator::asm::Register::{Rbp, Rsp};
 use crate::code_generator::def_libary::Directives;
 use lazy_static::lazy_static;
@@ -208,6 +209,28 @@ pub fn next_to_r11(code: &mut GeneratedCode, next: Register, scale: Scale) {
     )));
 }
 
+pub fn given_to_result(code: &mut GeneratedCode, given: Register, scale: Scale) {
+    code.codes.push(Instruction(BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            scale,
+            InstrOperand::Reg(given),
+            InstrOperand::Reg(RESULT_REG),
+        ),
+    )));
+}
+
+pub fn result_to_given(code: &mut GeneratedCode, given: Register, scale: Scale) {
+    code.codes.push(Instruction(BinaryInstr(
+        BinaryInstruction::new_single_scale(
+            InstrType::Mov,
+            scale,
+            InstrOperand::Reg(RESULT_REG),
+            InstrOperand::Reg(given),
+        ),
+    )));
+}
+
 pub fn r11_to_next(code: &mut GeneratedCode, next: Register, scale: Scale) {
     code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
         BinaryInstruction::new_single_scale(
@@ -383,8 +406,11 @@ impl Scale {
             1 => Scale::Byte,
             2 => Scale::Word,
             4 => Scale::Long,
-            8 => Scale::Quad,
-            _ => unreachable!("Invalid scale argument"),
+            0 | 8 => Scale::Quad,
+            _ => {
+                println!("{}", n);
+                unreachable!("Invalid scale argument")
+            }
         }
     }
 }

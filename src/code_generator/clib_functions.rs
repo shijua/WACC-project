@@ -2,7 +2,7 @@ use crate::code_generator::asm::AsmLine::{Directive, Instruction};
 use crate::code_generator::asm::CLibFunctions::{
     NullPairError, OutOfBoundsError, OutOfMemoryError, OverflowError, PrintString,
 };
-use crate::code_generator::asm::ConditionCode::{GTE, LT};
+use crate::code_generator::asm::ConditionCode::{OverFlow, GTE, LT};
 use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl};
 use crate::code_generator::asm::Register::*;
 use crate::code_generator::asm::Scale::{Byte, Long, Quad};
@@ -91,6 +91,8 @@ pub const SYS_EXIT_PLT: &str = "exit@plt";
 pub const MALLOC_PLT: &str = "malloc@plt";
 pub const FREE_PLT: &str = "free@plt";
 
+const EXIT_CODE: i32 = 255;
+
 impl CLibFunctions {
     pub fn generate_dependency(&self, code: &mut GeneratedCode) {
         match self {
@@ -126,8 +128,8 @@ impl CLibFunctions {
 
             CLibFunctions::ArrayStore(_) | CLibFunctions::ArrayLoad(_) => {
                 code.required_clib.insert(OutOfBoundsError);
-            }
-            _ => (),
+            } // _ => (),
+            _ => {}
         }
     }
 }
@@ -1127,7 +1129,7 @@ impl CLibFunctions {
         Self::call_func(code, SYS_EXIT_PLT);
     }
 
-    fn generate_overflow_error(code: &mut GeneratedCode) {
+    pub fn generate_overflow_error(code: &mut GeneratedCode) {
         // .section .rodata
         // # length of .L._errOverflow_str0
         //     .int 52
@@ -1150,7 +1152,7 @@ impl CLibFunctions {
         // call _prints
         Self::call_func(code, PRINT_LABEL_FOR_STRING);
         // movb $-1, %dil
-        Self::mov_immediate(code, Byte, -1, Rdi);
+        Self::mov_immediate(code, Byte, EXIT_CODE, Rdi);
         // call exit@plt
         Self::call_func(code, SYS_EXIT_PLT);
     }

@@ -13,8 +13,8 @@ use crate::code_generator::asm::{
     ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
     UnaryInstruction, UnaryNotScaled, ADDR_REG, RESULT_REG,
 };
-use crate::code_generator::clib_functions::BAD_CHAR_LABEL;
-use crate::code_generator::clib_functions::SYS_EXIT_LABEL;
+use crate::code_generator::clib_functions::{BAD_CHAR_LABEL, OVERFLOW_LABEL};
+use crate::code_generator::clib_functions::{ERROR_LABEL_FOR_OVERFLOW, SYS_EXIT_LABEL};
 use crate::code_generator::def_libary::{get_array_load_label, Directives};
 use crate::code_generator::x86_generate::Generator;
 use crate::code_generator::REFERENCE_OFFSET_SIZE;
@@ -61,6 +61,11 @@ impl Generator<'_> for Expr {
                                 InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
+                        code.codes
+                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                                InstrType::Jump(Some(ConditionCode::OverFlow)),
+                                InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OVERFLOW)),
+                            ))));
                         code.required_clib.insert(OverflowError);
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
@@ -85,6 +90,11 @@ impl Generator<'_> for Expr {
                                 InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
+                        code.codes
+                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                                InstrType::Jump(Some(ConditionCode::OverFlow)),
+                                InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OVERFLOW)),
+                            ))));
                         code.required_clib.insert(OverflowError);
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
@@ -109,6 +119,11 @@ impl Generator<'_> for Expr {
                                 InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
+                        code.codes
+                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                                InstrType::Jump(Some(ConditionCode::OverFlow)),
+                                InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OVERFLOW)),
+                            ))));
                         code.required_clib.insert(OverflowError);
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
@@ -319,7 +334,10 @@ impl Expr {
         // use the result from expression for bang and negative
         match op {
             UnaryOperator::Bang => Self::generate_unary_app_bang(code, reg),
-            UnaryOperator::Negative => Self::generate_unary_app_negation(code, reg),
+            UnaryOperator::Negative => {
+                Self::generate_unary_app_negation(code, reg);
+                reg
+            }
             UnaryOperator::Len => Self::generate_unary_length(code, regs, reg),
             // there's no need to particularly handle ord and chr functions
             // as internally char are stored as integers inside assembly
@@ -437,7 +455,12 @@ impl Expr {
                 Scale::default(),
                 InstrOperand::Reg(reg),
             ))));
-        // todo: Add negation: overflow error check
+        code.codes
+            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                InstrType::Jump(Some(ConditionCode::OverFlow)),
+                InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OVERFLOW)),
+            ))));
+        code.required_clib.insert(OverflowError);
         reg
     }
 
