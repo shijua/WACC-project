@@ -346,11 +346,13 @@ impl Stmt {
         // store value in regs[0] to that of lvalue
         let (dst_reg, size) = lvalue.generate(scope, code, regs, type_.clone());
 
+        next_to_rax(code, src_reg, Scale::from_size(size));
+
         code.codes.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
                 InstrType::Mov,
                 Scale::from_size(size),
-                Reg(src_reg),
+                Reg(RESULT_REG),
                 Reg(dst_reg),
             ),
         )));
