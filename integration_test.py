@@ -61,12 +61,13 @@ def get_file_content(path: str) -> str:
     with open(path, "r") as file:
         return file.read()
 
-def get_input_content(path: str) -> list[str]:
+def get_input_content(path: str) -> str:
     content = get_file_content(path)
     index = content.find("Input:")
     if index == -1:
-        return []
-    return content[index + 7:].split("\n")[0].split()
+        return ""
+    ans = content[index + 7:].split("\n")[0]
+    return ans if ans != [] else ""
 
 def get_output_content(path: str) -> str:
     content = get_file_content(path)
@@ -125,7 +126,7 @@ def running_our_single_test_cases(path: str) -> Result:
         print("PASS")
         if exists(f"{output}.s"):
             subprocess.run(["gcc", f"{output}.s", "-o", output, "-z", "noexecstack"], stdout=subprocess.PIPE)
-            res = subprocess.run([f"./{output}"] + get_input_content(path), stdout=subprocess.PIPE)
+            res = subprocess.run([f"./{output}"], input=(get_input_content(path) + "\n").encode("utf-8"), stdout=subprocess.PIPE)
             result.exit_code = res.returncode
             result.output = res.stdout.decode("utf-8").strip()
     return result
