@@ -7,7 +7,7 @@ use std::fmt::Debug;
 
 pub const DEFAULT_EXIT_CODE: i32 = 0;
 
-pub trait Generator: Debug {
+pub trait Generator<'a>: Debug {
     type Input;
 
     type Output;
