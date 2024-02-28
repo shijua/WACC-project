@@ -24,8 +24,8 @@ use crate::semantic_checker::util::SemanticType;
 use crate::symbol_table::{ScopeInfo, SymbolTable};
 use crate::Spanned;
 
-impl Generator for ScopedStmt {
-    type Input = ();
+impl<'a> Generator<'a> for ScopedStmt {
+    type Input = &'a mut Vec<usize>;
     type Output = ();
 
     fn generate(
@@ -63,7 +63,7 @@ impl Generator for ScopedStmt {
     }
 }
 
-impl Generator for Lvalue {
+impl Generator<'_> for Lvalue {
     type Input = Type;
     type Output = (Register, i32);
 
@@ -86,7 +86,7 @@ impl Generator for Lvalue {
     }
 }
 
-impl Generator for Rvalue {
+impl Generator<'_> for Rvalue {
     type Input = Type;
     type Output = Register;
 
@@ -135,8 +135,8 @@ impl Generator for Rvalue {
     }
 }
 
-impl Generator for Stmt {
-    type Input = ();
+impl<'a> Generator<'a> for Stmt {
+    type Input = &'a mut Vec<usize>;
     type Output = ();
 
     fn generate(
@@ -149,10 +149,10 @@ impl Generator for Stmt {
         match self {
             Stmt::Skip => (),
             Stmt::Print(print_type, (exp, _)) => {
-                Self::generate_stmt_print(scope, code, regs, aux, print_type, exp, false)
+                Self::generate_stmt_print(scope, code, regs, (), print_type, exp, false)
             }
             Stmt::Println(print_type, (exp, _)) => {
-                Self::generate_stmt_print(scope, code, regs, aux, print_type, exp, true);
+                Self::generate_stmt_print(scope, code, regs, (), print_type, exp, true);
                 code.required_clib.insert(CLibFunctions::PrintLn);
             }
             Stmt::Read(read_type, (lvalue, _)) => {
@@ -193,10 +193,10 @@ impl Generator for Stmt {
                 Self::generate_stmt_serial(scope, code, regs, aux, statement1, statement2);
             }
             Stmt::Declare((type_, _), (lvalue_, _), rvalue) => {
-                Self::generate_stmt_declare(scope, code, regs, aux, type_, lvalue_, rvalue);
+                Self::generate_stmt_declare(scope, code, regs, (), type_, lvalue_, rvalue);
             }
             Stmt::Assign(type_, (lvalue, _), (rvalue, _)) => {
-                Self::generate_stmt_assign(scope, code, regs, aux, type_, lvalue, rvalue);
+                Self::generate_stmt_assign(scope, code, regs, (), type_, lvalue, rvalue);
             }
             Stmt::If((cond, _), st1, st2) => {
                 Self::generate_stmt_if(scope, code, regs, aux, cond, st1, st2)
@@ -282,7 +282,7 @@ impl Stmt {
         scope: &mut ScopeInfo,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
-        aux: (),
+        aux: &mut Vec<usize>,
         cond: &mut Expr,
         st1: &mut ScopedStmt,
         st2: &mut ScopedStmt,
@@ -291,7 +291,7 @@ impl Stmt {
         let exit_if_label = code.get_control_label();
 
         // r[0] = evaluate if-condition
-        let next_reg = cond.generate(scope, code, regs, aux);
+        let next_reg = cond.generate(scope, code, regs, ());
 
         // cmpb $1, r[0]
         code.codes.push(Instruction(Instr::BinaryInstr(
@@ -394,7 +394,7 @@ impl Stmt {
         scope: &mut ScopeInfo,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
-        aux: (),
+        aux: &mut Vec<usize>,
         statement1: &mut Box<Spanned<Stmt>>,
         statement2: &mut Box<Spanned<Stmt>>,
     ) {
@@ -447,7 +447,7 @@ impl Stmt {
         scope: &mut ScopeInfo,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
-        aux: (),
+        aux: &mut Vec<usize>,
         cond: &mut Expr,
         body: &mut ScopedStmt,
     ) {
@@ -468,7 +468,7 @@ impl Stmt {
         code.codes
             .push(Directive(Directives::Label(cond_label.clone())));
         // evaluate condition
-        let res = cond.generate(scope, code, regs, aux);
+        let res = cond.generate(scope, code, regs, ());
         // cmpb $1, cond_reg => check if condition is true
         code.codes.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(InstrType::Cmp, Scale::Byte, Imm(1), Reg(res)),
@@ -487,11 +487,11 @@ impl Stmt {
         scope: &mut ScopeInfo,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
-        aux: (),
+        aux: &mut Vec<usize>,
         return_val: &mut Expr,
     ) {
         // evaluate(return_val)
-        let res = return_val.generate(scope, code, regs, aux);
+        let res = return_val.generate(scope, code, regs, ());
         // r0 = return_val
         code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
@@ -502,6 +502,9 @@ impl Stmt {
             ),
         )));
 
+        // store current location for stack frame
+        aux.push(code.codes.len());
+        pop_callee_saved_regs(code);
         code.codes.push(AsmLine::Instruction(Instr::Ret));
         // push back offset space
         // let final_offset = scope.get_total_offset();
@@ -523,7 +526,7 @@ impl Stmt {
     }
 }
 
-impl Generator for PairElem {
+impl Generator<'_> for PairElem {
     type Input = ();
     type Output = ();
 
@@ -579,7 +582,7 @@ fn generate_malloc(code: &mut GeneratedCode, bytes: i32, reg: Register) {
     )));
 }
 
-impl Generator for ArrayLiter {
+impl Generator<'_> for ArrayLiter {
     type Input = Type;
     type Output = Register;
 

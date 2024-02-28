@@ -132,7 +132,7 @@ impl CLibFunctions {
     }
 }
 
-impl Generator for CLibFunctions {
+impl Generator<'_> for CLibFunctions {
     type Input = ();
     type Output = ();
 

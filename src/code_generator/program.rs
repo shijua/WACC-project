@@ -12,7 +12,7 @@ use crate::code_generator::x86_generate::{Generator, DEFAULT_EXIT_CODE};
 use crate::new_spanned;
 use crate::symbol_table::ScopeInfo;
 
-impl Generator for Function {
+impl Generator<'_> for Function {
     // Input used to indicate whether it is the main function
     type Input = bool;
     type Output = ();
@@ -36,7 +36,8 @@ impl Generator for Function {
         push_callee_saved_regs(code);
 
         // record the location for allocating stack frame
-        let pos = code.codes.len();
+        let mut pos_vec_end: Vec<usize> = Vec::new();
+        let start_pos = code.codes.len();
 
         // process parameter scope to move it into other register
         let mut arg_regs: Vec<Register> = ARG_REGS.iter().cloned().collect();
@@ -61,12 +62,14 @@ impl Generator for Function {
         let mut scope = scope.make_scope(&mut self.body_symbol_table);
 
         // make body statements
-        self.body.0.generate(&mut scope, code, regs, ());
+        self.body
+            .0
+            .generate(&mut scope, code, regs, &mut pos_vec_end);
 
         // allocate stack frame for beginning
         let size = get_rbp_size(regs);
         code.codes.insert(
-            pos,
+            start_pos,
             AsmLine::Instruction(Instr::BinaryInstr(BinaryInstruction::new_single_scale(
                 InstrType::Sub,
                 Scale::default(),
@@ -75,18 +78,18 @@ impl Generator for Function {
             ))),
         );
 
-        // deallocate stack for main function
-        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Add,
-                Scale::default(),
-                InstrOperand::Imm(size),
-                InstrOperand::Reg(Register::Rsp),
-            ),
-        )));
-
         // main function will exit by exit-code 0, (or does it involve manipulating exit?)
         if aux {
+            // deallocate stack for main function
+            code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Add,
+                    Scale::default(),
+                    InstrOperand::Imm(size),
+                    InstrOperand::Reg(Register::Rsp),
+                ),
+            )));
+
             code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
                     InstrType::Mov,
@@ -95,15 +98,29 @@ impl Generator for Function {
                     InstrOperand::Reg(RESULT_REG),
                 ),
             )));
+            pop_callee_saved_regs(code);
+            // return
+            code.codes.push(AsmLine::Instruction(Instr::Ret));
+        } else {
+            // deallocate stack frame for return statement
+            pos_vec_end.sort();
+            println!("{:?}", pos_vec_end);
+            pos_vec_end.iter().rev().for_each(|&pos| {
+                code.codes.insert(
+                    pos,
+                    AsmLine::Instruction(Instr::BinaryInstr(BinaryInstruction::new_single_scale(
+                        InstrType::Sub,
+                        Scale::default(),
+                        InstrOperand::Imm(size),
+                        InstrOperand::Reg(Register::Rsp),
+                    ))),
+                );
+            });
         }
-
-        pop_callee_saved_regs(code);
-        // return
-        code.codes.push(AsmLine::Instruction(Instr::Ret));
     }
 }
 
-impl Generator for Program {
+impl Generator<'_> for Program {
     type Input = ();
     type Output = ();
 

@@ -22,7 +22,7 @@ use crate::semantic_checker::util::SemanticType;
 use crate::symbol_table::ScopeInfo;
 use crate::Spanned;
 
-impl Generator for Expr {
+impl Generator<'_> for Expr {
     type Input = ();
     type Output = Register;
 
@@ -765,4 +765,19 @@ fn generate_string_liter(
     rax_to_next(code, next_reg, Quad);
 
     next_reg
+}
+
+impl Generator<'_> for ArrayElem {
+    type Input = ();
+    type Output = ();
+
+    fn generate(
+        &mut self,
+        scope: &mut ScopeInfo,
+        code: &mut GeneratedCode,
+        regs: &mut Vec<Register>,
+        aux: Self::Input,
+    ) -> Self::Output {
+        todo!()
+    }
 }
