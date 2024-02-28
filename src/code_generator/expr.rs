@@ -126,163 +126,60 @@ impl Generator for Expr {
                         Self::generate_expr_div_mod(code, lhs_reg, rhs_reg, lhs_scale, false)
                     }
 
-                    // cmpq, setg, movsbq
-                    BinaryOperator::Gt => {
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Cmp,
-                                Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        // TODO: setg instruction
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_double_scale(
-                                InstrType::MovS,
-                                Scale::Byte,
-                                InstrOperand::Reg(ADDR_REG),
-                                Scale::Quad,
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        r11_to_next(code, lhs_reg, lhs_scale);
-                        lhs_reg
-                    }
+                    BinaryOperator::Gt => Self::generate_expr_binary_logical_compare(
+                        code,
+                        lhs_reg,
+                        rhs_reg,
+                        lhs_scale,
+                        ConditionCode::GT,
+                    ),
 
-                    //
-                    BinaryOperator::Gte => {
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Cmp,
-                                Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        // TODO: setge instruction
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_double_scale(
-                                InstrType::MovS,
-                                Scale::Byte,
-                                InstrOperand::Reg(ADDR_REG),
-                                Scale::Quad,
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        r11_to_next(code, lhs_reg, lhs_scale);
-                        lhs_reg
-                    }
+                    BinaryOperator::Gte => Self::generate_expr_binary_logical_compare(
+                        code,
+                        lhs_reg,
+                        rhs_reg,
+                        lhs_scale,
+                        ConditionCode::GTE,
+                    ),
 
-                    // cmpq, setl, movsbq
-                    BinaryOperator::Lt => {
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Cmp,
-                                Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        // TODO: setl instruction
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_double_scale(
-                                InstrType::MovS,
-                                Scale::Byte,
-                                InstrOperand::Reg(ADDR_REG),
-                                Scale::Quad,
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        r11_to_next(code, lhs_reg, lhs_scale);
-                        lhs_reg
-                    }
+                    BinaryOperator::Lt => Self::generate_expr_binary_logical_compare(
+                        code,
+                        lhs_reg,
+                        rhs_reg,
+                        lhs_scale,
+                        ConditionCode::LT,
+                    ),
 
-                    // cmpq, setle, movsbq
-                    BinaryOperator::Lte => {
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Cmp,
-                                Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        // TODO: setle instruction
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_double_scale(
-                                InstrType::MovS,
-                                Scale::Byte,
-                                InstrOperand::Reg(ADDR_REG),
-                                Scale::Quad,
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        r11_to_next(code, lhs_reg, lhs_scale);
-                        lhs_reg
-                    }
+                    BinaryOperator::Lte => Self::generate_expr_binary_logical_compare(
+                        code,
+                        lhs_reg,
+                        rhs_reg,
+                        lhs_scale,
+                        ConditionCode::LTE,
+                    ),
 
                     // cmpq, sete, movsbq
-                    BinaryOperator::Eq => {
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Cmp,
-                                Scale::default(),
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        code.codes
-                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                                InstrType::Set(ConditionCode::EQ),
-                                InstrOperand::RegVariant(ADDR_REG, Scale::Byte),
-                            ))));
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_double_scale(
-                                InstrType::MovS,
-                                Scale::Byte,
-                                InstrOperand::Reg(ADDR_REG),
-                                Quad,
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        r11_to_next(code, lhs_reg, lhs_scale);
-                        lhs_reg
-                    }
+                    BinaryOperator::Eq => Self::generate_expr_binary_logical_compare(
+                        code,
+                        lhs_reg,
+                        rhs_reg,
+                        lhs_scale,
+                        ConditionCode::EQ,
+                    ),
 
-                    // cmpq, sete, movsbq
-                    BinaryOperator::Neq => {
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Cmp,
-                                Scale::default(),
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        code.codes
-                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                                InstrType::Set(ConditionCode::NEQ),
-                                InstrOperand::RegVariant(ADDR_REG, Scale::Byte),
-                            ))));
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_double_scale(
-                                InstrType::MovS,
-                                Scale::Byte,
-                                InstrOperand::Reg(ADDR_REG),
-                                Quad,
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        r11_to_next(code, lhs_reg, lhs_scale);
-                        lhs_reg
-                    }
+                    // cmpq, setne, movsbq
+                    BinaryOperator::Neq => Self::generate_expr_binary_logical_compare(
+                        code,
+                        lhs_reg,
+                        rhs_reg,
+                        lhs_scale,
+                        ConditionCode::NEQ,
+                    ),
 
                     BinaryOperator::And => {
                         Self::generate_expr_binary_logical_and(code, lhs_reg, rhs_reg)
                     }
 
-                    // cmpq, or, movq, cmpq
                     BinaryOperator::Or => {
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
@@ -647,6 +544,43 @@ impl Expr {
         )));
         // the result is rax
         rax_to_next(code, lhs_reg, lhs_scale);
+        lhs_reg
+    }
+
+    fn generate_expr_binary_logical_compare(
+        code: &mut GeneratedCode,
+        lhs_reg: Register,
+        rhs_reg: Register,
+        lhs_scale: Scale,
+        condition_code: ConditionCode,
+    ) -> Register {
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Cmp,
+                lhs_scale,
+                InstrOperand::Reg(rhs_reg),
+                InstrOperand::Reg(ADDR_REG),
+            ),
+        )));
+
+        code.codes
+            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                InstrType::Set(condition_code),
+                InstrOperand::RegVariant(ADDR_REG, Scale::Byte),
+            ))));
+        if lhs_scale != Quad {
+            code.codes.push(Instruction(BinaryInstr(
+                BinaryInstruction::new_double_scale(
+                    InstrType::MovS,
+                    lhs_scale,
+                    InstrOperand::Reg(ADDR_REG),
+                    Quad,
+                    InstrOperand::Reg(ADDR_REG),
+                ),
+            )));
+        }
+
+        r11_to_next(code, lhs_reg, lhs_scale);
         lhs_reg
     }
 }
