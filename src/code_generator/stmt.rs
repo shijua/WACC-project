@@ -562,7 +562,7 @@ impl Generator for ArrayLiter {
         let aux = inner_type.0;
         let reg = get_next_register(regs, 8);
         let arr_len = self.val.len();
-        let arr_size = (arr_len * aux.size() + REFERENCE_OFFSET_SIZE) as i32;
+        let arr_size = ((arr_len * aux.size()) as i32) + REFERENCE_OFFSET_SIZE;
         generate_malloc(code, arr_size, ADDR_REG);
         // put array size
         code.codes.push(Instruction(Instr::BinaryInstr(
