@@ -28,6 +28,8 @@ class Result:
                 countother += 7
                 countself += 14
                 continue
+            if this[countself:countself+15] == '#runtime_error#':
+                return True
             if this[countself] != other[countother]:
                 return False
             countself += 1

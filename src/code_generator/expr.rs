@@ -192,7 +192,7 @@ impl Generator<'_> for Expr {
                     }
                 };
 
-                push_back_register(regs, rhs_reg);
+                // push_back_register(regs, rhs_reg);
 
                 final_reg
             }
@@ -593,10 +593,18 @@ impl Expr {
         lhs_scale: Scale,
         is_div: bool,
     ) -> Register {
-        let res = if is_div { Register::Rax } else { Register::Rdx };
+        let res = if is_div { RESULT_REG } else { Register::Rdx };
         r11_to_next(code, lhs_reg, lhs_scale);
         next_to_r11(code, rhs_reg, lhs_scale);
         next_to_rax(code, lhs_reg, lhs_scale);
+        // push rdx
+        code.codes
+            .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
+                InstrType::Push,
+                Scale::Quad,
+                InstrOperand::Reg(Register::Rdx),
+            ))));
+
         code.codes.push(Instruction(BinaryInstr(
             BinaryInstruction::new_single_scale(
                 InstrType::Cmp,
@@ -638,6 +646,15 @@ impl Expr {
                 InstrOperand::Reg(RESULT_REG),
             ),
         )));
+
+        // pop rdx
+        code.codes
+            .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
+                InstrType::Pop,
+                Scale::Quad,
+                InstrOperand::Reg(Register::Rdx),
+            ))));
+
         // the result is rax
         rax_to_next(code, lhs_reg, lhs_scale);
         lhs_reg
