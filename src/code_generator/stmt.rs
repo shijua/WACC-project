@@ -17,6 +17,7 @@ use crate::code_generator::clib_functions::{
 };
 use crate::code_generator::def_libary::Directives;
 use crate::code_generator::x86_generate::Generator;
+use crate::code_generator::REFERENCE_OFFSET_SIZE;
 use crate::semantic_checker::util::SemanticType;
 use crate::symbol_table::ScopeInfo;
 use crate::Spanned;
@@ -561,7 +562,7 @@ impl Generator for ArrayLiter {
         let aux = inner_type.0;
         let reg = get_next_register(regs, 8);
         let arr_len = self.val.len();
-        let arr_size = (arr_len * aux.size() + 4) as i32;
+        let arr_size = (arr_len * aux.size() + REFERENCE_OFFSET_SIZE) as i32;
         generate_malloc(code, arr_size, ADDR_REG);
         // put array size
         code.codes.push(Instruction(Instr::BinaryInstr(
@@ -577,7 +578,7 @@ impl Generator for ArrayLiter {
             BinaryInstruction::new_single_scale(
                 InstrType::Add,
                 Scale::default(),
-                Imm(4),
+                Imm(REFERENCE_OFFSET_SIZE),
                 Reg(ADDR_REG),
             ),
         )));

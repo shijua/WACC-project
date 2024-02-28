@@ -11,6 +11,7 @@ use crate::code_generator::asm::{
 };
 use crate::code_generator::def_libary::{Directives, FormatLabel};
 use crate::code_generator::x86_generate::Generator;
+use crate::code_generator::REFERENCE_OFFSET_SIZE;
 use crate::symbol_table::ScopeInfo;
 
 pub const PRINT_STRING_LABEL: &str = ".L._prints_str0";
@@ -671,7 +672,7 @@ impl CLibFunctions {
         //   movb $0, %al
         //   call printf@plt
         Self::mov_registers(code, Quad, Rdi, Rdx);
-        Self::mov_memory_ref_reg(code, Long, -4, true, Rdi, false, Rsi);
+        Self::mov_memory_ref_reg(code, Long, -REFERENCE_OFFSET_SIZE, true, Rdi, false, Rsi);
         Self::leaq_rip_with_label(code, PRINT_STRING_LABEL, Rdi);
         Self::mov_immediate(code, Byte, 0, Rax);
         Self::call_func(code, PRINTF_PLT);
@@ -833,7 +834,7 @@ impl CLibFunctions {
         Self::leaq_rip_with_label(code, PRINT_BOOL_LABEL_1, Rdx);
 
         Self::labelling(code, PRINT_LABEL_FOR_BOOL_1);
-        Self::mov_memory_ref_reg(code, Long, -4, true, Rdx, false, Rsi);
+        Self::mov_memory_ref_reg(code, Long, -REFERENCE_OFFSET_SIZE, true, Rdx, false, Rsi);
         Self::leaq_rip_with_label(code, PRINT_BOOL_LABEL_2, Rdi);
         Self::mov_immediate(code, Byte, 0, Rax);
         Self::call_func(code, PRINTF_PLT);
@@ -1115,7 +1116,7 @@ impl CLibFunctions {
                     InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OUT_OF_BOUNDS)),
                 ),
             )));
-        Self::mov_memory_ref_reg(code, Long, -4, true, R9, false, Rbx);
+        Self::mov_memory_ref_reg(code, Long, -REFERENCE_OFFSET_SIZE, true, R9, false, Rbx);
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
@@ -1239,7 +1240,7 @@ impl CLibFunctions {
         // jl _errOutOfBounds
         Self::jump_on_condition(code, LT, ERROR_LABEL_FOR_OUT_OF_BOUNDS);
         // movl -4(%r9), %ebx
-        Self::mov_memory_ref_reg(code, Long, -4, true, R9, false, Rbx);
+        Self::mov_memory_ref_reg(code, Long, -REFERENCE_OFFSET_SIZE, true, R9, false, Rbx);
         // cmpl %ebx, %r10d
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(

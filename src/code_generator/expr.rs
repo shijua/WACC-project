@@ -11,6 +11,7 @@ use crate::code_generator::asm::{
 };
 use crate::code_generator::def_libary::Directives;
 use crate::code_generator::x86_generate::Generator;
+use crate::code_generator::REFERENCE_OFFSET_SIZE;
 use crate::semantic_checker::util::SemanticType;
 use crate::symbol_table::ScopeInfo;
 use crate::Spanned;
@@ -260,7 +261,7 @@ impl Expr {
                 InstrType::MovS,
                 Scale::Long,
                 InstrOperand::Reference(MemoryReference {
-                    imm: Some(OffsetImm(-4)),
+                    imm: Some(OffsetImm(-REFERENCE_OFFSET_SIZE)),
                     base_reg: Some(reg),
                     shift_unit_reg: None,
                     shift_cnt: None,
