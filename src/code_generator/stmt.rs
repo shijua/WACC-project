@@ -1,7 +1,7 @@
 use crate::ast::ArgList::Arg;
 use crate::ast::{ArrayLiter, Expr, Ident, Lvalue, PairElem, Rvalue, ScopedStmt, Stmt, Type};
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
-use crate::code_generator::asm::InstrOperand::{Imm, Reference, Reg};
+use crate::code_generator::asm::InstrOperand::{Imm, Reference, Reg, RegVariant};
 use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rax, Rdi};
@@ -266,13 +266,13 @@ impl Stmt {
         // r[0] = evaluate if-condition
         let next_reg = cond.generate(scope, code, regs, aux);
 
-        // cmpq $1, r[0]
+        // cmp $1, r[0]
         code.codes.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
                 InstrType::Cmp,
-                Scale::default(),
+                Scale::Byte,
                 InstrOperand::Imm(1),
-                InstrOperand::Reg(next_reg),
+                InstrOperand::RegVariant(next_reg, Scale::Byte),
             ),
         )));
 
@@ -298,6 +298,8 @@ impl Stmt {
 
         // st1.body
         st1.generate(scope, code, regs, aux);
+
+        push_back_register(regs, next_reg);
 
         // exit_label:
         code.codes.push(Directive(Directives::Label(exit_if_label)))
@@ -438,9 +440,14 @@ impl Stmt {
             .push(Directive(Directives::Label(cond_label.clone())));
         // evaluate condition
         let res = cond.generate(scope, code, regs, aux);
-        // cmpq $1, cond_reg => check if condition is true
+        // cmp $1, cond_reg => check if condition is true
         code.codes.push(Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(InstrType::Cmp, Scale::default(), Imm(1), Reg(res)),
+            BinaryInstruction::new_single_scale(
+                InstrType::Cmp,
+                Scale::Byte,
+                Imm(1),
+                RegVariant(res, Scale::Byte),
+            ),
         )));
         // je body_label
         code.codes

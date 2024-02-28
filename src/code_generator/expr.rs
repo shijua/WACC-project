@@ -181,40 +181,7 @@ impl Generator for Expr {
                     }
 
                     BinaryOperator::Or => {
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Cmp,
-                                Scale::default(),
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Or,
-                                Scale::default(),
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Mov,
-                                Scale::default(),
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Cmp,
-                                Scale::default(),
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        r11_to_next(code, lhs_reg, lhs_scale);
-                        lhs_reg
+                        Self::generate_expr_binary_logical_or(code, lhs_reg, rhs_reg)
                     }
                 };
 
