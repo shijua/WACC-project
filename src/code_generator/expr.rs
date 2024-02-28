@@ -531,17 +531,17 @@ impl Expr {
             ))));
 
         // movsbq %al, %rax
-        code.codes.push(Instruction(BinaryInstr(
-            BinaryInstruction::new_double_scale(
-                InstrType::MovS,
-                Scale::Byte,
-                InstrOperand::Reg(RESULT_REG),
-                Scale::Quad,
-                InstrOperand::Reg(RESULT_REG),
-            ),
-        )));
+        // code.codes.push(Instruction(BinaryInstr(
+        //     BinaryInstruction::new_double_scale(
+        //         InstrType::MovS,
+        //         Scale::Byte,
+        //         InstrOperand::Reg(RESULT_REG),
+        //         Scale::Quad,
+        //         InstrOperand::Reg(RESULT_REG),
+        //     ),
+        // )));
 
-        rax_to_next(code, lhs_reg, Scale::default());
+        rax_to_next(code, lhs_reg, Byte);
         lhs_reg
     }
 
@@ -595,17 +595,17 @@ impl Expr {
             ))));
 
         // movsbq %al, %rax
-        code.codes.push(Instruction(BinaryInstr(
-            BinaryInstruction::new_double_scale(
-                InstrType::MovS,
-                Scale::Byte,
-                InstrOperand::Reg(RESULT_REG),
-                Scale::Quad,
-                InstrOperand::Reg(RESULT_REG),
-            ),
-        )));
+        // code.codes.push(Instruction(BinaryInstr(
+        //     BinaryInstruction::new_double_scale(
+        //         InstrType::MovS,
+        //         Scale::Byte,
+        //         InstrOperand::Reg(RESULT_REG),
+        //         Scale::Quad,
+        //         InstrOperand::Reg(RESULT_REG),
+        //     ),
+        // )));
 
-        rax_to_next(code, lhs_reg, Scale::default());
+        rax_to_next(code, lhs_reg, Byte);
         lhs_reg
     }
 
