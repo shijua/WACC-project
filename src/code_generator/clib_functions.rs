@@ -217,9 +217,7 @@ impl Generator<'_> for CLibFunctions {
             CLibFunctions::ArrayLoad(scale) => {
                 Self::generate_array_load(code, scale.clone());
             }
-            CLibFunctions::ArrayStore(_) => {
-                todo!()
-            }
+            CLibFunctions::ArrayStore(scale) => Self::generate_array_store(code, scale.clone()),
         }
     }
 }
@@ -1381,7 +1379,7 @@ impl CLibFunctions {
         // # Special calling convention: array ptr passed in R9, index in R10, value to store in RAX
         // pushq %rbx
 
-        let store_label = get_array_store_label(scale);
+        let store_label = get_array_store_label(&scale);
         Self::labelling(code, store_label.as_str());
         Self::pushq_rbx(code);
         // cmpl $0, %r10d
