@@ -13,7 +13,9 @@ use crate::code_generator::asm::{
     ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
     UnaryInstruction, UnaryNotScaled, ADDR_REG, RESULT_REG,
 };
-use crate::code_generator::clib_functions::{BAD_CHAR_LABEL, OVERFLOW_LABEL};
+use crate::code_generator::clib_functions::{
+    BAD_CHAR_LABEL, ERROR_LABEL_FOR_BAD_CHAR, ERROR_LABEL_FOR_DIV_ZERO, OVERFLOW_LABEL,
+};
 use crate::code_generator::clib_functions::{ERROR_LABEL_FOR_OVERFLOW, SYS_EXIT_LABEL};
 use crate::code_generator::def_libary::{get_array_load_label, Directives};
 use crate::code_generator::x86_generate::Generator;
@@ -362,7 +364,6 @@ impl Expr {
                 // testq $-128, %rax
                 // cmovne %rax, %rsi
                 // jne _errBadChar
-                // TODO
                 code.codes.push(Instruction(BinaryInstr(
                     BinaryInstruction::new_single_scale(
                         InstrType::Cmp,
@@ -371,6 +372,12 @@ impl Expr {
                         InstrOperand::Reg(reg),
                     ),
                 )));
+                code.codes
+                    .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                        InstrType::Jump(Some(ConditionCode::NEQ)),
+                        InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_BAD_CHAR)),
+                    ))));
+                code.required_clib.insert(BadCharError);
                 code.codes
                     .push(Instruction(Instr::BinaryControl(BinaryControl::new(
                         InstrType::CMov(GTE),
@@ -628,6 +635,11 @@ impl Expr {
                 InstrOperand::Reg(ADDR_REG),
             ),
         )));
+        code.codes
+            .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                InstrType::Jump(Some(ConditionCode::EQ)),
+                InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_DIV_ZERO)),
+            ))));
         code.required_clib.insert(DivZeroError);
         code.codes.push(Instruction(CltdInstr(InstrType::Cltd)));
         code.codes

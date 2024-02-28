@@ -1088,7 +1088,7 @@ impl CLibFunctions {
         // call _prints
         Self::call_func(code, PRINT_LABEL_FOR_STRING);
         // movb $-1, %dil
-        Self::mov_immediate(code, Byte, -1, Rdi);
+        Self::mov_immediate(code, Byte, EXIT_CODE, Rdi);
         // call exit@plt
         Self::call_func(code, SYS_EXIT_PLT);
     }
@@ -1124,7 +1124,7 @@ impl CLibFunctions {
         // call fflush@plt
         Self::call_func(code, F_FLUSH_PLT);
         // movb $-1, %dil
-        Self::mov_immediate(code, Byte, -1, Rdi);
+        Self::mov_immediate(code, Byte, EXIT_CODE, Rdi);
         // call exit@plt
         Self::call_func(code, SYS_EXIT_PLT);
     }
@@ -1187,7 +1187,7 @@ impl CLibFunctions {
         // call fflush@plt
         Self::call_func(code, F_FLUSH_PLT);
         // movb $-1, %dil
-        Self::mov_immediate(code, Byte, -1, Rdi);
+        Self::mov_immediate(code, Byte, EXIT_CODE, Rdi);
         // call exit@plt
         Self::call_func(code, SYS_EXIT_PLT);
     }
@@ -1215,7 +1215,7 @@ impl CLibFunctions {
         // call _prints
         Self::call_func(code, PRINT_LABEL_FOR_STRING);
         // movb $-1, %dil
-        Self::mov_immediate(code, Byte, -1, Rdi);
+        Self::mov_immediate(code, Byte, EXIT_CODE, Rdi);
         // call exit@plt
         Self::call_func(code, SYS_EXIT_PLT);
     }
@@ -1243,7 +1243,7 @@ impl CLibFunctions {
         // call _prints
         Self::call_func(code, PRINT_LABEL_FOR_STRING);
         // movb $-1, %dil
-        Self::mov_immediate(code, Byte, -1, Rdi);
+        Self::mov_immediate(code, Byte, EXIT_CODE, Rdi);
         // call exit@plt
         Self::call_func(code, SYS_EXIT_PLT);
     }
