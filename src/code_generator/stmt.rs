@@ -501,6 +501,8 @@ impl Stmt {
                 Reg(RESULT_REG),
             ),
         )));
+
+        code.codes.push(AsmLine::Instruction(Instr::Ret));
         // push back offset space
         // let final_offset = scope.get_total_offset();
 

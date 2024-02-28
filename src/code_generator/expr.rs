@@ -12,6 +12,7 @@ use crate::code_generator::asm::{
     InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG,
     RESULT_REG,
 };
+use crate::code_generator::clib_functions::BAD_CHAR_LABEL;
 use crate::code_generator::def_libary::Directives;
 use crate::code_generator::x86_generate::Generator;
 use crate::code_generator::REFERENCE_OFFSET_SIZE;
@@ -228,24 +229,45 @@ impl Expr {
             // as internally char are stored as integers inside assembly
             // therefore a forced cast would not influence anything at the backend.
             UnaryOperator::Ord => {
+                code.codes.push(Instruction(BinaryInstr(
+                    BinaryInstruction::new_double_scale(
+                        InstrType::MovS,
+                        Scale::Byte,
+                        InstrOperand::Reg(reg),
+                        Scale::Long,
+                        InstrOperand::Reg(reg),
+                    ),
+                )));
                 reg
-                // todo!()
             }
             // however, when it comes to the terms of using the 'chr' function
             // we would still have to test whether it is implemented on a function that is
             // within the range of standard ASCII codes
             UnaryOperator::Chr => {
-                // todo!: complete correct form
                 // (well, not necessarily rax but a general form of register representation)
                 // testq $-128, %rax
                 // cmovne %rax, %rsi
                 // jne _errBadChar
+                // TODO
+                code.codes.push(Instruction(BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Cmp,
+                        Quad,
+                        InstrOperand::Imm(-128),
+                        InstrOperand::Reg(reg),
+                    ),
+                )));
                 code.codes
                     .push(Instruction(Instr::BinaryControl(BinaryControl::new(
                         InstrType::CMov(GTE),
                         Quad,
                         InstrOperand::Reg(R10),
                         InstrOperand::Reg(Rsi),
+                    ))));
+                code.codes
+                    .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                        InstrType::Jump(Some(ConditionCode::NEQ)),
+                        InstrOperand::LabelRef(String::from(BAD_CHAR_LABEL)),
                     ))));
                 code.required_clib.insert(BadCharError);
                 reg
