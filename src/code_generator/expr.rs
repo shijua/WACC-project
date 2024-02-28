@@ -3,7 +3,7 @@ use crate::code_generator::asm::AsmLine::{Directive, Instruction};
 use crate::code_generator::asm::Instr::{BinaryInstr, CltdInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
 use crate::code_generator::asm::Register::Rax;
-use crate::code_generator::asm::Scale::Quad;
+use crate::code_generator::asm::Scale::{Byte, Quad};
 use crate::code_generator::asm::{
     get_next_register, next_to_r11, next_to_rax, push_back_register, r11_to_next, rax_to_next,
     AsmLine, BinaryInstruction, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
@@ -533,13 +533,13 @@ impl Expr {
         code.codes
             .push(Instruction(UnaryControl(UnaryNotScaled::new(
                 InstrType::Set(condition_code),
-                InstrOperand::RegVariant(ADDR_REG, Scale::Byte),
+                InstrOperand::RegVariant(ADDR_REG, Byte),
             ))));
         if lhs_scale != Quad {
             code.codes.push(Instruction(BinaryInstr(
                 BinaryInstruction::new_double_scale(
                     InstrType::MovS,
-                    lhs_scale,
+                    Byte,
                     InstrOperand::Reg(ADDR_REG),
                     Quad,
                     InstrOperand::Reg(ADDR_REG),

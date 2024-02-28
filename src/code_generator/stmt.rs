@@ -211,10 +211,6 @@ impl Stmt {
             }
             Type::Func(_) => (),
         };
-        // todo:
-        // Does we need to push and pop rdi? Don't quite know for know
-        // now we'll just use a placeholder, direct move
-        // this is just a temporary placeholder for carrot marks!
 
         // not sure the comment below is essential or not
         // # Set up R11 as a temporary second base pointer for the caller saved things
@@ -242,9 +238,8 @@ impl Stmt {
             ))));
         if is_println {
             code.codes
-                .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
                     InstrType::Call,
-                    Scale::default(),
                     InstrOperand::LabelRef(String::from(PRINT_LABEL_FOR_STRING_LINE)),
                 ))));
         }
@@ -266,7 +261,7 @@ impl Stmt {
         // r[0] = evaluate if-condition
         let next_reg = cond.generate(scope, code, regs, aux);
 
-        // cmp $1, r[0]
+        // cmpb $1, r[0]
         code.codes.push(Instruction(Instr::BinaryInstr(
             BinaryInstruction::new_single_scale(
                 InstrType::Cmp,
@@ -329,7 +324,7 @@ impl Stmt {
             ),
         )));
 
-        push_back_register(regs, src_reg);
+        // push_back_register(regs, src_reg);
     }
 
     fn generate_stmt_declare(
@@ -440,14 +435,9 @@ impl Stmt {
             .push(Directive(Directives::Label(cond_label.clone())));
         // evaluate condition
         let res = cond.generate(scope, code, regs, aux);
-        // cmp $1, cond_reg => check if condition is true
+        // cmpb $1, cond_reg => check if condition is true
         code.codes.push(Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Cmp,
-                Scale::Byte,
-                Imm(1),
-                RegVariant(res, Scale::Byte),
-            ),
+            BinaryInstruction::new_single_scale(InstrType::Cmp, Scale::Byte, Imm(1), Reg(res)),
         )));
         // je body_label
         code.codes

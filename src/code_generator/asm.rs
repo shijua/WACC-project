@@ -49,7 +49,7 @@ pub fn push_arg_regs(code: &mut GeneratedCode) {
         BinaryInstruction::new_single_scale(
             InstrType::Sub,
             Scale::default(),
-            InstrOperand::Imm(48),
+            InstrOperand::Imm((ARG_REGS.len() * 8) as i32),
             InstrOperand::Reg(Register::Rsp),
         ),
     )));
@@ -96,7 +96,7 @@ pub fn pop_arg_regs(code: &mut GeneratedCode) {
         BinaryInstruction::new_single_scale(
             InstrType::Add,
             Scale::default(),
-            InstrOperand::Imm(48),
+            InstrOperand::Imm((ARG_REGS.len() * 8) as i32),
             InstrOperand::Reg(Register::Rsp),
         ),
     )));
@@ -111,6 +111,7 @@ pub fn arg_register_mapping(reg: Register) -> Register {
         Register::Rcx => Register::RspStack(24),
         Register::R8 => Register::RspStack(32),
         Register::R9 => Register::RspStack(40),
+        Register::R11 => Register::RspStack(48),
         reg => reg,
     }
 }
