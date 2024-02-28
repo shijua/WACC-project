@@ -107,21 +107,31 @@ impl Generator<'_> for Rvalue {
                 todo!()
             }
             Rvalue::RCall((ident, _), (Arg(arglist), _)) => {
-                // todo!()
                 let mut arg_regs: Vec<Register> = ARG_REGS.iter().cloned().collect();
                 assert!(arglist.len() <= ARG_REGS.len()); // current restriction
+
+                // eval arguments
+                let mut args_eval: Vec<(Register, Type)> = Vec::new();
                 arglist.iter().for_each(|(arg, _)| {
                     let _type = arg.clone().analyse(scope).unwrap();
-                    let reg = arg.clone().generate(scope, code, regs, ());
+                    let reg = arg_register_mapping(arg.clone().generate(scope, code, regs, ()));
+                    args_eval.push((reg, _type));
+                });
+
+                // now put argument into correct register
+                push_arg_regs(code);
+                args_eval.iter().for_each(|(reg, _type)| {
                     code.codes.push(Instruction(Instr::BinaryInstr(
                         BinaryInstruction::new_single_scale(
                             InstrType::Mov,
                             Scale::from_size(_type.size() as i32), // type needed
-                            Reg(reg),
+                            Reg(reg.clone()),
                             Reg(arg_regs.pop().unwrap()),
                         ),
                     )));
                 });
+
+                // finally call the function
                 let func_name = code.get_function_label(ident);
                 code.codes
                     .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
@@ -129,6 +139,7 @@ impl Generator<'_> for Rvalue {
                         InstrOperand::LabelRef(func_name),
                     ))));
                 // return Rax as the result
+                pop_arg_regs(code);
                 RESULT_REG
             }
         }
@@ -492,12 +503,14 @@ impl Stmt {
     ) {
         // evaluate(return_val)
         let res = return_val.generate(scope, code, regs, ());
+        let _type = return_val.analyse(scope).unwrap();
         // r0 = return_val
         code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                Default::default(),
+            BinaryInstruction::new_double_scale(
+                InstrType::MovS,
+                Scale::from_size(_type.size() as i32),
                 Reg(res),
+                Scale::Quad,
                 Reg(RESULT_REG),
             ),
         )));

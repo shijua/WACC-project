@@ -57,6 +57,26 @@ impl Generator<'_> for Function {
                         InstrOperand::Reg(reg),
                     ),
                 )));
+                // if Scale::from_size(_type.size() as i32) == Scale::Quad {
+                //     code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+                //         BinaryInstruction::new_single_scale(
+                //             InstrType::Mov,
+                //             Scale::Quad,
+                //             InstrOperand::Reg(arg_reg),
+                //             InstrOperand::Reg(reg),
+                //         ),
+                //     )));
+                // } else {
+                //     code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+                //         BinaryInstruction::new_double_scale(
+                //             InstrType::MovS,
+                //             Scale::from_size(_type.size() as i32),
+                //             InstrOperand::Reg(arg_reg),
+                //             Scale::Quad,
+                //             InstrOperand::Reg(reg),
+                //         ),
+                //     )));
+                // };
             });
 
         let mut scope = scope.make_scope(&mut self.body_symbol_table);
@@ -104,12 +124,11 @@ impl Generator<'_> for Function {
         } else {
             // deallocate stack frame for return statement
             pos_vec_end.sort();
-            println!("{:?}", pos_vec_end);
             pos_vec_end.iter().rev().for_each(|&pos| {
                 code.codes.insert(
-                    pos,
+                    pos + 1, // +1 because we insert a statement at the beginning
                     AsmLine::Instruction(Instr::BinaryInstr(BinaryInstruction::new_single_scale(
-                        InstrType::Sub,
+                        InstrType::Add,
                         Scale::default(),
                         InstrOperand::Imm(size),
                         InstrOperand::Reg(Register::Rsp),

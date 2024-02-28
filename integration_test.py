@@ -79,6 +79,8 @@ def get_output_content(path: str) -> str:
     # if there is an exit statement, we only want to get the output before the exit statement
     if index_end_if_exit != -1 and (index_end_if_exit < index_end or index_end == -1):
         index_end = index_end_if_exit
+    if index_end == -1:
+        index_end = content.find("begin") # as some program does not contain program: at the start
     output = content[index + 7:index_end].replace("\n# ", "\n").replace("\n#", "\n").strip()
     return output
 

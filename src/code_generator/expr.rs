@@ -345,27 +345,27 @@ impl Expr {
                 // cmovne %rax, %rsi
                 // jne _errBadChar
                 // TODO
-                code.codes.push(Instruction(BinaryInstr(
-                    BinaryInstruction::new_single_scale(
-                        InstrType::Cmp,
-                        Quad,
-                        InstrOperand::Imm(-128),
-                        InstrOperand::Reg(reg),
-                    ),
-                )));
-                code.codes
-                    .push(Instruction(Instr::BinaryControl(BinaryControl::new(
-                        InstrType::CMov(GTE),
-                        Quad,
-                        InstrOperand::Reg(R10),
-                        InstrOperand::Reg(Rsi),
-                    ))));
-                code.codes
-                    .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                        InstrType::Jump(Some(ConditionCode::NEQ)),
-                        InstrOperand::LabelRef(String::from(BAD_CHAR_LABEL)),
-                    ))));
-                code.required_clib.insert(BadCharError);
+                // code.codes.push(Instruction(BinaryInstr(
+                //     BinaryInstruction::new_single_scale(
+                //         InstrType::Cmp,
+                //         Quad,
+                //         InstrOperand::Imm(-128),
+                //         InstrOperand::Reg(reg),
+                //     ),
+                // )));
+                // code.codes
+                //     .push(Instruction(Instr::BinaryControl(BinaryControl::new(
+                //         InstrType::CMov(GTE),
+                //         Quad,
+                //         InstrOperand::Reg(R10),
+                //         InstrOperand::Reg(Rsi),
+                //     ))));
+                // code.codes
+                //     .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                //         InstrType::Jump(Some(ConditionCode::NEQ)),
+                //         InstrOperand::LabelRef(String::from(BAD_CHAR_LABEL)),
+                //     ))));
+                // code.required_clib.insert(BadCharError);
                 reg
             }
         }
@@ -743,7 +743,7 @@ fn generate_string_liter(
     regs: &mut Vec<Register>,
     str_val: String,
 ) -> Register {
-    let next_reg = get_next_register(regs, 4);
+    let next_reg = get_next_register(regs, 8);
     // string must be referred to as a global dereference
     let str_label = code.get_next_string_label(&str_val);
 
