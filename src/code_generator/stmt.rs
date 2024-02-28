@@ -194,31 +194,43 @@ impl Generator<'_> for Rvalue {
 
                 pair_addr
             }
-            Rvalue::RPairElem(given_elem) => {
-                let elem_offset = given_elem.0.get_offset();
-                // todo: error check
-                let mut target_type = Type::Any;
-                let mut target = match given_elem.0.clone() {
-                    PairElem::PairElemFst(pair_target) => {
-                        target_type = Type::Pair(
-                            Box::new(new_spanned(aux)),
-                            Box::new(new_spanned(Type::Any)),
-                        );
-                        pair_target.0
-                    }
-                    PairElem::PairElemSnd(pair_target) => {
-                        target_type = Type::Pair(
-                            Box::new(new_spanned(Type::Any)),
-                            Box::new(new_spanned(aux)),
-                        );
-                        pair_target.0
-                    }
-                };
+            Rvalue::RPairElem(boxed_pair_elem) => {
+                // todo!: pair element null check
+                let pair_elem = boxed_pair_elem.0.clone();
+                let offset = pair_elem.get_offset();
 
-                // todo: null pair check
-                let (target_reg, target_size) = target.generate(scope, code, regs, target_type);
+                let (stripped_pair, pair_size) = match pair_elem.clone() {
+                    PairElem::PairElemFst(x) | PairElem::PairElemSnd(x) => x.0.clone(),
+                }
+                .generate(scope, code, regs, pair_elem.recovered_pair(aux));
 
-                todo!()
+                let elem_scale = Scale::from_size(offset);
+
+                given_to_result(code, stripped_pair, elem_scale);
+
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Add,
+                        Scale::default(),
+                        Imm(offset),
+                        Reg(RESULT_REG),
+                    ),
+                )));
+
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        elem_scale, // type needed
+                        Reference(MemoryReference::new(None, Some(RESULT_REG), None, None)),
+                        Reg(RESULT_REG),
+                    ),
+                )));
+
+                let next_reg = get_next_register(regs, offset);
+
+                rax_to_next(code, next_reg, elem_scale);
+
+                next_reg
             }
             Rvalue::RCall((ident, _), (Arg(arglist), _)) => {
                 let mut arg_regs: Vec<Register> = ARG_REGS.iter().cloned().collect();
