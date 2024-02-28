@@ -21,7 +21,7 @@ use crate::code_generator::def_libary::Directives;
 use crate::code_generator::x86_generate::Generator;
 use crate::code_generator::REFERENCE_OFFSET_SIZE;
 use crate::semantic_checker::util::SemanticType;
-use crate::symbol_table::ScopeInfo;
+use crate::symbol_table::{ScopeInfo, SymbolTable};
 use crate::Spanned;
 
 impl Generator for ScopedStmt {
@@ -36,7 +36,7 @@ impl Generator for ScopedStmt {
         aux: Self::Input,
     ) -> Self::Output {
         // Allocate relevant space onto the stack for new variables declared within the scope
-        let new_offset = self.symbol_table.size;
+        // let new_offset = self.symbol_table.size;
         // code.codes.push(Instruction(Instr::BinaryInstr(
         //     BinaryInstruction::new_single_scale(
         //         InstrType::Sub,
@@ -47,9 +47,10 @@ impl Generator for ScopedStmt {
         // )));
 
         // enter the new scope
-        let mut scope = scope.make_scope(&mut self.symbol_table);
+        let mut symboltable = SymbolTable::default();
+        let mut new_scope = scope.make_scope(&mut symboltable);
 
-        self.stmt.0.generate(&mut scope, code, regs, aux);
+        self.stmt.0.generate(&mut new_scope, code, regs, aux);
 
         // code.codes.push(Instruction(Instr::BinaryInstr(
         //     BinaryInstruction::new_single_scale(

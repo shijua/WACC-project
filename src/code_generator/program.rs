@@ -114,7 +114,6 @@ impl Generator for Program {
         regs: &mut Vec<Register>,
         aux: Self::Input,
     ) -> Self::Output {
-        // todo: text directive and global main
         // push global main directive
         code.pre_defined
             .push(AsmLine::Directive(Directives::GlobalDeclare(
@@ -137,8 +136,6 @@ impl Generator for Program {
             body_symbol_table: self.body.symbol_table.clone(),
         }
         .generate(&mut scope, code, regs, true);
-
-        // todo: generate assembly for the functions
 
         self.functions.iter().for_each(|(func, _)| {
             // thinking of calling the same function for multiple times, we need to ensure that
