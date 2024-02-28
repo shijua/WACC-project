@@ -456,18 +456,40 @@ impl Expr {
         reg
     }
     fn generate_unary_app_negation(code: &mut GeneratedCode, reg: Register) -> Register {
-        code.codes
-            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-                InstrType::Neg,
-                Scale::default(),
+        // movl $0, %eax
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Mov,
+                Scale::Long,
+                InstrOperand::Imm(0),
+                InstrOperand::Reg(Rax),
+            ),
+        )));
+        // subl %reg, %eax
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_single_scale(
+                InstrType::Sub,
+                Scale::Long,
                 InstrOperand::Reg(reg),
-            ))));
+                InstrOperand::Reg(Rax),
+            ),
+        )));
         code.codes
             .push(Instruction(UnaryControl(UnaryNotScaled::new(
                 InstrType::Jump(Some(ConditionCode::OverFlow)),
                 InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OVERFLOW)),
             ))));
         code.required_clib.insert(OverflowError);
+        // movslq %eax, %rax
+        code.codes.push(Instruction(BinaryInstr(
+            BinaryInstruction::new_double_scale(
+                InstrType::MovS,
+                Scale::Long,
+                InstrOperand::Reg(Rax),
+                Scale::Quad,
+                InstrOperand::Reg(Rax),
+            ),
+        )));
         reg
     }
 
