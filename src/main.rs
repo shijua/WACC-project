@@ -161,13 +161,12 @@ fn main() {
         exit(SYNTAX_ERROR_CODE);
     }
 
-    let mut program = ast.unwrap().0.0;
+    let mut program = ast.unwrap().0 .0;
 
     let result = program_checker(&mut program);
     if result.is_err() {
         exit(SEMANTIC_ERROR_CODE);
     }
-    println!("{:?}", program);
 
     let code = code_generator::x86_generate::gen_x86_for_program(&mut program);
 

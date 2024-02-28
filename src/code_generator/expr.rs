@@ -1,19 +1,21 @@
-use crate::ast::{ArrayElem, BinaryOperator, Expr, Ident, UnaryOperator};
+use crate::ast::Type::Array;
+use crate::ast::{ArrayElem, BinaryOperator, Expr, Ident, Type, UnaryOperator};
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
 use crate::code_generator::asm::CLibFunctions::{BadCharError, DivZeroError, OverflowError};
 use crate::code_generator::asm::ConditionCode::GTE;
 use crate::code_generator::asm::Instr::{BinaryInstr, CltdInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
-use crate::code_generator::asm::Register::{Rax, Rsi, R10};
+use crate::code_generator::asm::Register::{Rax, Rsi, R10, R9};
 use crate::code_generator::asm::Scale::{Byte, Quad};
 use crate::code_generator::asm::{
-    get_next_register, next_to_r11, next_to_rax, push_back_register, r11_to_next, rax_to_next,
-    AsmLine, BinaryControl, BinaryInstruction, ConditionCode, GeneratedCode, Instr, InstrOperand,
-    InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG,
-    RESULT_REG,
+    get_next_register, next_to_r11, next_to_rax, pop_arg_regs, push_arg_regs, push_back_register,
+    r11_to_next, rax_to_next, AsmLine, BinaryControl, BinaryInstruction, CLibFunctions,
+    ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
+    UnaryInstruction, UnaryNotScaled, ADDR_REG, RESULT_REG,
 };
 use crate::code_generator::clib_functions::BAD_CHAR_LABEL;
-use crate::code_generator::def_libary::Directives;
+use crate::code_generator::clib_functions::SYS_EXIT_LABEL;
+use crate::code_generator::def_libary::{get_array_load_label, Directives};
 use crate::code_generator::x86_generate::Generator;
 use crate::code_generator::REFERENCE_OFFSET_SIZE;
 use crate::semantic_checker::util::SemanticType;
@@ -200,8 +202,102 @@ impl Generator for Expr {
             }
             Expr::Ident(id) => Self::generate_expr_ident(scope, code, regs, id),
 
-            Expr::ArrayElem(_) => {
-                todo!()
+            Expr::ArrayElem((arr_elem, _)) => {
+                let id = &arr_elem.ident;
+                let arr_reg = scope.get_register(id).unwrap();
+
+                // now RESULT_REG stores the address of array
+                code.codes.push(Instruction(BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Scale::default(),
+                        InstrOperand::Reg(arr_reg),
+                        InstrOperand::Reg(RESULT_REG),
+                    ),
+                )));
+
+                let mut arr_type = scope.get_type(id).unwrap().clone();
+                let current_indices = arr_elem.clone().indices;
+                let mut index_cnt = 0;
+                let mut scale = Scale::default();
+
+                // array element is guaranteed to be having at least 1 element in indices
+                while let Array(inner_type) = &arr_type {
+                    if index_cnt >= current_indices.len() {
+                        break;
+                    }
+                    let inner_type = &inner_type.0;
+                    scale = inner_type.get_scale();
+                    let mut current_index = current_indices.get(index_cnt).unwrap().0.clone();
+                    let index_reg = current_index.generate(scope, code, regs, ());
+
+                    // calling convention: array ptr passed in R9, index in R10, and return into R9
+
+                    // put index_reg into r10 (and free it?)
+                    code.codes.push(Instruction(BinaryInstr(
+                        BinaryInstruction::new_single_scale(
+                            InstrType::Mov,
+                            Scale::Long,
+                            InstrOperand::Reg(index_reg),
+                            InstrOperand::Reg(R10),
+                        ),
+                    )));
+
+                    push_arg_regs(code);
+
+                    // put array register into R9 (how?)
+                    code.codes.push(Instruction(BinaryInstr(
+                        BinaryInstruction::new_single_scale(
+                            InstrType::Mov,
+                            Scale::default(),
+                            InstrOperand::Reg(RESULT_REG),
+                            InstrOperand::Reg(R9),
+                        ),
+                    )));
+
+                    // call _arrLoadScale
+                    let load_label = get_array_load_label(&scale);
+
+                    code.required_clib
+                        .insert(CLibFunctions::ArrayLoad(scale.clone()));
+
+                    code.codes
+                        .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
+                            InstrType::Call,
+                            InstrOperand::LabelRef(load_label),
+                        ))));
+
+                    // move R9 back to rax
+                    code.codes.push(Instruction(BinaryInstr(
+                        BinaryInstruction::new_single_scale(
+                            InstrType::Mov,
+                            scale,
+                            InstrOperand::Reg(R9),
+                            InstrOperand::Reg(RESULT_REG),
+                        ),
+                    )));
+
+                    pop_arg_regs(code);
+
+                    // push_back_register(regs, index_reg);
+
+                    arr_type = inner_type.clone();
+                    index_cnt = index_cnt + 1;
+                }
+
+                // mov value in rax back to the next register
+                let target = get_next_register(regs, scale.size());
+
+                code.codes.push(Instruction(BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        scale,
+                        InstrOperand::Reg(RESULT_REG),
+                        InstrOperand::Reg(target),
+                    ),
+                )));
+
+                target
             }
         }
     }
@@ -669,19 +765,4 @@ fn generate_string_liter(
     rax_to_next(code, next_reg, Quad);
 
     next_reg
-}
-
-impl Generator for ArrayElem {
-    type Input = ();
-    type Output = ();
-
-    fn generate(
-        &mut self,
-        scope: &mut ScopeInfo,
-        code: &mut GeneratedCode,
-        regs: &mut Vec<Register>,
-        aux: Self::Input,
-    ) -> Self::Output {
-        todo!()
-    }
 }
