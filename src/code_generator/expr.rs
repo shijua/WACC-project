@@ -1,13 +1,16 @@
 use crate::ast::{ArrayElem, BinaryOperator, Expr, Ident, UnaryOperator};
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
+use crate::code_generator::asm::CLibFunctions::{BadCharError, DivZeroError, OverflowError};
+use crate::code_generator::asm::ConditionCode::GTE;
 use crate::code_generator::asm::Instr::{BinaryInstr, CltdInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
-use crate::code_generator::asm::Register::Rax;
+use crate::code_generator::asm::Register::{Rax, Rsi, R10};
 use crate::code_generator::asm::Scale::{Byte, Quad};
 use crate::code_generator::asm::{
     get_next_register, next_to_r11, next_to_rax, push_back_register, r11_to_next, rax_to_next,
-    AsmLine, BinaryInstruction, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
-    MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, RESULT_REG,
+    AsmLine, BinaryControl, BinaryInstruction, ConditionCode, GeneratedCode, Instr, InstrOperand,
+    InstrType, MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG,
+    RESULT_REG,
 };
 use crate::code_generator::def_libary::Directives;
 use crate::code_generator::x86_generate::Generator;
@@ -55,7 +58,7 @@ impl Generator for Expr {
                                 InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
-                        // TODO: 1. check overflow
+                        code.required_clib.insert(OverflowError);
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
@@ -79,7 +82,7 @@ impl Generator for Expr {
                                 InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
-                        // TODO: 1. check overflow
+                        code.required_clib.insert(OverflowError);
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
@@ -103,7 +106,7 @@ impl Generator for Expr {
                                 InstrOperand::Reg(ADDR_REG),
                             ),
                         )));
-                        // TODO: 1. check overflow
+                        code.required_clib.insert(OverflowError);
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_double_scale(
                                 InstrType::MovS,
@@ -232,13 +235,20 @@ impl Expr {
             // we would still have to test whether it is implemented on a function that is
             // within the range of standard ASCII codes
             UnaryOperator::Chr => {
-                reg
-                // todo!()
-                // todo:
+                // todo!: complete correct form
                 // (well, not necessarily rax but a general form of register representation)
                 // testq $-128, %rax
                 // cmovne %rax, %rsi
                 // jne _errBadChar
+                code.codes
+                    .push(Instruction(Instr::BinaryControl(BinaryControl::new(
+                        InstrType::CMov(GTE),
+                        Quad,
+                        InstrOperand::Reg(R10),
+                        InstrOperand::Reg(Rsi),
+                    ))));
+                code.required_clib.insert(BadCharError);
+                reg
             }
         }
     }
@@ -477,7 +487,7 @@ impl Expr {
                 InstrOperand::Reg(ADDR_REG),
             ),
         )));
-        // TODO: 1. check divide by zero
+        code.required_clib.insert(DivZeroError);
         code.codes.push(Instruction(CltdInstr(InstrType::Cltd)));
         code.codes
             .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
