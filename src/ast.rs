@@ -1,3 +1,5 @@
+use crate::ast::Type::{Any, BoolType, CharType, IntType, NestedPair, StringType};
+use crate::code_generator::asm::Scale;
 use crate::from_span;
 use crate::symbol_table::SymbolTable;
 use crate::Spanned;
@@ -101,6 +103,16 @@ impl Type {
             IntType => 4,
             BoolType | CharType => 1,
             StringType | Array(_) | Func(_) | Pair(_, _) | NestedPair => 8,
+            Any => panic!("Cannot evaluate size of an Any type"),
+        }
+    }
+
+    pub fn get_scale(&self) -> Scale {
+        use Type::*;
+        match self {
+            IntType => Scale::Long,
+            BoolType | CharType => Scale::Byte,
+            StringType | Array(_) | Func(_) | Pair(_, _) | NestedPair => Scale::Quad,
             Any => panic!("Cannot evaluate size of an Any type"),
         }
     }

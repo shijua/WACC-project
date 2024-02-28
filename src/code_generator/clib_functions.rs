@@ -11,7 +11,9 @@ use crate::code_generator::asm::{
     InstrOperand, InstrType, MemoryReference, MemoryReferenceImmediate, Register, Scale,
     UnaryInstruction, UnaryNotScaled, RESULT_REG,
 };
-use crate::code_generator::def_libary::{Directives, FormatLabel};
+use crate::code_generator::def_libary::{
+    get_array_load_label, get_array_store_label, Directives, FormatLabel,
+};
 use crate::code_generator::x86_generate::Generator;
 use crate::code_generator::REFERENCE_OFFSET_SIZE;
 use crate::symbol_table::ScopeInfo;
@@ -210,8 +212,8 @@ impl Generator for CLibFunctions {
                 Self::generate_null_pair_error(code);
             }
 
-            CLibFunctions::ArrayLoad(_) => {
-                todo!()
+            CLibFunctions::ArrayLoad(scale) => {
+                Self::generate_array_load(code, scale.clone());
             }
             CLibFunctions::ArrayStore(_) => {
                 todo!()
@@ -1259,7 +1261,7 @@ impl CLibFunctions {
         // Byte: movsbq (%r9,%r10), %r9 // Long: movslq (%r9,%r10,4), %r9 // Quad: movq (%r9,%r10,8), %r9
         // popq %rbx
         // ret
-        let load_label = Self::get_array_load_label(&scale);
+        let load_label = get_array_load_label(&scale);
         Self::labelling(code, load_label.as_str());
         Self::pushq_rbx(code);
         code.lib_functions
@@ -1318,15 +1320,6 @@ impl CLibFunctions {
                 ),
             )));
         // Byte: movsbq (%r9,%r10), %r9 // Long: movslq (%r9,%r10,4), %r9 // Quad: movq (%r9,%r10,8), %r9
-        code.lib_functions.push(Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_double_scale(
-                InstrType::MovS,
-                scale.clone(),
-                InstrOperand::Reference(MemoryReference::new(None, Some(R9), Some(R10), Some(4))),
-                Quad,
-                InstrOperand::Reg(R9),
-            ),
-        )));
         match scale {
             Byte => {
                 code.lib_functions.push(Instruction(Instr::BinaryInstr(
@@ -1386,7 +1379,7 @@ impl CLibFunctions {
         // # Special calling convention: array ptr passed in R9, index in R10, value to store in RAX
         // pushq %rbx
 
-        let store_label = Self::get_array_store_label(scale);
+        let store_label = get_array_store_label(scale);
         Self::labelling(code, store_label.as_str());
         Self::pushq_rbx(code);
         // cmpl $0, %r10d
@@ -1490,14 +1483,6 @@ impl CLibFunctions {
         Self::popq_rbx(code);
         // ret
         Self::ret(code);
-    }
-
-    fn get_array_store_label(scale: Scale) -> String {
-        format!("{}{}", ARRAY_STORE_LABEL, scale)
-    }
-
-    fn get_array_load_label(scale: &Scale) -> String {
-        format!("{}{}", ARRAY_LOAD_LABEL, scale)
     }
 
     fn generate_free_pair(code: &mut GeneratedCode) {
