@@ -102,8 +102,7 @@ impl Type {
         match self {
             IntType => 4,
             BoolType | CharType => 1,
-            StringType | Array(_) | Func(_) | Pair(_, _) | NestedPair => 8,
-            Any => panic!("Cannot evaluate size of an Any type"),
+            StringType | Array(_) | Func(_) | Pair(_, _) | NestedPair | Any => 8,
         }
     }
 
@@ -112,8 +111,7 @@ impl Type {
         match self {
             IntType => Scale::Long,
             BoolType | CharType => Scale::Byte,
-            StringType | Array(_) | Func(_) | Pair(_, _) | NestedPair => Scale::Quad,
-            Any => panic!("Cannot evaluate size of an Any type"),
+            StringType | Array(_) | Func(_) | Pair(_, _) | NestedPair | Any => Scale::Quad,
         }
     }
 

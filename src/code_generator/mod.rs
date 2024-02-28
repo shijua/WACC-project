@@ -13,3 +13,5 @@ mod stmt;
 pub mod x86_generate;
 
 pub const REFERENCE_OFFSET_SIZE: i32 = 4;
+pub const PAIR_ELEM_SIZE: i32 = 8;
+pub const PAIR_SIZE: i32 = 16;

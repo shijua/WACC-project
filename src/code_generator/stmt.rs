@@ -6,11 +6,11 @@ use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rax, Rdi};
 use crate::code_generator::asm::{
-    arg_register_mapping, get_next_register, next_to_rax, pop_arg_regs, pop_callee_saved_regs,
-    push_arg_regs, push_back_register, push_callee_saved_regs, rax_to_next, AsmLine,
-    BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
-    MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, ARG_REGS,
-    RESULT_REG,
+    arg_register_mapping, get_next_register, given_to_result, next_to_rax, pop_arg_regs,
+    pop_callee_saved_regs, push_arg_regs, push_back_register, push_callee_saved_regs, rax_to_next,
+    result_to_given, AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode,
+    Instr, InstrOperand, InstrType, MemoryReference, Register, Scale, UnaryInstruction,
+    UnaryNotScaled, ADDR_REG, ARG_REGS, RESULT_REG,
 };
 use crate::code_generator::clib_functions::{
     MALLOC_LABEL, PRINT_LABEL_FOR_BOOL, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT,
@@ -19,10 +19,10 @@ use crate::code_generator::clib_functions::{
 };
 use crate::code_generator::def_libary::Directives;
 use crate::code_generator::x86_generate::Generator;
-use crate::code_generator::REFERENCE_OFFSET_SIZE;
+use crate::code_generator::{PAIR_ELEM_SIZE, REFERENCE_OFFSET_SIZE};
 use crate::semantic_checker::util::SemanticType;
 use crate::symbol_table::{ScopeInfo, SymbolTable};
-use crate::Spanned;
+use crate::{new_spanned, Spanned};
 
 impl Generator for ScopedStmt {
     type Input = ();
@@ -63,6 +63,26 @@ impl Generator for ScopedStmt {
     }
 }
 
+impl PairElem {
+    pub fn get_offset(&self) -> i32 {
+        match self {
+            PairElem::PairElemFst(_) => 0,
+            PairElem::PairElemSnd(_) => PAIR_ELEM_SIZE,
+        }
+    }
+
+    pub fn recovered_pair(&self, aux: Type) -> Type {
+        match self {
+            PairElem::PairElemFst(_) => {
+                Type::Pair(Box::new(new_spanned(aux)), Box::new(new_spanned(Type::Any)))
+            }
+            PairElem::PairElemSnd(_) => {
+                Type::Pair(Box::new(new_spanned(Type::Any)), Box::new(new_spanned(aux)))
+            }
+        }
+    }
+}
+
 impl Generator for Lvalue {
     type Input = Type;
     type Output = (Register, i32);
@@ -79,8 +99,32 @@ impl Generator for Lvalue {
             Lvalue::LArrElem(arr_elem) => {
                 todo!()
             }
-            Lvalue::LPairElem(arr_elem) => {
-                todo!()
+            Lvalue::LPairElem(boxed_pair_elem) => {
+                // push rax?
+                let pair_elem = boxed_pair_elem.0.clone();
+                let offset = pair_elem.get_offset();
+
+                let (stripped_pair, pair_size) = match pair_elem.clone() {
+                    PairElem::PairElemFst(x) | PairElem::PairElemSnd(x) => x.0.clone(),
+                }
+                .generate(scope, code, regs, pair_elem.recovered_pair(aux));
+
+                let elem_scale = Scale::from_size(offset);
+
+                given_to_result(code, stripped_pair, elem_scale);
+
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Add,
+                        Scale::default(),
+                        Imm(offset),
+                        Reg(RESULT_REG),
+                    ),
+                )));
+
+                result_to_given(code, stripped_pair, Scale::Quad);
+
+                (stripped_pair, PAIR_ELEM_SIZE)
             }
         }
     }
@@ -101,9 +145,79 @@ impl Generator for Rvalue {
             Rvalue::RExpr(boxed_expr) => boxed_expr.0.generate(scope, code, regs, ()),
             Rvalue::RArrLit(boxed_arrlit) => boxed_arrlit.0.generate(scope, code, regs, aux),
             Rvalue::RNewPair(boxed_pair1, boxed_pair2) => {
-                todo!()
+                // by default, pair will attempt to store a 16-byte malloc-ed memory
+                // with the lhs 8 bytes for fst, and rhs 8 bytes for snd
+                let pair_addr = get_next_register(regs, 8);
+                generate_malloc(code, PAIR_ELEM_SIZE, ADDR_REG);
+                let calculated_elem = &mut boxed_pair1.0;
+                let calculated_reg = calculated_elem.generate(scope, code, regs, ());
+                given_to_result(code, calculated_reg.clone(), Scale::default());
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Scale::default(),
+                        Reg(RESULT_REG),
+                        Reference(MemoryReference::new(None, Some(ADDR_REG), None, None)),
+                    ),
+                )));
+
+                push_back_register(regs, calculated_reg);
+
+                let calculated_elem = &mut boxed_pair2.0;
+                let calculated_reg = calculated_elem.generate(scope, code, regs, ());
+                given_to_result(code, calculated_reg.clone(), Scale::default());
+
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Scale::default(),
+                        Reg(RESULT_REG),
+                        Reference(MemoryReference::new(
+                            Some(OffsetImm(PAIR_ELEM_SIZE)),
+                            Some(ADDR_REG),
+                            None,
+                            None,
+                        )),
+                    ),
+                )));
+
+                push_back_register(regs, calculated_reg);
+
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Scale::default(),
+                        Reg(ADDR_REG),
+                        Reg(pair_addr),
+                    ),
+                )));
+
+                pair_addr
             }
-            Rvalue::RPairElem(_) => {
+            Rvalue::RPairElem(given_elem) => {
+                let elem_offset = given_elem.0.get_offset();
+                // todo: error check
+                let mut target_type = Type::Any;
+                let mut target = match given_elem.0.clone() {
+                    PairElem::PairElemFst(pair_target) => {
+                        target_type = Type::Pair(
+                            Box::new(new_spanned(aux)),
+                            Box::new(new_spanned(Type::Any)),
+                        );
+                        pair_target.0
+                    }
+                    PairElem::PairElemSnd(pair_target) => {
+                        target_type = Type::Pair(
+                            Box::new(new_spanned(Type::Any)),
+                            Box::new(new_spanned(aux)),
+                        );
+                        pair_target.0
+                    }
+                };
+
+                // todo: null pair check
+                let (target_reg, target_size) = target.generate(scope, code, regs, target_type);
+
                 todo!()
             }
             Rvalue::RCall((ident, _), (Arg(arglist), _)) => {
