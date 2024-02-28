@@ -946,7 +946,7 @@ impl CLibFunctions {
         //   movsbq (%rsp), %rax
         //   addq $16, %rsp
         Self::subq_rsp(code);
-        Self::mov_memory_ref_reg(code, Byte, 0, true, Rsp, false, Rsi);
+        Self::mov_memory_ref_reg(code, Byte, 0, false, Rdi, true, Rsp);
         Self::leaq_registers(code, Rsp, Rsi);
         Self::leaq_rip_with_label(code, READ_CHAR_LABEL, Rdi);
         Self::mov_immediate(code, Byte, 0, Rax);

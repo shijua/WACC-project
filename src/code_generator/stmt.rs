@@ -6,14 +6,16 @@ use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rax, Rdi};
 use crate::code_generator::asm::{
-    arg_register_mapping, get_next_register, next_to_rax, pop_arg_regs, push_arg_regs,
-    push_back_register, rax_to_next, AsmLine, BinaryInstruction, CLibFunctions, ConditionCode,
-    GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
-    UnaryInstruction, UnaryNotScaled, ADDR_REG, ARG_REGS, RESULT_REG,
+    arg_register_mapping, get_next_register, next_to_rax, pop_arg_regs, pop_callee_saved_regs,
+    push_arg_regs, push_back_register, push_callee_saved_regs, rax_to_next, AsmLine,
+    BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
+    MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, ARG_REGS,
+    RESULT_REG,
 };
 use crate::code_generator::clib_functions::{
     MALLOC_LABEL, PRINT_LABEL_FOR_BOOL, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT,
-    PRINT_LABEL_FOR_REF, PRINT_LABEL_FOR_STRING, PRINT_LABEL_FOR_STRING_LINE, SYS_EXIT_LABEL,
+    PRINT_LABEL_FOR_REF, PRINT_LABEL_FOR_STRING, PRINT_LABEL_FOR_STRING_LINE, READ_LABEL_FOR_CHAR,
+    READ_LABEL_FOR_INT, SYS_EXIT_LABEL,
 };
 use crate::code_generator::def_libary::Directives;
 use crate::code_generator::x86_generate::Generator;
@@ -152,7 +154,35 @@ impl Generator for Stmt {
                 code.required_clib.insert(CLibFunctions::PrintLn);
             }
             Stmt::Read(read_type, (lvalue, _)) => {
-                todo!()
+                let (mut next_reg, _) = lvalue.generate(scope, code, regs, read_type.clone());
+                next_reg = arg_register_mapping(next_reg);
+                push_arg_regs(code);
+                next_to_rax(code, next_reg, Scale::from_size(read_type.size() as i32));
+                rax_to_next(code, Rdi, Scale::from_size(read_type.size() as i32));
+
+                match read_type {
+                    Type::IntType => {
+                        code.codes
+                            .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
+                                InstrType::Call,
+                                InstrOperand::LabelRef(String::from(READ_LABEL_FOR_INT)),
+                            ))));
+                        code.required_clib.insert(CLibFunctions::ReadInt);
+                    }
+                    Type::CharType => {
+                        code.codes
+                            .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
+                                InstrType::Call,
+                                InstrOperand::LabelRef(String::from(READ_LABEL_FOR_CHAR)),
+                            ))));
+                        code.required_clib.insert(CLibFunctions::ReadChar);
+                    }
+                    _ => {
+                        panic!("Cannot read type {:?}", read_type);
+                    }
+                }
+                rax_to_next(code, next_reg, Scale::from_size(read_type.size() as i32));
+                pop_arg_regs(code);
             }
             Stmt::Exit((exit_val, _)) => {
                 Self::generate_stmt_exit(scope, code, regs, exit_val);
