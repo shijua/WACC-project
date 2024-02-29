@@ -544,7 +544,7 @@ impl<'a> Generator<'a> for Stmt {
                                 Reg(Rdi),
                             ),
                         )));
-                        // code.required_clib.insert(CLibFunctions::FreeArray);
+                        code.required_clib.insert(CLibFunctions::Free);
                         code.codes
                             .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
                                 InstrType::Call,
