@@ -113,6 +113,7 @@ impl Display for InstrType {
             InstrType::Div => write!(f, "idiv"),
             InstrType::Cltd => write!(f, "cltd"),
             InstrType::CMov(condition_code) => write!(f, "cmov{}", condition_code),
+            InstrType::Test => write!(f, "test"),
         }
     }
 }

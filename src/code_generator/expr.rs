@@ -1,13 +1,18 @@
+use crate::ast::BinaryOperator::Neq;
 use crate::ast::Type::Array;
 use crate::ast::{ArrayElem, BinaryOperator, Expr, Ident, Type, UnaryOperator};
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
 use crate::code_generator::asm::CLibFunctions::{BadCharError, DivZeroError, OverflowError};
-use crate::code_generator::asm::ConditionCode::GTE;
+use crate::code_generator::asm::ConditionCode::{GTE, NEQ};
 use crate::code_generator::asm::Instr::{BinaryInstr, CltdInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
 use crate::code_generator::asm::Register::{Rax, Rsi, R10, R9};
-use crate::code_generator::asm::Scale::{Byte, Quad};
+use crate::code_generator::asm::Scale::{Byte, Long, Quad};
 use crate::code_generator::asm::{
+    arg_register_mapping, get_next_register, next_to_r11, next_to_rax, pop_arg_regs, push_arg_regs,
+    push_back_register, r11_to_next, rax_to_next, AsmLine, BinaryControl, BinaryInstruction,
+    CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference,
+    Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, RESULT_REG,
     get_next_register, next_to_r11, next_to_rax, pop_arg_regs, pop_rax, push_arg_regs,
     push_back_register, push_rax, r11_to_next, rax_to_next, AsmLine, BinaryControl,
     BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
@@ -343,35 +348,30 @@ impl Expr {
                 // testq $-128, %rax
                 // cmovne %rax, %rsi
                 // jne _errBadChar
+                push_arg_regs(code);
                 code.codes.push(Instruction(BinaryInstr(
                     BinaryInstruction::new_single_scale(
-                        InstrType::Cmp,
-                        Quad,
+                        InstrType::Test,
+                        Long,
                         InstrOperand::Imm(-128),
                         InstrOperand::Reg(reg),
                     ),
                 )));
-                push_arg_regs(code);
+                code.required_clib.insert(BadCharError);
+                code.codes
+                    .push(Instruction(Instr::BinaryControl(BinaryControl::new(
+                        InstrType::CMov(NEQ),
+                        Quad,
+                        InstrOperand::Reg(arg_register_mapping(reg)),
+                        InstrOperand::Reg(Rsi),
+                    ))));
+
                 code.codes
                     .push(Instruction(UnaryControl(UnaryNotScaled::new(
                         InstrType::Jump(Some(ConditionCode::NEQ)),
                         InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_BAD_CHAR)),
                     ))));
                 pop_arg_regs(code);
-                code.required_clib.insert(BadCharError);
-                code.codes
-                    .push(Instruction(Instr::BinaryControl(BinaryControl::new(
-                        InstrType::CMov(GTE),
-                        Quad,
-                        InstrOperand::Reg(R10),
-                        InstrOperand::Reg(Rsi),
-                    ))));
-                code.codes
-                    .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                        InstrType::Jump(Some(ConditionCode::NEQ)),
-                        InstrOperand::LabelRef(String::from(BAD_CHAR_LABEL)),
-                    ))));
-                code.required_clib.insert(BadCharError);
                 reg
             }
         }
