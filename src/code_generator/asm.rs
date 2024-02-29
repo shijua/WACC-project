@@ -533,6 +533,7 @@ pub enum InstrType {
     Div,
     Cltd,
     CMov(ConditionCode),
+    Test,
 }
 
 #[derive(PartialEq, Debug, Clone)]
