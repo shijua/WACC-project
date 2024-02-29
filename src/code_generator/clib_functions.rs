@@ -55,6 +55,7 @@ pub const ARRAY_LOAD_LABEL: &str = "_arrLoad";
 pub const ARRAY_STORE_LABEL: &str = "_arrStore";
 
 pub const FREE_PAIR_LABEL: &str = "_freepair";
+pub const FREE_LABEL: &str = "_free";
 
 pub const OUT_OF_MEMORY_LABEL: &str = ".L._errOutOfMemory_str0";
 pub const ERROR_LABEL_FOR_OUT_OF_MEMORY: &str = "_errOutOfMemory";
@@ -218,6 +219,7 @@ impl Generator<'_> for CLibFunctions {
                 Self::generate_array_load(code, scale.clone());
             }
             CLibFunctions::ArrayStore(scale) => Self::generate_array_store(code, scale.clone()),
+            _ => {} // todo
         }
     }
 }

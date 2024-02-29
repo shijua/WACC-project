@@ -9,16 +9,16 @@ use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rax, Rdi, R10, R9};
 use crate::code_generator::asm::{
     arg_register_mapping, function_arguments_calculate_extra_size, get_next_register,
-    given_to_result, next_to_rax, pop_arg_regs, pop_callee_saved_regs, pop_rax, push_arg_regs,
-    push_back_register, push_callee_saved_regs, push_rax, rax_to_next, result_to_given, AsmLine,
-    BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
-    MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, ARG_REGS,
-    RESULT_REG,
+    given_to_result, next_to_rax, pop_arg_regs, pop_callee_saved_regs, pop_rax, pop_register,
+    push_arg_regs, push_back_register, push_callee_saved_regs, push_rax, push_register,
+    rax_to_next, result_to_given, AsmLine, BinaryInstruction, CLibFunctions, ConditionCode,
+    GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
+    UnaryInstruction, UnaryNotScaled, ADDR_REG, ARG_REGS, RESULT_REG,
 };
 use crate::code_generator::clib_functions::{
-    MALLOC_LABEL, PRINT_LABEL_FOR_BOOL, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT,
-    PRINT_LABEL_FOR_REF, PRINT_LABEL_FOR_STRING, PRINT_LABEL_FOR_STRING_LINE, READ_LABEL_FOR_CHAR,
-    READ_LABEL_FOR_INT, SYS_EXIT_LABEL,
+    FREE_LABEL, FREE_PAIR_LABEL, MALLOC_LABEL, PRINT_LABEL_FOR_BOOL, PRINT_LABEL_FOR_CHAR,
+    PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_REF, PRINT_LABEL_FOR_STRING, PRINT_LABEL_FOR_STRING_LINE,
+    READ_LABEL_FOR_CHAR, READ_LABEL_FOR_INT, SYS_EXIT_LABEL,
 };
 use crate::code_generator::def_libary::{get_array_load_label, get_array_store_label, Directives};
 use crate::code_generator::x86_generate::Generator;
@@ -140,38 +140,13 @@ impl Generator<'_> for Lvalue {
 
                         // RAX now stores the current address of the array to visit
 
-                        // then mov the RAX for offset stored in index_reg
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Mov,
-                                Scale::default(),
-                                InstrOperand::Reg(RESULT_REG),
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-
-                        // then move the index into RAX
+                        // then move the index into R10
                         code.codes.push(Instruction(BinaryInstr(
                             BinaryInstruction::new_single_scale(
                                 InstrType::Mov,
                                 Scale::Long,
                                 InstrOperand::Reg(index_reg),
-                                InstrOperand::Reg(RESULT_REG),
-                            ),
-                        )));
-
-                        // move offset-based into RAX
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Mov,
-                                Scale::default(),
-                                InstrOperand::Reference(MemoryReference::new(
-                                    None,
-                                    Some(RESULT_REG),
-                                    Some(index_reg),
-                                    Some(index_cnt as i32),
-                                )),
-                                InstrOperand::Reg(RESULT_REG),
+                                InstrOperand::Reg(R10),
                             ),
                         )));
 
@@ -183,6 +158,10 @@ impl Generator<'_> for Lvalue {
                     }
 
                     // calling convention: array ptr passed in R9, index in R10, and return into R9
+
+                    push_register(code, R9);
+
+                    push_register(code, R10);
 
                     // put index_reg into r10 (and free it?)
                     code.codes.push(Instruction(BinaryInstr(
@@ -229,6 +208,8 @@ impl Generator<'_> for Lvalue {
                     )));
 
                     pop_arg_regs(code);
+                    pop_register(code, R10);
+                    pop_register(code, R9);
 
                     // push_back_register(regs, index_reg);
 
@@ -540,8 +521,39 @@ impl<'a> Generator<'a> for Stmt {
             Stmt::Return((return_val, _)) => {
                 Self::generate_stmt_return(scope, code, regs, aux, return_val);
             }
-            Stmt::Free(_, _) => {
-                todo!()
+            Stmt::Free(_type, (expr, _)) => {
+                let reg = expr.generate(scope, code, regs, ());
+                push_arg_regs(code);
+                next_to_rax(code, arg_register_mapping(reg), Scale::Quad);
+                rax_to_next(code, Rdi, Scale::Quad);
+                match _type {
+                    Type::Pair(_, _) => {
+                        code.required_clib.insert(CLibFunctions::FreePair);
+                        code.codes
+                            .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
+                                InstrType::Call,
+                                InstrOperand::LabelRef(String::from(FREE_PAIR_LABEL)),
+                            ))));
+                    }
+                    Type::Array(_) => {
+                        code.codes.push(Instruction(Instr::BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Sub,
+                                Scale::Quad,
+                                Imm(4),
+                                Reg(Rdi),
+                            ),
+                        )));
+                        // code.required_clib.insert(CLibFunctions::FreeArray);
+                        code.codes
+                            .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
+                                InstrType::Call,
+                                InstrOperand::LabelRef(String::from(FREE_LABEL)),
+                            ))));
+                    }
+                    _ => panic!("Cannot free type {:?}", _type),
+                }
+                pop_arg_regs(code);
             }
         }
     }
@@ -697,17 +709,26 @@ impl Stmt {
                 )));
             }
             Lvalue::LArrElem(_) => {
+                // after evaluating, the address for array elem saving is already at dst_reg,
+                // the index is already at R10
+                // and hence we need to move the value at dst to r9
                 let scale = Scale::from_size(size);
-                // Rvalue at rax
-                // move rax to R10
-                rax_to_next(code, R10, scale);
-                // move dst_reg to R9
-                rax_to_next(code, dst_reg, scale);
-                // call array_storeScale
+
+                code.codes.push(Instruction(BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Scale::default(),
+                        InstrOperand::Reg(dst_reg),
+                        InstrOperand::Reg(R9),
+                    ),
+                )));
+
+                // // call array_storeScale
+
                 code.required_clib
                     .insert(CLibFunctions::ArrayStore(scale.clone()));
-
-                // add instruction dependency: system exit
+                //
+                // // add instruction dependency: system exit
                 code.codes
                     .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
                         InstrType::Call,
@@ -716,8 +737,6 @@ impl Stmt {
                     ))));
             }
         }
-
-        // push_back_register(regs, src_reg);
     }
 
     fn generate_stmt_declare(

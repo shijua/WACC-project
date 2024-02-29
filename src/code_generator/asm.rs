@@ -92,6 +92,26 @@ pub fn pop_rax(code: &mut GeneratedCode) {
         ))));
 }
 
+pub fn push_register(code: &mut GeneratedCode, reg: Register) {
+    assert!(!matches!(reg, Register::Stack(_)));
+    code.codes
+        .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+            InstrType::Push,
+            Scale::default(),
+            InstrOperand::Reg(reg),
+        ))));
+}
+
+pub fn pop_register(code: &mut GeneratedCode, reg: Register) {
+    assert!(!matches!(reg, Register::Stack(_)));
+    code.codes
+        .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+            InstrType::Push,
+            Scale::default(),
+            InstrOperand::Reg(reg),
+        ))));
+}
+
 // pop argument registers
 pub fn pop_arg_regs(code: &mut GeneratedCode) {
     let mut count: i32 = 0;
@@ -393,8 +413,8 @@ pub enum CLibFunctions {
     DivZeroError,
     NullPairError,
 
-    // FreeArray -> Unsure
     Malloc,
+    Free,
     FreePair,
     ArrayLoad(Scale),
     ArrayStore(Scale),
