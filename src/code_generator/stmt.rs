@@ -756,7 +756,7 @@ impl Stmt {
         //     rvalue.clone(),
         // )
         // .generate(scope, code, regs, aux);
-        // symboltable
+        // symbol table
         let res = rvalue.0.generate(scope, code, regs, type_.clone());
         let sto = get_next_register(regs, type_.size() as i32);
         let scale = Scale::from_size(type_.size() as i32);
@@ -1025,7 +1025,7 @@ impl Generator<'_> for ArrayLiter {
                     )),
                 ),
             )));
-            push_back_register(regs, expr_reg);
+            // push_back_register(regs, expr_reg);
         }
 
         code.codes.push(Instruction(Instr::BinaryInstr(

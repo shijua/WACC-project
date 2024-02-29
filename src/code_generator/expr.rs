@@ -9,9 +9,10 @@ use crate::code_generator::asm::Register::{Rax, Rsi, R10, R9};
 use crate::code_generator::asm::Scale::{Byte, Long, Quad};
 use crate::code_generator::asm::{
     arg_register_mapping, get_next_register, next_to_r11, next_to_rax, pop_arg_regs, pop_rax,
-    push_arg_regs, push_back_register, push_rax, r11_to_next, rax_to_next, AsmLine, BinaryControl,
-    BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
-    MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, RESULT_REG,
+    pop_register, push_arg_regs, push_back_register, push_rax, push_register, r11_to_next,
+    rax_to_next, AsmLine, BinaryControl, BinaryInstruction, CLibFunctions, ConditionCode,
+    GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
+    UnaryInstruction, UnaryNotScaled, ADDR_REG, RESULT_REG,
 };
 use crate::code_generator::clib_functions::{
     BAD_CHAR_LABEL, ERROR_LABEL_FOR_BAD_CHAR, ERROR_LABEL_FOR_DIV_ZERO, OVERFLOW_LABEL,
@@ -224,6 +225,10 @@ impl Generator<'_> for Expr {
 
                     let index_reg = current_index.generate(scope, code, regs, ());
 
+                    pop_rax(code);
+
+                    push_arg_regs(code);
+
                     // calling convention: array ptr passed in R9, index in R10, and return into R9
 
                     // put index_reg into r10 (and free it?)
@@ -236,9 +241,9 @@ impl Generator<'_> for Expr {
                         ),
                     )));
 
-                    pop_rax(code);
+                    push_register(code, R9);
 
-                    push_arg_regs(code);
+                    push_register(code, R10);
 
                     // put array register into R9 (how?)
                     code.codes.push(Instruction(BinaryInstr(
@@ -273,6 +278,10 @@ impl Generator<'_> for Expr {
                     )));
 
                     pop_arg_regs(code);
+
+                    pop_register(code, R9);
+
+                    pop_register(code, R10);
 
                     // push_back_register(regs, index_reg);
 
