@@ -924,9 +924,11 @@ impl Generator<'_> for PairElem {
 fn generate_malloc(code: &mut GeneratedCode, bytes: i32, reg: Register) {
     code.required_clib.insert(CLibFunctions::Malloc);
     // push rdi
-    code.codes.push(AsmLine::Instruction(Instr::UnaryInstr(
-        UnaryInstruction::new_unary(InstrType::Push, Scale::default(), Reg(ARG_REGS[0])),
-    )));
+    // code.codes.push(AsmLine::Instruction(Instr::UnaryInstr(
+    //     UnaryInstruction::new_unary(InstrType::Push, Scale::default(), Reg(ARG_REGS[0])),
+    // )));
+
+    push_arg_regs(code);
 
     // movl bytes edi
     code.codes.push(Instruction(Instr::BinaryInstr(
@@ -947,9 +949,11 @@ fn generate_malloc(code: &mut GeneratedCode, bytes: i32, reg: Register) {
         ))));
 
     // pop RDI
-    code.codes.push(AsmLine::Instruction(Instr::UnaryInstr(
-        UnaryInstruction::new_unary(InstrType::Pop, Scale::default(), Reg(ARG_REGS[0])),
-    )));
+    // code.codes.push(AsmLine::Instruction(Instr::UnaryInstr(
+    //     UnaryInstruction::new_unary(InstrType::Pop, Scale::default(), Reg(ARG_REGS[0])),
+    // )));
+
+    pop_arg_regs(code);
 
     // mov RESULT_REG reg
     code.codes.push(Instruction(Instr::BinaryInstr(
