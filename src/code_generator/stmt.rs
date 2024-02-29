@@ -1,14 +1,16 @@
 use crate::ast::ArgList::Arg;
+use crate::ast::Type::Array;
 use crate::ast::{ArrayLiter, Expr, Ident, Lvalue, PairElem, Rvalue, ScopedStmt, Stmt, Type};
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
+use crate::code_generator::asm::Instr::BinaryInstr;
 use crate::code_generator::asm::InstrOperand::{Imm, Reference, Reg, RegVariant};
 use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
-use crate::code_generator::asm::Register::{Rax, Rdi};
+use crate::code_generator::asm::Register::{Rax, Rdi, R10, R9};
 use crate::code_generator::asm::{
     arg_register_mapping, function_arguments_calculate_extra_size, get_next_register,
-    given_to_result, next_to_rax, pop_arg_regs, pop_callee_saved_regs, push_arg_regs,
-    push_back_register, push_callee_saved_regs, rax_to_next, result_to_given, AsmLine,
+    given_to_result, next_to_rax, pop_arg_regs, pop_callee_saved_regs, pop_rax, push_arg_regs,
+    push_back_register, push_callee_saved_regs, push_rax, rax_to_next, result_to_given, AsmLine,
     BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
     MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, ARG_REGS,
     RESULT_REG,
@@ -18,7 +20,7 @@ use crate::code_generator::clib_functions::{
     PRINT_LABEL_FOR_REF, PRINT_LABEL_FOR_STRING, PRINT_LABEL_FOR_STRING_LINE, READ_LABEL_FOR_CHAR,
     READ_LABEL_FOR_INT, SYS_EXIT_LABEL,
 };
-use crate::code_generator::def_libary::Directives;
+use crate::code_generator::def_libary::{get_array_load_label, get_array_store_label, Directives};
 use crate::code_generator::x86_generate::Generator;
 use crate::code_generator::{PAIR_ELEM_SIZE, REFERENCE_OFFSET_SIZE};
 use crate::semantic_checker::util::SemanticType;
@@ -97,8 +99,144 @@ impl Generator<'_> for Lvalue {
     ) -> Self::Output {
         match self {
             Lvalue::LIdent((id, _)) => (scope.get_register(id).unwrap(), aux.size() as i32),
-            Lvalue::LArrElem(arr_elem) => {
-                todo!()
+            Lvalue::LArrElem((arr_elem, _)) => {
+                // to store into an array element we would need to fetch its address
+                // as the returned Lvalue
+                // and then return it to stmt_assign for later operations
+                // we would: call array_load for multi-dimension arrays
+                let id = &arr_elem.ident;
+                let arr_reg = scope.get_register(id).unwrap();
+
+                // now RESULT_REG stores the address of array
+                code.codes.push(Instruction(BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Scale::default(),
+                        InstrOperand::Reg(arr_reg),
+                        InstrOperand::Reg(RESULT_REG),
+                    ),
+                )));
+
+                push_rax(code);
+
+                let mut arr_type = scope.get_type(id).unwrap().clone();
+                let current_indices = arr_elem.clone().indices;
+                let mut index_cnt = 0;
+                let mut scale = Scale::default();
+
+                // recursively fetch out array address
+                while let Array(inner_type) = &arr_type {
+                    // we would fetch the address of the final index outside the while loop
+                    let inner_type = &inner_type.0;
+                    scale = inner_type.get_scale();
+                    let mut current_index = current_indices.get(index_cnt).unwrap().0.clone();
+                    let index_reg = current_index.generate(scope, code, regs, ());
+
+                    pop_rax(code);
+
+                    if index_cnt == current_indices.len() - 1 {
+                        // if we come to the last instruction: no more loading is needed, we would
+                        // only need to return the corresponding address into the target register
+
+                        // RAX now stores the current address of the array to visit
+
+                        // then mov the RAX for offset stored in index_reg
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Mov,
+                                Scale::default(),
+                                InstrOperand::Reg(RESULT_REG),
+                                InstrOperand::Reg(ADDR_REG),
+                            ),
+                        )));
+
+                        // then move the index into RAX
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Mov,
+                                Scale::Long,
+                                InstrOperand::Reg(index_reg),
+                                InstrOperand::Reg(RESULT_REG),
+                            ),
+                        )));
+
+                        // move offset-based into RAX
+                        code.codes.push(Instruction(BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Mov,
+                                Scale::default(),
+                                InstrOperand::Reference(MemoryReference::new(
+                                    None,
+                                    Some(RESULT_REG),
+                                    Some(index_reg),
+                                    Some(index_cnt as i32),
+                                )),
+                                InstrOperand::Reg(RESULT_REG),
+                            ),
+                        )));
+
+                        let target = get_next_register(regs, Scale::default().size());
+
+                        rax_to_next(code, target, Scale::default());
+
+                        return (target, scale.size());
+                    }
+
+                    // calling convention: array ptr passed in R9, index in R10, and return into R9
+
+                    // put index_reg into r10 (and free it?)
+                    code.codes.push(Instruction(BinaryInstr(
+                        BinaryInstruction::new_single_scale(
+                            InstrType::Mov,
+                            Scale::Long,
+                            InstrOperand::Reg(index_reg),
+                            InstrOperand::Reg(R10),
+                        ),
+                    )));
+
+                    push_arg_regs(code);
+
+                    // put array register into R9 (how?)
+                    code.codes.push(Instruction(BinaryInstr(
+                        BinaryInstruction::new_single_scale(
+                            InstrType::Mov,
+                            Scale::default(),
+                            InstrOperand::Reg(RESULT_REG),
+                            InstrOperand::Reg(R9),
+                        ),
+                    )));
+
+                    // call _arrLoadScale
+                    let load_label = get_array_load_label(&scale);
+
+                    code.required_clib
+                        .insert(CLibFunctions::ArrayLoad(scale.clone()));
+
+                    code.codes
+                        .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
+                            InstrType::Call,
+                            InstrOperand::LabelRef(load_label),
+                        ))));
+
+                    // move R9 back to rax
+                    code.codes.push(Instruction(BinaryInstr(
+                        BinaryInstruction::new_single_scale(
+                            InstrType::Mov,
+                            scale,
+                            InstrOperand::Reg(R9),
+                            InstrOperand::Reg(RESULT_REG),
+                        ),
+                    )));
+
+                    pop_arg_regs(code);
+
+                    // push_back_register(regs, index_reg);
+
+                    arr_type = inner_type.clone();
+                    index_cnt = index_cnt + 1;
+                    push_rax(code);
+                }
+                unreachable!("must have been returned");
             }
             Lvalue::LPairElem(boxed_pair_elem) => {
                 // push rax?
@@ -195,31 +333,43 @@ impl Generator<'_> for Rvalue {
 
                 pair_addr
             }
-            Rvalue::RPairElem(given_elem) => {
-                let elem_offset = given_elem.0.get_offset();
-                // todo: error check
-                let mut target_type = Type::Any;
-                let mut target = match given_elem.0.clone() {
-                    PairElem::PairElemFst(pair_target) => {
-                        target_type = Type::Pair(
-                            Box::new(new_spanned(aux)),
-                            Box::new(new_spanned(Type::Any)),
-                        );
-                        pair_target.0
-                    }
-                    PairElem::PairElemSnd(pair_target) => {
-                        target_type = Type::Pair(
-                            Box::new(new_spanned(Type::Any)),
-                            Box::new(new_spanned(aux)),
-                        );
-                        pair_target.0
-                    }
-                };
+            Rvalue::RPairElem(boxed_pair_elem) => {
+                // todo!: pair element null check
+                let pair_elem = boxed_pair_elem.0.clone();
+                let offset = pair_elem.get_offset();
 
-                // todo: null pair check
-                let (target_reg, target_size) = target.generate(scope, code, regs, target_type);
+                let (stripped_pair, pair_size) = match pair_elem.clone() {
+                    PairElem::PairElemFst(x) | PairElem::PairElemSnd(x) => x.0.clone(),
+                }
+                .generate(scope, code, regs, pair_elem.recovered_pair(aux));
 
-                todo!()
+                let elem_scale = Scale::from_size(offset);
+
+                given_to_result(code, stripped_pair, elem_scale);
+
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Add,
+                        Scale::default(),
+                        Imm(offset),
+                        Reg(RESULT_REG),
+                    ),
+                )));
+
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        elem_scale, // type needed
+                        Reference(MemoryReference::new(None, Some(RESULT_REG), None, None)),
+                        Reg(RESULT_REG),
+                    ),
+                )));
+
+                let next_reg = get_next_register(regs, offset);
+
+                rax_to_next(code, next_reg, elem_scale);
+
+                next_reg
             }
             Rvalue::RCall((ident, _), (Arg(arglist), _)) => {
                 let mut arg_regs: Vec<Register> = ARG_REGS.iter().cloned().collect();
@@ -531,14 +681,41 @@ impl Stmt {
 
         next_to_rax(code, src_reg, Scale::from_size(size));
 
-        code.codes.push(Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                Scale::from_size(size),
-                Reg(RESULT_REG),
-                Reg(dst_reg),
-            ),
-        )));
+        // todo:
+        // special case when Lvalue is of type LArrElem:
+        // we would then need to implement arrStore
+
+        match lvalue {
+            Lvalue::LIdent(_) | Lvalue::LPairElem(_) => {
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Scale::from_size(size),
+                        Reg(RESULT_REG),
+                        Reg(dst_reg),
+                    ),
+                )));
+            }
+            Lvalue::LArrElem(_) => {
+                let scale = Scale::from_size(size);
+                // Rvalue at rax
+                // move rax to R10
+                rax_to_next(code, R10, scale);
+                // move dst_reg to R9
+                rax_to_next(code, dst_reg, scale);
+                // call array_storeScale
+                code.required_clib
+                    .insert(CLibFunctions::ArrayStore(scale.clone()));
+
+                // add instruction dependency: system exit
+                code.codes
+                    .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+                        InstrType::Call,
+                        Scale::default(),
+                        InstrOperand::LabelRef(get_array_store_label(&scale.clone())),
+                    ))));
+            }
+        }
 
         // push_back_register(regs, src_reg);
     }

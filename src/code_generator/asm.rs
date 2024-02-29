@@ -74,6 +74,24 @@ pub fn push_arg_regs(code: &mut GeneratedCode) {
     });
 }
 
+pub fn push_rax(code: &mut GeneratedCode) {
+    code.codes
+        .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+            InstrType::Push,
+            Scale::default(),
+            InstrOperand::Reg(RESULT_REG),
+        ))));
+}
+
+pub fn pop_rax(code: &mut GeneratedCode) {
+    code.codes
+        .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+            InstrType::Pop,
+            Scale::default(),
+            InstrOperand::Reg(RESULT_REG),
+        ))));
+}
+
 // pop argument registers
 pub fn pop_arg_regs(code: &mut GeneratedCode) {
     let mut count: i32 = 0;

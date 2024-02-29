@@ -20,7 +20,7 @@ pub enum Directives {
     FormattedString(FormatLabel, String),
 }
 
-pub fn get_array_store_label(scale: Scale) -> String {
+pub fn get_array_store_label(scale: &Scale) -> String {
     format!("{}{}", ARRAY_STORE_LABEL, scale)
 }
 pub fn get_array_load_label(scale: &Scale) -> String {
