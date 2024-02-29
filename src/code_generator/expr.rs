@@ -411,21 +411,29 @@ impl Expr {
         // as arrays would have been malloced.
         //
         // the length of array is stored 4 bytes before the given location as -4(something)
+        push_rax(code);
         let dst_reg = get_next_register(regs, 4);
+
+        next_to_rax(code, reg, Scale::Quad);
+
         code.codes.push(Instruction(BinaryInstr(
             BinaryInstruction::new_double_scale(
                 InstrType::MovS,
                 Scale::Long,
                 InstrOperand::Reference(MemoryReference {
                     imm: Some(OffsetImm(-REFERENCE_OFFSET_SIZE)),
-                    base_reg: Some(reg),
+                    base_reg: Some(RESULT_REG),
                     shift_unit_reg: None,
                     shift_cnt: None,
                 }),
                 Scale::default(),
-                InstrOperand::Reg(dst_reg),
+                InstrOperand::Reg(RESULT_REG),
             ),
         )));
+
+        rax_to_next(code, dst_reg, Scale::default());
+
+        pop_rax(code);
         dst_reg
     }
 
