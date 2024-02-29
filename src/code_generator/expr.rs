@@ -320,6 +320,7 @@ impl Expr {
             // therefore a forced cast would not influence anything at the backend.
             UnaryOperator::Ord => {
                 // rax is needed to prevent moving by reference
+                let next_reg = get_next_register(regs, 4);
                 code.codes.push(Instruction(BinaryInstr(
                     BinaryInstruction::new_double_scale(
                         InstrType::MovS,
@@ -329,7 +330,15 @@ impl Expr {
                         InstrOperand::Reg(RESULT_REG),
                     ),
                 )));
-                RESULT_REG
+                code.codes.push(Instruction(BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Scale::Long,
+                        InstrOperand::Reg(RESULT_REG),
+                        InstrOperand::Reg(next_reg),
+                    ),
+                )));
+                next_reg
             }
             // however, when it comes to the terms of using the 'chr' function
             // we would still have to test whether it is implemented on a function that is
