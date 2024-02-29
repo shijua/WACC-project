@@ -2,7 +2,8 @@ use crate::ast::ArgList::Arg;
 use crate::ast::Type::Array;
 use crate::ast::{ArrayLiter, Expr, Ident, Lvalue, PairElem, Rvalue, ScopedStmt, Stmt, Type};
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
-use crate::code_generator::asm::Instr::BinaryInstr;
+use crate::code_generator::asm::CLibFunctions::NullPairError;
+use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl};
 use crate::code_generator::asm::InstrOperand::{Imm, Reference, Reg, RegVariant};
 use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
@@ -16,9 +17,9 @@ use crate::code_generator::asm::{
     UnaryInstruction, UnaryNotScaled, ADDR_REG, ARG_REGS, RESULT_REG,
 };
 use crate::code_generator::clib_functions::{
-    FREE_LABEL, FREE_PAIR_LABEL, MALLOC_LABEL, PRINT_LABEL_FOR_BOOL, PRINT_LABEL_FOR_CHAR,
-    PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_REF, PRINT_LABEL_FOR_STRING, PRINT_LABEL_FOR_STRING_LINE,
-    READ_LABEL_FOR_CHAR, READ_LABEL_FOR_INT, SYS_EXIT_LABEL,
+    ERROR_LABEL_FOR_NULL_PAIR, FREE_LABEL, FREE_PAIR_LABEL, MALLOC_LABEL, PRINT_LABEL_FOR_BOOL,
+    PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_REF, PRINT_LABEL_FOR_STRING,
+    PRINT_LABEL_FOR_STRING_LINE, READ_LABEL_FOR_CHAR, READ_LABEL_FOR_INT, SYS_EXIT_LABEL,
 };
 use crate::code_generator::def_libary::{get_array_load_label, get_array_store_label, Directives};
 use crate::code_generator::x86_generate::Generator;
@@ -703,7 +704,6 @@ impl Stmt {
         // todo:
         // special case when Lvalue is of type LArrElem:
         // we would then need to implement arrStore
-
         match lvalue {
             Lvalue::LIdent(_) => {
                 code.codes.push(Instruction(Instr::BinaryInstr(
@@ -786,6 +786,26 @@ impl Stmt {
         let res = rvalue.0.generate(scope, code, regs, type_.clone());
         let sto = get_next_register(regs, type_.size() as i32);
         let scale = Scale::from_size(type_.size() as i32);
+
+        match *type_ {
+            Type::Pair(_, _) => {
+                code.required_clib.insert(NullPairError);
+                code.codes.push(Instruction(BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Cmp,
+                        Default::default(),
+                        Imm(0),
+                        Reg(res),
+                    ),
+                )));
+                code.codes
+                    .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                        InstrType::Jump(Some(ConditionCode::EQ)),
+                        InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_NULL_PAIR)),
+                    ))));
+            }
+            _ => {}
+        }
 
         next_to_rax(code, res, scale.clone());
 
