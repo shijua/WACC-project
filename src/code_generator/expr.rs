@@ -1,4 +1,3 @@
-use crate::ast::BinaryOperator::Neq;
 use crate::ast::Type::Array;
 use crate::ast::{ArrayElem, BinaryOperator, Expr, Ident, Type, UnaryOperator};
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
@@ -9,12 +8,8 @@ use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetIm
 use crate::code_generator::asm::Register::{Rax, Rsi, R10, R9};
 use crate::code_generator::asm::Scale::{Byte, Long, Quad};
 use crate::code_generator::asm::{
-    arg_register_mapping, get_next_register, next_to_r11, next_to_rax, pop_arg_regs, push_arg_regs,
-    push_back_register, r11_to_next, rax_to_next, AsmLine, BinaryControl, BinaryInstruction,
-    CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference,
-    Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, RESULT_REG,
-    get_next_register, next_to_r11, next_to_rax, pop_arg_regs, pop_rax, push_arg_regs,
-    push_back_register, push_rax, r11_to_next, rax_to_next, AsmLine, BinaryControl,
+    arg_register_mapping, get_next_register, next_to_r11, next_to_rax, pop_arg_regs, pop_rax,
+    push_arg_regs, push_back_register, push_rax, r11_to_next, rax_to_next, AsmLine, BinaryControl,
     BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
     MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, RESULT_REG,
 };
