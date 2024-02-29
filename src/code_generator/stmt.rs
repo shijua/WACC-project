@@ -898,16 +898,27 @@ impl Stmt {
         let res = return_val.generate(scope, code, regs, ());
         let _type = return_val.analyse(scope).unwrap();
         // r0 = return_val
-        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_double_scale(
-                InstrType::MovS,
-                Scale::from_size(_type.size() as i32),
-                Reg(res),
-                Scale::Quad,
-                Reg(RESULT_REG),
-            ),
-        )));
-
+        // check whether size need to be scaled
+        if (_type.size() as i32 == 0 || _type.size() as i32 == 8) {
+            code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Mov,
+                    Scale::default(),
+                    Reg(res),
+                    Reg(RESULT_REG),
+                ),
+            )));
+        } else {
+            code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_double_scale(
+                    InstrType::MovS,
+                    Scale::from_size(_type.size() as i32),
+                    Reg(res),
+                    Scale::Quad,
+                    Reg(RESULT_REG),
+                ),
+            )));
+        }
         // store current location for stack frame
         aux.push(code.codes.len());
         pop_callee_saved_regs(code);
