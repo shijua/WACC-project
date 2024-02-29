@@ -8,10 +8,10 @@ use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetIm
 use crate::code_generator::asm::Register::{Rax, Rsi, R10, R9};
 use crate::code_generator::asm::Scale::{Byte, Quad};
 use crate::code_generator::asm::{
-    get_next_register, next_to_r11, next_to_rax, pop_arg_regs, push_arg_regs, push_back_register,
-    r11_to_next, rax_to_next, AsmLine, BinaryControl, BinaryInstruction, CLibFunctions,
-    ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
-    UnaryInstruction, UnaryNotScaled, ADDR_REG, RESULT_REG,
+    get_next_register, next_to_r11, next_to_rax, pop_arg_regs, pop_rax, push_arg_regs,
+    push_back_register, push_rax, r11_to_next, rax_to_next, AsmLine, BinaryControl,
+    BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
+    MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, RESULT_REG,
 };
 use crate::code_generator::clib_functions::{
     BAD_CHAR_LABEL, ERROR_LABEL_FOR_BAD_CHAR, ERROR_LABEL_FOR_DIV_ZERO, OVERFLOW_LABEL,
@@ -219,6 +219,9 @@ impl Generator<'_> for Expr {
                     let inner_type = &inner_type.0;
                     scale = inner_type.get_scale();
                     let mut current_index = current_indices.get(index_cnt).unwrap().0.clone();
+
+                    push_rax(code);
+
                     let index_reg = current_index.generate(scope, code, regs, ());
 
                     // calling convention: array ptr passed in R9, index in R10, and return into R9
@@ -232,6 +235,8 @@ impl Generator<'_> for Expr {
                             InstrOperand::Reg(R10),
                         ),
                     )));
+
+                    pop_rax(code);
 
                     push_arg_regs(code);
 
