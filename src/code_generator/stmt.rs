@@ -705,13 +705,32 @@ impl Stmt {
         // we would then need to implement arrStore
 
         match lvalue {
-            Lvalue::LIdent(_) | Lvalue::LPairElem(_) => {
+            Lvalue::LIdent(_) => {
                 code.codes.push(Instruction(Instr::BinaryInstr(
                     BinaryInstruction::new_single_scale(
                         InstrType::Mov,
                         Scale::from_size(size),
                         Reg(RESULT_REG),
                         Reg(dst_reg),
+                    ),
+                )));
+            }
+            Lvalue::LPairElem((inner, _)) => {
+                let offset = match inner {
+                    PairElem::PairElemFst(_) => 0,
+                    PairElem::PairElemSnd(_) => PAIR_ELEM_SIZE,
+                };
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Scale::from_size(size),
+                        Reg(RESULT_REG),
+                        Reference(MemoryReference::new(
+                            Some(OffsetImm(offset)),
+                            Some(dst_reg),
+                            None,
+                            None,
+                        )),
                     ),
                 )));
             }
