@@ -9,8 +9,8 @@ use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rax, Rdi, R10, R9};
 use crate::code_generator::asm::{
     arg_register_mapping, function_arguments_calculate_extra_size, get_next_register,
-    given_to_result, next_to_rax, pop_arg_regs, pop_callee_saved_regs, push_arg_regs,
-    push_back_register, push_callee_saved_regs, rax_to_next, result_to_given, AsmLine,
+    given_to_result, next_to_rax, pop_arg_regs, pop_callee_saved_regs, pop_rax, push_arg_regs,
+    push_back_register, push_callee_saved_regs, push_rax, rax_to_next, result_to_given, AsmLine,
     BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
     MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, ARG_REGS,
     RESULT_REG,
@@ -117,6 +117,8 @@ impl Generator<'_> for Lvalue {
                     ),
                 )));
 
+                push_rax(code);
+
                 let mut arr_type = scope.get_type(id).unwrap().clone();
                 let current_indices = arr_elem.clone().indices;
                 let mut index_cnt = 0;
@@ -129,6 +131,8 @@ impl Generator<'_> for Lvalue {
                     scale = inner_type.get_scale();
                     let mut current_index = current_indices.get(index_cnt).unwrap().0.clone();
                     let index_reg = current_index.generate(scope, code, regs, ());
+
+                    pop_rax(code);
 
                     if index_cnt == current_indices.len() - 1 {
                         // if we come to the last instruction: no more loading is needed, we would
@@ -230,6 +234,7 @@ impl Generator<'_> for Lvalue {
 
                     arr_type = inner_type.clone();
                     index_cnt = index_cnt + 1;
+                    push_rax(code);
                 }
                 unreachable!("must have been returned");
             }
