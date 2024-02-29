@@ -69,15 +69,6 @@ impl Generator<'_> for Expr {
                                 InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OVERFLOW)),
                             ))));
                         code.required_clib.insert(OverflowError);
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_double_scale(
-                                InstrType::MovS,
-                                Scale::Long,
-                                InstrOperand::Reg(ADDR_REG),
-                                Scale::Quad,
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
                         r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
@@ -98,15 +89,6 @@ impl Generator<'_> for Expr {
                                 InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OVERFLOW)),
                             ))));
                         code.required_clib.insert(OverflowError);
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_double_scale(
-                                InstrType::MovS,
-                                Scale::Long,
-                                InstrOperand::Reg(ADDR_REG),
-                                Scale::Quad,
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
                         r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
@@ -127,15 +109,6 @@ impl Generator<'_> for Expr {
                                 InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OVERFLOW)),
                             ))));
                         code.required_clib.insert(OverflowError);
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_double_scale(
-                                InstrType::MovS,
-                                Scale::Long,
-                                InstrOperand::Reg(ADDR_REG),
-                                Quad,
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
                         r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
@@ -345,16 +318,17 @@ impl Expr {
             // as internally char are stored as integers inside assembly
             // therefore a forced cast would not influence anything at the backend.
             UnaryOperator::Ord => {
+                // rax is needed to prevent moving by reference
                 code.codes.push(Instruction(BinaryInstr(
                     BinaryInstruction::new_double_scale(
                         InstrType::MovS,
                         Scale::Byte,
                         InstrOperand::Reg(reg),
                         Scale::Long,
-                        InstrOperand::Reg(reg),
+                        InstrOperand::Reg(RESULT_REG),
                     ),
                 )));
-                reg
+                RESULT_REG
             }
             // however, when it comes to the terms of using the 'chr' function
             // we would still have to test whether it is implemented on a function that is
@@ -372,11 +346,13 @@ impl Expr {
                         InstrOperand::Reg(reg),
                     ),
                 )));
+                push_arg_regs(code);
                 code.codes
                     .push(Instruction(UnaryControl(UnaryNotScaled::new(
                         InstrType::Jump(Some(ConditionCode::NEQ)),
                         InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_BAD_CHAR)),
                     ))));
+                pop_arg_regs(code);
                 code.required_clib.insert(BadCharError);
                 code.codes
                     .push(Instruction(Instr::BinaryControl(BinaryControl::new(
@@ -459,7 +435,7 @@ impl Expr {
         code.codes
             .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
                 InstrType::Neg,
-                Scale::default(),
+                Scale::Long,
                 InstrOperand::Reg(reg),
             ))));
         code.codes
@@ -468,15 +444,6 @@ impl Expr {
                 InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OVERFLOW)),
             ))));
         code.required_clib.insert(OverflowError);
-        code.codes.push(Instruction(BinaryInstr(
-            BinaryInstruction::new_double_scale(
-                InstrType::MovS,
-                Scale::Long,
-                InstrOperand::Reg(reg),
-                Scale::Quad,
-                InstrOperand::Reg(reg),
-            ),
-        )));
         reg
     }
 
@@ -547,15 +514,6 @@ impl Expr {
             ))));
 
         // movsbq %al, %rax
-        // code.codes.push(Instruction(BinaryInstr(
-        //     BinaryInstruction::new_double_scale(
-        //         InstrType::MovS,
-        //         Scale::Byte,
-        //         InstrOperand::Reg(RESULT_REG),
-        //         Scale::Quad,
-        //         InstrOperand::Reg(RESULT_REG),
-        //     ),
-        // )));
 
         rax_to_next(code, lhs_reg, Byte);
         lhs_reg
@@ -611,15 +569,6 @@ impl Expr {
             ))));
 
         // movsbq %al, %rax
-        // code.codes.push(Instruction(BinaryInstr(
-        //     BinaryInstruction::new_double_scale(
-        //         InstrType::MovS,
-        //         Scale::Byte,
-        //         InstrOperand::Reg(RESULT_REG),
-        //         Scale::Quad,
-        //         InstrOperand::Reg(RESULT_REG),
-        //     ),
-        // )));
 
         rax_to_next(code, lhs_reg, Byte);
         lhs_reg
@@ -674,14 +623,6 @@ impl Expr {
             ),
         )));
         code.codes.push(Instruction(BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                Scale::Long,
-                InstrOperand::Reg(RESULT_REG),
-                InstrOperand::Reg(RESULT_REG),
-            ),
-        )));
-        code.codes.push(Instruction(BinaryInstr(
             BinaryInstruction::new_double_scale(
                 InstrType::MovS,
                 Scale::Long,
@@ -725,17 +666,6 @@ impl Expr {
                 InstrType::Set(condition_code),
                 InstrOperand::RegVariant(ADDR_REG, Byte),
             ))));
-        if lhs_scale != Quad {
-            code.codes.push(Instruction(BinaryInstr(
-                BinaryInstruction::new_double_scale(
-                    InstrType::MovS,
-                    Byte,
-                    InstrOperand::Reg(ADDR_REG),
-                    Quad,
-                    InstrOperand::Reg(ADDR_REG),
-                ),
-            )));
-        }
 
         r11_to_next(code, lhs_reg, lhs_scale);
         lhs_reg
