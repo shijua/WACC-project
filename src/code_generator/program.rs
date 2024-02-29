@@ -1,11 +1,13 @@
 use crate::ast::Param::Parameter;
 use crate::ast::{Function, Program, Type};
 use crate::code_generator::asm::AsmLine::Instruction;
-use crate::code_generator::asm::Register::{Rbp, Rsp};
+use crate::code_generator::asm::InstrOperand::{Imm, Reg};
+use crate::code_generator::asm::Register::{Rbp, Rsp, RspStack};
 use crate::code_generator::asm::{
-    get_next_register, get_rbp_size, pop_callee_saved_regs, push_callee_saved_regs, AsmLine,
-    BinaryInstruction, GeneratedCode, Instr, InstrOperand, InstrType, Register, Scale,
-    UnaryInstruction, ARG_REGS, CALLEE_SAVED_REGS, GENERAL_REGS, RESULT_REG,
+    function_arguments_calculate_extra_size, get_next_register, get_rbp_size,
+    pop_callee_saved_regs, push_callee_saved_regs, AsmLine, BinaryInstruction, GeneratedCode,
+    Instr, InstrOperand, InstrType, Register, Scale, UnaryInstruction, ARG_REGS, CALLEE_SAVED_REGS,
+    GENERAL_REGS, RESULT_REG,
 };
 use crate::code_generator::def_libary::{Directives, MAIN_FUNCTION_TITLE};
 use crate::code_generator::x86_generate::{Generator, DEFAULT_EXIT_CODE};
@@ -41,53 +43,94 @@ impl Generator<'_> for Function {
 
         // process parameter scope to move it into other register
         let mut arg_regs: Vec<Register> = ARG_REGS.iter().cloned().collect();
-        assert!(self.parameters.len() <= ARG_REGS.len()); // current restriction
         let mut scope = scope.make_scope(&mut self.param_symbol_table);
+
+        let mut scope = scope.make_scope(&mut self.body_symbol_table);
+
+        // record position so we can change the reference to stack size after the function body
+        let arg_pos = code.codes.len();
+        let mut arg_pos_end = arg_pos;
+        // functions for insert arguments
+        let mut args_type = Vec::new();
+        self.parameters
+            .iter()
+            .for_each(|(Parameter((_type, _), _), _)| args_type.push(_type.clone()));
+        let s = function_arguments_calculate_extra_size(
+            &mut arg_regs,
+            args_type,
+            (ARG_REGS.len() * 8 + 8) as i32, // 8 is the size of return address
+        );
+        // insert the stack size after the function body
         self.parameters
             .iter()
             .for_each(|(Parameter((_type, _), (ident, _)), _)| {
                 let reg = get_next_register(regs, _type.size() as i32);
                 scope.add_with_reg(&ident.clone(), _type.clone(), reg);
-                let arg_reg = arg_regs.pop().unwrap();
-                code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-                    BinaryInstruction::new_single_scale(
-                        InstrType::Mov,
-                        Scale::from_size(_type.size() as i32),
-                        InstrOperand::Reg(arg_reg),
-                        InstrOperand::Reg(reg),
-                    ),
-                )));
-                // if Scale::from_size(_type.size() as i32) == Scale::Quad {
-                //     code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-                //         BinaryInstruction::new_single_scale(
-                //             InstrType::Mov,
-                //             Scale::Quad,
-                //             InstrOperand::Reg(arg_reg),
-                //             InstrOperand::Reg(reg),
-                //         ),
-                //     )));
-                // } else {
-                //     code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-                //         BinaryInstruction::new_double_scale(
-                //             InstrType::MovS,
-                //             Scale::from_size(_type.size() as i32),
-                //             InstrOperand::Reg(arg_reg),
-                //             Scale::Quad,
-                //             InstrOperand::Reg(reg),
-                //         ),
-                //     )));
-                // };
+                let arg_reg = arg_regs.remove(0);
+                match arg_reg {
+                    // if the argument is a stack argument, we need to move it rax first
+                    Register::RspStack(i) => {
+                        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Mov,
+                                Scale::from_size(_type.size() as i32),
+                                InstrOperand::Reg(arg_reg),
+                                InstrOperand::Reg(RESULT_REG),
+                            ),
+                        )));
+                        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Mov,
+                                Scale::from_size(_type.size() as i32),
+                                InstrOperand::Reg(RESULT_REG),
+                                InstrOperand::Reg(reg),
+                            ),
+                        )));
+                        arg_pos_end += 2;
+                    }
+                    _ => {
+                        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
+                            BinaryInstruction::new_single_scale(
+                                InstrType::Mov,
+                                Scale::from_size(_type.size() as i32),
+                                InstrOperand::Reg(arg_reg),
+                                InstrOperand::Reg(reg),
+                            ),
+                        )));
+                        arg_pos_end += 1;
+                    }
+                }
             });
-
-        let mut scope = scope.make_scope(&mut self.body_symbol_table);
 
         // make body statements
         self.body
             .0
             .generate(&mut scope, code, regs, &mut pos_vec_end);
 
-        // allocate stack frame for beginning
         let size = get_rbp_size(regs);
+        // move the rsp stack with correct offset
+        for i in arg_pos..arg_pos_end {
+            match &code.codes[i] {
+                AsmLine::Instruction(Instr::BinaryInstr(BinaryInstruction {
+                    instr_type: InstrType::Mov,
+                    src_scale: scale,
+                    src_operand: Reg(RspStack(j)),
+                    dst_operand: Reg(RESULT_REG),
+                    ..
+                })) => {
+                    code.codes[i] = AsmLine::Instruction(Instr::BinaryInstr(
+                        BinaryInstruction::new_single_scale(
+                            InstrType::Mov,
+                            scale.clone(),
+                            InstrOperand::Reg(RspStack(j + size)),
+                            InstrOperand::Reg(RESULT_REG),
+                        ),
+                    ));
+                }
+                _ => {}
+            }
+        }
+        // allocate stack frame for beginning
         code.codes.insert(
             start_pos,
             AsmLine::Instruction(Instr::BinaryInstr(BinaryInstruction::new_single_scale(
@@ -98,6 +141,7 @@ impl Generator<'_> for Function {
             ))),
         );
 
+        // function below is for insert where order need to be reversed
         // main function will exit by exit-code 0, (or does it involve manipulating exit?)
         if aux {
             // deallocate stack for main function

@@ -1,3 +1,4 @@
+use crate::ast::Type;
 use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::Instr::BinaryInstr;
 use crate::code_generator::asm::Register::{Rbp, Rsp};
@@ -242,6 +243,23 @@ pub fn r11_to_next(code: &mut GeneratedCode, next: Register, scale: Scale) {
     )));
 }
 
+pub fn function_arguments_calculate_extra_size(
+    arg_regs: &mut Vec<Register>,
+    args_eval: Vec<Type>,
+    base: i32,
+) -> i32 {
+    // record rsp size
+    let mut s = base;
+    // put arguments into correct registers if there are more than 6 arguments
+    for i in 0..args_eval.len() {
+        if i >= 6 {
+            arg_regs.push(Register::RspStack(s));
+            s += args_eval[i].size() as i32;
+        }
+    }
+    s
+}
+
 pub fn revert_escape_char(ch: char) -> Option<&'static str> {
     match ch {
         '\0' => Some("\\0"),
@@ -271,7 +289,7 @@ fn revert_escape_string(str: &str) -> String {
     s
 }
 
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(Eq, PartialEq, Debug, Clone, Copy)]
 pub enum Register {
     Rax,
     Rbx,

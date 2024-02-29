@@ -6,11 +6,12 @@ use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
 use crate::code_generator::asm::Register::{Rax, Rdi};
 use crate::code_generator::asm::{
-    arg_register_mapping, get_next_register, given_to_result, next_to_rax, pop_arg_regs,
-    pop_callee_saved_regs, push_arg_regs, push_back_register, push_callee_saved_regs, rax_to_next,
-    result_to_given, AsmLine, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode,
-    Instr, InstrOperand, InstrType, MemoryReference, Register, Scale, UnaryInstruction,
-    UnaryNotScaled, ADDR_REG, ARG_REGS, RESULT_REG,
+    arg_register_mapping, function_arguments_calculate_extra_size, get_next_register,
+    given_to_result, next_to_rax, pop_arg_regs, pop_callee_saved_regs, push_arg_regs,
+    push_back_register, push_callee_saved_regs, rax_to_next, result_to_given, AsmLine,
+    BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
+    MemoryReference, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, ARG_REGS,
+    RESULT_REG,
 };
 use crate::code_generator::clib_functions::{
     MALLOC_LABEL, PRINT_LABEL_FOR_BOOL, PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT,
@@ -222,7 +223,6 @@ impl Generator<'_> for Rvalue {
             }
             Rvalue::RCall((ident, _), (Arg(arglist), _)) => {
                 let mut arg_regs: Vec<Register> = ARG_REGS.iter().cloned().collect();
-                assert!(arglist.len() <= ARG_REGS.len()); // current restriction
 
                 // eval arguments
                 let mut args_eval: Vec<(Register, Type)> = Vec::new();
@@ -234,15 +234,61 @@ impl Generator<'_> for Rvalue {
 
                 // now put argument into correct register
                 push_arg_regs(code);
+
+                let mut args_type = Vec::new();
+                args_eval
+                    .iter()
+                    .for_each(|(_, _type)| args_type.push(_type.clone()));
+                let s = function_arguments_calculate_extra_size(&mut arg_regs, args_type, 0);
+
+                // sub rsp, s to give space for other arguments
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Sub,
+                        Scale::default(),
+                        Imm(s),
+                        Reg(Register::Rsp),
+                    ),
+                )));
+
+                // move arguments into correct registers
                 args_eval.iter().for_each(|(reg, _type)| {
-                    code.codes.push(Instruction(Instr::BinaryInstr(
-                        BinaryInstruction::new_single_scale(
-                            InstrType::Mov,
-                            Scale::from_size(_type.size() as i32), // type needed
-                            Reg(reg.clone()),
-                            Reg(arg_regs.pop().unwrap()),
-                        ),
-                    )));
+                    let reg = match reg {
+                        Register::RspStack(i) => Register::RspStack(i + s), // shift required
+                        _ => reg.clone(),
+                    };
+                    let arg_reg = arg_regs.remove(0);
+                    match arg_reg {
+                        // if the argument is a stack argument, we need to move it rax first
+                        Register::RspStack(i) => {
+                            code.codes.push(Instruction(Instr::BinaryInstr(
+                                BinaryInstruction::new_single_scale(
+                                    InstrType::Mov,
+                                    Scale::from_size(_type.size() as i32), // type needed
+                                    Reg(reg.clone()),
+                                    Reg(RESULT_REG),
+                                ),
+                            )));
+                            code.codes.push(Instruction(Instr::BinaryInstr(
+                                BinaryInstruction::new_single_scale(
+                                    InstrType::Mov,
+                                    Scale::from_size(_type.size() as i32), // type needed
+                                    Reg(RESULT_REG),
+                                    Reg(arg_reg),
+                                ),
+                            )));
+                        }
+                        _ => {
+                            code.codes.push(Instruction(Instr::BinaryInstr(
+                                BinaryInstruction::new_single_scale(
+                                    InstrType::Mov,
+                                    Scale::from_size(_type.size() as i32), // type needed
+                                    Reg(reg.clone()),
+                                    Reg(arg_reg),
+                                ),
+                            )));
+                        }
+                    }
                 });
 
                 // finally call the function
@@ -252,8 +298,19 @@ impl Generator<'_> for Rvalue {
                         InstrType::Call,
                         InstrOperand::LabelRef(func_name),
                     ))));
-                // return Rax as the result
+
+                // add rsp back
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Add,
+                        Scale::default(),
+                        Imm(s),
+                        Reg(Register::Rsp),
+                    ),
+                )));
+
                 pop_arg_regs(code);
+                // return Rax as the result
                 RESULT_REG
             }
         }

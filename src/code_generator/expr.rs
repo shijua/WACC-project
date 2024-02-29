@@ -318,16 +318,17 @@ impl Expr {
             // as internally char are stored as integers inside assembly
             // therefore a forced cast would not influence anything at the backend.
             UnaryOperator::Ord => {
+                // rax is needed to prevent moving by reference
                 code.codes.push(Instruction(BinaryInstr(
                     BinaryInstruction::new_double_scale(
                         InstrType::MovS,
                         Scale::Byte,
                         InstrOperand::Reg(reg),
                         Scale::Long,
-                        InstrOperand::Reg(reg),
+                        InstrOperand::Reg(RESULT_REG),
                     ),
                 )));
-                reg
+                RESULT_REG
             }
             // however, when it comes to the terms of using the 'chr' function
             // we would still have to test whether it is implemented on a function that is
@@ -618,14 +619,6 @@ impl Expr {
                 InstrType::Mov,
                 Scale::Long,
                 InstrOperand::Reg(res),
-                InstrOperand::Reg(RESULT_REG),
-            ),
-        )));
-        code.codes.push(Instruction(BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                Scale::Long,
-                InstrOperand::Reg(RESULT_REG),
                 InstrOperand::Reg(RESULT_REG),
             ),
         )));
