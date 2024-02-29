@@ -26,6 +26,7 @@ use crate::code_generator::{PAIR_ELEM_SIZE, REFERENCE_OFFSET_SIZE};
 use crate::semantic_checker::util::SemanticType;
 use crate::symbol_table::{ScopeInfo, SymbolTable};
 use crate::{new_spanned, Spanned};
+use chumsky::prelude::todo;
 
 impl<'a> Generator<'a> for ScopedStmt {
     type Input = &'a mut Vec<usize>;
@@ -544,7 +545,7 @@ impl<'a> Generator<'a> for Stmt {
                                 Reg(Rdi),
                             ),
                         )));
-                        // code.required_clib.insert(CLibFunctions::FreeArray);
+                        code.required_clib.insert(CLibFunctions::Free);
                         code.codes
                             .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
                                 InstrType::Call,
@@ -582,10 +583,14 @@ impl Stmt {
             Type::BoolType => {
                 code.required_clib.insert(CLibFunctions::PrintBool);
             }
+            Type::Array(inner_type) if inner_type.0 == Type::CharType => {
+                code.required_clib.insert(CLibFunctions::PrintString);
+            }
             Type::Array(_) | Type::Pair(_, _) | Type::NestedPair | Type::Any => {
                 code.required_clib.insert(CLibFunctions::PrintRefs);
             }
             Type::Func(_) => (),
+            _ => (),
         };
 
         // not sure the comment below is essential or not
@@ -604,8 +609,10 @@ impl Stmt {
             Type::IntType => PRINT_LABEL_FOR_INT,
             Type::CharType => PRINT_LABEL_FOR_CHAR,
             Type::BoolType => PRINT_LABEL_FOR_BOOL,
+            Type::Array(inner_type) if inner_type.0 == Type::CharType => PRINT_LABEL_FOR_STRING,
             Type::Array(_) | Type::Pair(_, _) | Type::NestedPair | Type::Any => PRINT_LABEL_FOR_REF,
             Type::Func(_) => unreachable!("Cannot print functions"),
+            _ => unreachable!("Cannot print type {:?}", print_type),
         };
         code.codes
             .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(

@@ -28,6 +28,10 @@ class Result:
                 countother += 7
                 countself += 14
                 continue
+            if other[countother:countother+6] == '#addrs':
+                countother += 6
+                countself += 13
+                continue
             if this[countself:countself+15] == '#runtime_error#':
                 return True
             if this[countself] != other[countother]:
@@ -83,7 +87,7 @@ def get_output_content(path: str) -> str:
         index_end = index_end_if_exit
     if index_end == -1:
         index_end = content.find("begin") # as some program does not contain program: at the start
-    output = content[index + 7:index_end].replace("\n# ", "\n").replace("\n#", "\n").strip()
+    output = content[index + 7:index_end].replace("\n# ", "\n").replace("#\n", "\n").strip()
     return output
 
 def get_exit_code(path: str) -> int:

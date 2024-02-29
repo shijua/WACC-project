@@ -129,7 +129,7 @@ impl CLibFunctions {
 
             CLibFunctions::ArrayStore(_) | CLibFunctions::ArrayLoad(_) => {
                 code.required_clib.insert(OutOfBoundsError);
-            } // _ => (),
+            }
             _ => {}
         }
     }
@@ -187,6 +187,10 @@ impl Generator<'_> for CLibFunctions {
                 Self::generate_sys_malloc(code);
             }
 
+            CLibFunctions::Free => {
+                Self::generate_free(code);
+            }
+
             CLibFunctions::FreePair => {
                 Self::generate_free_pair(code);
             }
@@ -224,71 +228,7 @@ impl Generator<'_> for CLibFunctions {
     }
 }
 
-/*
- Overall Functions List:
- - § 1. Basic
-    § 1.1 read_only_strings()
-    § 1.2 length_of_string()
-    § 1.3 labelling()
-    § 1.4 ascii_string()
-    § 1.5 assembler_text() <.text>
-
- - § 2. Mov
-    § 2.1 mov_registers()
-    § 2.2 mov_offset()
-    § 2.3 mov_memory_ref_reg()
-    § 2.4 movs_registers() -- movs<scale1><scale2> (%<reg1>) <%reg2>
-
- - § 3. Lea
-    § 3.1 leaq_rip_with_label() -- leaq <label>(%rip), %<reg>
-    § 3.2 leaq_registers() -- leaq (%<reg1>) %<reg2>
-
- - § 4. And
-    § 4.1 andq_rsp() -- andq $-16, %rsp
-
- - § 5. Add
-    § 5.1 addq_rsp()
-
- - § 6. Sub
-    § 6.1 subq_rsp()
-
- - § 7. Cmp
-    § 7.1 cmpb_register() -- cmpb $0, <%reg>
-
- - § 8. Jump
-    § 8.1 jmp()
-    § 8.2 jne()
-
- - § 9. Call
-    § 9.1 call_plt()
-
- - § 10. Push
-    § 10.1 pushq_rbp()
-
- - § 11. Pop
-    § 11.1 popq_rbp()
-
- - § 12. Ret
-    § 12.1 ret()
-
- - § 13. Function Environment
-    § 13.1 set_up_stack()
-    § 13.2 set_back_stack()
-
- - § 14. Functions For Print & Read
-    § 14.1 create_string()
-    § 14.2 general_set_up()
-
- - § 15. C-lib Functions
-*/
-
 impl CLibFunctions {
-    /*
-       ==========================================================
-                                Basic
-       ==========================================================
-    */
-
     // .section .rodata
     fn read_only_strings(code: &mut GeneratedCode) {
         code.lib_functions
@@ -321,12 +261,6 @@ impl CLibFunctions {
         code.lib_functions
             .push(Directive(Directives::AssemblerText));
     }
-
-    /*
-       ==========================================================
-                                 Mov
-       ==========================================================
-    */
 
     // mov<scale> %<reg1> %<reg2>
     fn mov_registers(code: &mut GeneratedCode, scale: Scale, reg1: Register, reg2: Register) {
@@ -408,11 +342,6 @@ impl CLibFunctions {
             )));
     }
 
-    /*
-       ==========================================================
-                                 Lea
-       ==========================================================
-    */
     // Note here we use MemoryReference to indicate we generate parentheses
     // out of our first register, not actually access to the memory inside.
 
@@ -447,12 +376,6 @@ impl CLibFunctions {
             )));
     }
 
-    /*
-      ==========================================================
-                                And
-      ==========================================================
-    */
-
     // andq $-16, %rsp
     fn andq_rsp(code: &mut GeneratedCode) {
         code.lib_functions
@@ -465,12 +388,6 @@ impl CLibFunctions {
                 ),
             )));
     }
-
-    /*
-        ==========================================================
-                                  Add
-        ==========================================================
-    */
 
     // addq $16, %rsp
     fn addq_rsp(code: &mut GeneratedCode) {
@@ -485,12 +402,6 @@ impl CLibFunctions {
             )));
     }
 
-    /*
-        ==========================================================
-                                  Sub
-        ==========================================================
-    */
-
     // subq $16, %rsp
     fn subq_rsp(code: &mut GeneratedCode) {
         code.lib_functions
@@ -504,12 +415,6 @@ impl CLibFunctions {
             )));
     }
 
-    /*
-        ==========================================================
-                                  Cmp
-        ==========================================================
-    */
-
     // cmpb $0, <%reg>
     fn cmpb_register(code: &mut GeneratedCode, reg: Register) {
         code.lib_functions
@@ -522,12 +427,6 @@ impl CLibFunctions {
                 ),
             )));
     }
-
-    /*
-        ==========================================================
-                                  Jump
-        ==========================================================
-    */
 
     // jmp <label>
     fn jmp(code: &mut GeneratedCode, label: &str) {
@@ -559,12 +458,6 @@ impl CLibFunctions {
             ))));
     }
 
-    /*
-       ==========================================================
-                                 Call
-       ==========================================================
-    */
-
     // call <plt_label>
     fn call_func(code: &mut GeneratedCode, plt_label: &str) {
         code.lib_functions
@@ -573,12 +466,6 @@ impl CLibFunctions {
                 InstrOperand::LabelRef(String::from(plt_label)),
             ))));
     }
-
-    /*
-       ==========================================================
-                                Push
-       ==========================================================
-    */
 
     // pushq &rbp
     fn pushq_rbp(code: &mut GeneratedCode) {
@@ -600,12 +487,6 @@ impl CLibFunctions {
             ))));
     }
 
-    /*
-       ==========================================================
-                                 Pop
-       ==========================================================
-    */
-
     // popq %rbp
     fn popq_rbp(code: &mut GeneratedCode) {
         code.lib_functions
@@ -625,21 +506,9 @@ impl CLibFunctions {
             ))));
     }
 
-    /*
-        ==========================================================
-                                  Ret
-        ==========================================================
-    */
-
     fn ret(code: &mut GeneratedCode) {
         code.lib_functions.push(Instruction(Instr::Ret));
     }
-
-    /*
-        ==========================================================
-                            Function Environment
-        ==========================================================
-    */
 
     fn set_up_stack(code: &mut GeneratedCode) {
         // (<labelled function>:)
@@ -663,12 +532,6 @@ impl CLibFunctions {
         Self::popq_rbp(code);
         Self::ret(code);
     }
-
-    /*
-       ==========================================================
-                       Functions For Print & Read
-       ==========================================================
-    */
 
     fn create_string(code: &mut GeneratedCode, length: i32, label: &str, string: &str) {
         //   .int <length>
@@ -698,12 +561,6 @@ impl CLibFunctions {
         Self::assembler_text(code);
         Self::labelling(code, func_label);
     }
-
-    /*
-       ==========================================================
-                            C-lib Functions
-       ==========================================================
-    */
 
     fn generate_print_string(code: &mut GeneratedCode) {
         // .section .rodata
@@ -1077,7 +934,7 @@ impl CLibFunctions {
             code,
             27,
             OUT_OF_MEMORY_LABEL,
-            "fatal error: out of memory\n",
+            "fatal error: out of memory\\n",
             ERROR_LABEL_FOR_OUT_OF_MEMORY,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1105,7 +962,7 @@ impl CLibFunctions {
             code,
             42,
             OUT_OF_BOUNDS_LABEL,
-            "fatal error: array index %d out of bounds\n",
+            "fatal error: array index %d out of bounds\\n",
             ERROR_LABEL_FOR_OUT_OF_BOUNDS,
         );
 
@@ -1141,7 +998,7 @@ impl CLibFunctions {
             code,
             52,
             OVERFLOW_LABEL,
-            "fatal error: integer overflow or underflow occurred\n",
+            "fatal error: integer overflow or underflow occurred\\n",
             ERROR_LABEL_FOR_OVERFLOW,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1169,7 +1026,7 @@ impl CLibFunctions {
             code,
             50,
             BAD_CHAR_LABEL,
-            "fatal error: int %d is not ascii character 0-127 \n",
+            "fatal error: int %d is not ascii character 0-127 \\n",
             ERROR_LABEL_FOR_BAD_CHAR,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1204,7 +1061,7 @@ impl CLibFunctions {
             code,
             40,
             DIV_ZERO_LABEL,
-            "fatal error: division or modulo by zero\n",
+            "fatal error: division or modulo by zero\\n",
             ERROR_LABEL_FOR_DIV_ZERO,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1232,7 +1089,7 @@ impl CLibFunctions {
             code,
             45,
             NULL_PAIR_LABEL,
-            "fatal error: null pair dereferenced or freed\n",
+            "fatal error: null pair dereferenced or freed\\n",
             ERROR_LABEL_FOR_NULL_PAIR,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1485,6 +1342,22 @@ impl CLibFunctions {
         Self::popq_rbx(code);
         // ret
         Self::ret(code);
+    }
+
+    fn generate_free(code: &mut GeneratedCode) {
+        // _free:
+        Self::labelling(code, FREE_LABEL);
+        // pushq %rbp
+        // movq %rsp, %rbp
+        // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
+        // andq $-16, %rsp
+        Self::set_up_stack(code);
+        // call free@plt
+        Self::call_func(code, FREE_PLT);
+        // movq %rbp, %rsp
+        // popq %rbp
+        // ret
+        Self::set_back_stack(code);
     }
 
     fn generate_free_pair(code: &mut GeneratedCode) {

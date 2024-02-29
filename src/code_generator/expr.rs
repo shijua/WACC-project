@@ -189,7 +189,16 @@ impl Generator<'_> for Expr {
             }
 
             Expr::PairLiter => {
-                todo!()
+                let next_reg = get_next_register(regs, 8);
+                code.codes.push(Instruction(BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Scale::Long,
+                        InstrOperand::Imm(0),
+                        InstrOperand::Reg(next_reg),
+                    ),
+                )));
+                next_reg
             }
             Expr::Ident(id) => Self::generate_expr_ident(scope, code, regs, id),
 
