@@ -934,7 +934,7 @@ impl CLibFunctions {
             code,
             27,
             OUT_OF_MEMORY_LABEL,
-            "fatal error: out of memory\n",
+            "fatal error: out of memory\\n",
             ERROR_LABEL_FOR_OUT_OF_MEMORY,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -962,7 +962,7 @@ impl CLibFunctions {
             code,
             42,
             OUT_OF_BOUNDS_LABEL,
-            "fatal error: array index %d out of bounds\n",
+            "fatal error: array index %d out of bounds\\n",
             ERROR_LABEL_FOR_OUT_OF_BOUNDS,
         );
 
@@ -998,7 +998,7 @@ impl CLibFunctions {
             code,
             52,
             OVERFLOW_LABEL,
-            "fatal error: integer overflow or underflow occurred\n",
+            "fatal error: integer overflow or underflow occurred\\n",
             ERROR_LABEL_FOR_OVERFLOW,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1026,7 +1026,7 @@ impl CLibFunctions {
             code,
             50,
             BAD_CHAR_LABEL,
-            "fatal error: int %d is not ascii character 0-127 \n",
+            "fatal error: int %d is not ascii character 0-127 \\n",
             ERROR_LABEL_FOR_BAD_CHAR,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1061,7 +1061,7 @@ impl CLibFunctions {
             code,
             40,
             DIV_ZERO_LABEL,
-            "fatal error: division or modulo by zero\n",
+            "fatal error: division or modulo by zero\\n",
             ERROR_LABEL_FOR_DIV_ZERO,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1089,7 +1089,7 @@ impl CLibFunctions {
             code,
             45,
             NULL_PAIR_LABEL,
-            "fatal error: null pair dereferenced or freed\n",
+            "fatal error: null pair dereferenced or freed\\n",
             ERROR_LABEL_FOR_NULL_PAIR,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
