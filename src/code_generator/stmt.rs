@@ -334,6 +334,21 @@ impl Generator<'_> for Rvalue {
 
                 let elem_scale = Scale::from_size(offset);
 
+                code.required_clib.insert(NullPairError);
+                code.codes.push(Instruction(BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Cmp,
+                        elem_scale,
+                        Imm(0),
+                        Reg(stripped_pair),
+                    ),
+                )));
+                code.codes
+                    .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                        InstrType::Jump(Some(ConditionCode::EQ)),
+                        InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_NULL_PAIR)),
+                    ))));
+
                 given_to_result(code, stripped_pair, elem_scale);
 
                 code.codes.push(Instruction(Instr::BinaryInstr(

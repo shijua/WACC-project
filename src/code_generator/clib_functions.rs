@@ -1379,7 +1379,7 @@ impl CLibFunctions {
                 ),
             )));
         // je _errNull
-        Self::jump_on_condition(code, ConditionCode::EQ, NULL_PAIR_LABEL);
+        Self::jump_on_condition(code, ConditionCode::EQ, ERROR_LABEL_FOR_NULL_PAIR);
         // call free@plt
         Self::call_func(code, FREE_PLT);
         // movq %rbp, %rsp
