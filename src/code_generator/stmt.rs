@@ -22,7 +22,7 @@ use crate::code_generator::clib_functions::{
 };
 use crate::code_generator::def_libary::{get_array_load_label, get_array_store_label, Directives};
 use crate::code_generator::x86_generate::Generator;
-use crate::code_generator::{PAIR_ELEM_SIZE, REFERENCE_OFFSET_SIZE};
+use crate::code_generator::{PAIR_ELEM_SIZE, PAIR_SIZE, REFERENCE_OFFSET_SIZE};
 use crate::semantic_checker::util::SemanticType;
 use crate::symbol_table::{ScopeInfo, SymbolTable};
 use crate::{new_spanned, Spanned};
@@ -234,15 +234,6 @@ impl Generator<'_> for Lvalue {
 
                 given_to_result(code, stripped_pair, elem_scale);
 
-                code.codes.push(Instruction(Instr::BinaryInstr(
-                    BinaryInstruction::new_single_scale(
-                        InstrType::Add,
-                        Scale::default(),
-                        Imm(offset),
-                        Reg(RESULT_REG),
-                    ),
-                )));
-
                 result_to_given(code, stripped_pair, Scale::Quad);
 
                 (stripped_pair, PAIR_ELEM_SIZE)
@@ -269,7 +260,7 @@ impl Generator<'_> for Rvalue {
                 // by default, pair will attempt to store a 16-byte malloc-ed memory
                 // with the lhs 8 bytes for fst, and rhs 8 bytes for snd
                 let pair_addr = get_next_register(regs, 8);
-                generate_malloc(code, PAIR_ELEM_SIZE, ADDR_REG);
+                generate_malloc(code, PAIR_SIZE, ADDR_REG);
                 let calculated_elem = &mut boxed_pair1.0;
                 let calculated_reg = calculated_elem.generate(scope, code, regs, ());
                 given_to_result(code, calculated_reg.clone(), Scale::default());
@@ -716,10 +707,7 @@ impl Stmt {
                 )));
             }
             Lvalue::LPairElem((inner, _)) => {
-                let offset = match inner {
-                    PairElem::PairElemFst(_) => 0,
-                    PairElem::PairElemSnd(_) => PAIR_ELEM_SIZE,
-                };
+                let offset = inner.get_offset();
                 code.codes.push(Instruction(Instr::BinaryInstr(
                     BinaryInstruction::new_single_scale(
                         InstrType::Mov,
