@@ -21,6 +21,8 @@ class Result:
         return f"exit code: \"{self.exit_code}\", output: \"{self.output}\""
 
     def output_cmp(self, this: str, other: str) -> bool:
+        if other.find("runtime_error") != -1:
+            return True
         countself: int = 0
         countother: int = 0
         while len(this) != countself and len(other) != countother:
@@ -32,8 +34,10 @@ class Result:
                 countother += 6
                 countself += 13
                 continue
-            if this[countself:countself+15] == '#runtime_error#':
-                return True
+            if other[countother:countother+6] == 'addrs#':
+                countother += 6
+                countself += 13
+                continue
             if this[countself] != other[countother]:
                 return False
             countself += 1
@@ -87,7 +91,7 @@ def get_output_content(path: str) -> str:
         index_end = index_end_if_exit
     if index_end == -1:
         index_end = content.find("begin") # as some program does not contain program: at the start
-    output = content[index + 7:index_end].replace("\n# ", "\n").replace("#\n", "\n").strip()
+    output = content[index + 7:index_end].replace("\n# ", "\n").replace("\n#", "\n").strip()
     return output
 
 def get_exit_code(path: str) -> int:

@@ -1,4 +1,5 @@
 use crate::ast::ArgList::Arg;
+use crate::ast::Lvalue::LIdent;
 use crate::ast::Type::Array;
 use crate::ast::{ArrayLiter, Expr, Ident, Lvalue, PairElem, Rvalue, ScopedStmt, Stmt, Type};
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
@@ -226,10 +227,27 @@ impl Generator<'_> for Lvalue {
                 let pair_elem = boxed_pair_elem.0.clone();
                 let offset = pair_elem.get_offset();
 
-                let (stripped_pair, pair_size) = match pair_elem.clone() {
-                    PairElem::PairElemFst(x) | PairElem::PairElemSnd(x) => x.0.clone(),
+                let stripped_pair;
+                println!("{:?}", aux);
+                match aux {
+                    // cases for nested pairs
+                    Type::Pair(_, _) | Type::NestedPair => {
+                        stripped_pair =
+                            Rvalue::RPairElem(Box::from(boxed_pair_elem.clone())) // inner fst would use rpair
+                                .generate(scope, code, regs, aux);
+                    }
+                    _ => {
+                        (stripped_pair, _) = match pair_elem.clone() {
+                            PairElem::PairElemFst(x) | PairElem::PairElemSnd(x) => x.0.clone(),
+                        }
+                        .generate(
+                            scope,
+                            code,
+                            regs,
+                            pair_elem.recovered_pair(aux),
+                        );
+                    }
                 }
-                .generate(scope, code, regs, pair_elem.recovered_pair(aux));
 
                 let elem_scale = Scale::from_size(offset);
 
@@ -323,7 +341,6 @@ impl Generator<'_> for Rvalue {
                 pair_addr
             }
             Rvalue::RPairElem(boxed_pair_elem) => {
-                // todo!: pair element null check
                 let pair_elem = boxed_pair_elem.0.clone();
                 let offset = pair_elem.get_offset();
 
@@ -917,7 +934,7 @@ impl Stmt {
         let _type = return_val.analyse(scope).unwrap();
         // r0 = return_val
         // check whether size need to be scaled
-        if (_type.size() as i32 == 0 || _type.size() as i32 == 8) {
+        if _type.size() as i32 == 0 || _type.size() as i32 == 8 {
             code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
                     InstrType::Mov,
