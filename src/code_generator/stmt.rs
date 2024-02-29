@@ -1014,9 +1014,12 @@ impl Generator<'_> for ArrayLiter {
         regs: &mut Vec<Register>,
         aux: Self::Input,
     ) -> Self::Output {
-        // aux is guaranteed to be off array type
-        let Type::Array(inner_type) = aux else {
-            unreachable!("Attempting manage a non-array")
+        let inner_type = {
+            match aux {
+                Type::Array(x) => x,
+                Type::StringType => Box::new(new_spanned(Type::CharType)),
+                _ => unreachable!("Attempting manage a non-array"),
+            }
         };
         let aux = inner_type.0;
         let reg = get_next_register(regs, 8);
