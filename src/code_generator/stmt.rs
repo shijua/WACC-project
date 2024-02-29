@@ -233,6 +233,21 @@ impl Generator<'_> for Lvalue {
 
                 let elem_scale = Scale::from_size(offset);
 
+                code.required_clib.insert(NullPairError);
+                code.codes.push(Instruction(BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Cmp,
+                        elem_scale,
+                        Imm(0),
+                        Reg(stripped_pair),
+                    ),
+                )));
+                code.codes
+                    .push(Instruction(UnaryControl(UnaryNotScaled::new(
+                        InstrType::Jump(Some(ConditionCode::EQ)),
+                        InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_NULL_PAIR)),
+                    ))));
+
                 given_to_result(code, stripped_pair, elem_scale);
 
                 code.codes.push(Instruction(Instr::BinaryInstr(
@@ -787,26 +802,6 @@ impl Stmt {
         let sto = get_next_register(regs, type_.size() as i32);
         let scale = Scale::from_size(type_.size() as i32);
 
-        match *type_ {
-            Type::Pair(_, _) => {
-                code.required_clib.insert(NullPairError);
-                code.codes.push(Instruction(BinaryInstr(
-                    BinaryInstruction::new_single_scale(
-                        InstrType::Cmp,
-                        Default::default(),
-                        Imm(0),
-                        Reg(res),
-                    ),
-                )));
-                code.codes
-                    .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                        InstrType::Jump(Some(ConditionCode::EQ)),
-                        InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_NULL_PAIR)),
-                    ))));
-            }
-            _ => {}
-        }
-
         next_to_rax(code, res, scale.clone());
 
         rax_to_next(code, sto, scale.clone());
@@ -960,21 +955,6 @@ impl Stmt {
         // code.codes.push(AsmLine::Instruction(Instr::UnaryInstr(
         //     UnaryInstruction::new_unary(InstrType::Pop, Scale::default(), Reg(Rbp)),
         // )));
-    }
-}
-
-impl Generator<'_> for PairElem {
-    type Input = ();
-    type Output = ();
-
-    fn generate(
-        &mut self,
-        scope: &mut ScopeInfo,
-        code: &mut GeneratedCode,
-        regs: &mut Vec<Register>,
-        aux: Self::Input,
-    ) -> Self::Output {
-        todo!()
     }
 }
 
