@@ -1,21 +1,23 @@
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
 use crate::code_generator::asm::CLibFunctions::{
-    NullPairError, OutOfBoundsError, OutOfMemoryError, OverflowError, PrintString,
+    NullPairError, OutOfBoundsError, OutOfMemoryError, OverflowError, PrintCall,
 };
 use crate::code_generator::asm::ConditionCode::{OverFlow, GTE, LT};
 use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl};
+use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
+use crate::code_generator::asm::PrintType::PrintString;
 use crate::code_generator::asm::Register::*;
 use crate::code_generator::asm::Scale::{Byte, Long, Quad};
 use crate::code_generator::asm::{
     AsmLine, BinaryControl, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr,
-    InstrOperand, InstrType, MemoryReference, MemoryReferenceImmediate, Register, Scale,
+    InstrOperand, InstrType, MemoryReference, MemoryReferenceImmediate, PrintType, Register, Scale,
     UnaryInstruction, UnaryNotScaled, RESULT_REG,
 };
 use crate::code_generator::def_libary::{
     get_array_load_label, get_array_store_label, Directives, FormatLabel,
 };
 use crate::code_generator::x86_generate::Generator;
-use crate::code_generator::REFERENCE_OFFSET_SIZE;
+use crate::code_generator::{POINTER_SIZE, REFERENCE_OFFSET_SIZE};
 use crate::symbol_table::ScopeInfo;
 
 pub const PRINT_STRING_LABEL: &str = ".L._prints_str0";
@@ -94,29 +96,30 @@ pub const FREE_PLT: &str = "free@plt";
 
 const EXIT_CODE: i32 = 255;
 
+pub const FATAL_OUT_OF_MEMORY: &str = "fatal error: out of memory\\n";
+pub const FATAL_ARRAY_INDEX_OUT_OF_BOUND: &str = "fatal error: array index %d out of bounds\\n";
+pub const FATAL_INTEGER_OVERFLOW_UNDERFLOW: &str =
+    "fatal error: integer overflow or underflow occurred\\n";
+pub const FATAL_BAD_CHAR: &str = "fatal error: int %d is not ascii character 0-127 \\n";
+pub const FATAL_DIV_ZERO: &str = "fatal error: division or modulo by zero\\n";
+pub const FATAL_NULL_PAIR_DEREF: &str = "fatal error: null pair dereferenced or freed\\n";
+
+// #[derive(PartialEq, Debug, Clone)]
+
 impl CLibFunctions {
     pub fn generate_dependency(&self, code: &mut GeneratedCode) {
         match self {
-            // CLibFunctions::PrintString => {}
-            // CLibFunctions::PrintLn => {}
-            // CLibFunctions::PrintInt => {}
-            // CLibFunctions::PrintChar => {}
-            // CLibFunctions::PrintBool => {}
-            // CLibFunctions::PrintRefs => {}
-            // CLibFunctions::ReadInt => {}
-            // CLibFunctions::ReadChar => {}
-            // CLibFunctions::SystemExit => {}
             CLibFunctions::OverflowError => {
-                code.required_clib.insert(PrintString);
+                code.required_clib.insert(PrintCall(PrintString));
             }
 
             CLibFunctions::Malloc => {
-                code.required_clib.insert(PrintString);
+                code.required_clib.insert(PrintCall(PrintString));
                 code.required_clib.insert(OutOfMemoryError);
             }
 
             CLibFunctions::FreePair => {
-                code.required_clib.insert(PrintString);
+                code.required_clib.insert(PrintCall(PrintString));
                 code.required_clib.insert(NullPairError);
             }
 
@@ -124,7 +127,7 @@ impl CLibFunctions {
             | CLibFunctions::OverflowError
             | CLibFunctions::DivZeroError
             | CLibFunctions::NullPairError => {
-                code.required_clib.insert(PrintString);
+                code.required_clib.insert(PrintCall(PrintString));
             }
 
             CLibFunctions::ArrayStore(_) | CLibFunctions::ArrayLoad(_) => {
@@ -147,28 +150,8 @@ impl Generator<'_> for CLibFunctions {
         aux: Self::Input,
     ) -> Self::Output {
         match self {
-            CLibFunctions::PrintString => {
-                Self::generate_print_string(code);
-            }
-
-            CLibFunctions::PrintLn => {
-                Self::generate_print_ln(code);
-            }
-
-            CLibFunctions::PrintInt => {
-                Self::generate_print_int(code);
-            }
-
-            CLibFunctions::PrintChar => {
-                Self::generate_print_char(code);
-            }
-
-            CLibFunctions::PrintBool => {
-                Self::generate_print_bool(code);
-            }
-
-            CLibFunctions::PrintRefs => {
-                Self::generate_print_reference(code);
+            CLibFunctions::PrintCall(print_type) => {
+                Self::generate_print_call(code, print_type.clone())
             }
 
             CLibFunctions::ReadInt => {
@@ -222,8 +205,9 @@ impl Generator<'_> for CLibFunctions {
             CLibFunctions::ArrayLoad(scale) => {
                 Self::generate_array_load(code, scale.clone());
             }
-            CLibFunctions::ArrayStore(scale) => Self::generate_array_store(code, scale.clone()),
-            _ => {} // todo
+            CLibFunctions::ArrayStore(scale) => {
+                Self::generate_array_store(code, scale.clone());
+            }
         }
     }
 }
@@ -303,17 +287,16 @@ impl CLibFunctions {
         reg2: Register,
     ) {
         let src = if memory_ref1 {
-            InstrOperand::Reference(MemoryReference::new(
-                Some(MemoryReferenceImmediate::OffsetImm(offset)),
-                Some(reg1),
-                None,
-                None,
-            ))
+            InstrOperand::Reference(
+                MemoryReference::default()
+                    .with_offset(OffsetImm(offset))
+                    .with_base_reg(reg1),
+            )
         } else {
             InstrOperand::Reg(reg1)
         };
         let dst = if memory_ref2 {
-            InstrOperand::Reference(MemoryReference::new(None, Some(reg2), None, None))
+            InstrOperand::Reference(MemoryReference::default().with_base_reg(reg2))
         } else {
             InstrOperand::Reg(reg2)
         };
@@ -335,7 +318,7 @@ impl CLibFunctions {
                 BinaryInstruction::new_double_scale(
                     InstrType::MovS,
                     scale1,
-                    InstrOperand::Reference(MemoryReference::new(None, Some(reg1), None, None)),
+                    InstrOperand::Reference(MemoryReference::default().with_base_reg(reg1)),
                     scale2,
                     InstrOperand::Reg(reg2),
                 ),
@@ -352,12 +335,11 @@ impl CLibFunctions {
                 BinaryInstruction::new_single_scale(
                     InstrType::Lea,
                     Quad,
-                    InstrOperand::Reference(MemoryReference::new(
-                        Some(MemoryReferenceImmediate::LabelledImm(String::from(label))),
-                        Some(Rip),
-                        None,
-                        None,
-                    )),
+                    InstrOperand::Reference(
+                        MemoryReference::default()
+                            .with_offset(LabelledImm(String::from(label)))
+                            .with_base_reg(Rip),
+                    ),
                     InstrOperand::Reg(reg),
                 ),
             )));
@@ -370,7 +352,7 @@ impl CLibFunctions {
                 BinaryInstruction::new_single_scale(
                     InstrType::Lea,
                     Scale::default(),
-                    InstrOperand::Reference(MemoryReference::new(None, Some(reg1), None, None)),
+                    InstrOperand::Reference(MemoryReference::default().with_base_reg(reg1)),
                     InstrOperand::Reg(reg2),
                 ),
             )));
@@ -415,15 +397,46 @@ impl CLibFunctions {
             )));
     }
 
-    // cmpb $0, <%reg>
-    fn cmpb_register(code: &mut GeneratedCode, reg: Register) {
+    // cmp<scale> $0, <%reg>
+    fn cmp_zero_with_reg(code: &mut GeneratedCode, scale: Scale, reg: Register) {
         code.lib_functions
             .push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
                     InstrType::Cmp,
-                    Byte,
+                    scale,
                     InstrOperand::Imm(0),
                     InstrOperand::Reg(reg),
+                ),
+            )));
+    }
+
+    // cmp<scale> <%reg1>, <%reg2>
+    fn cmp_registers(code: &mut GeneratedCode, scale: Scale, reg1: Register, reg2: Register) {
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryInstr(
+                BinaryInstruction::new_single_scale(
+                    InstrType::Cmp,
+                    scale,
+                    InstrOperand::Reg(reg1),
+                    InstrOperand::Reg(reg2),
+                ),
+            )));
+    }
+
+    // cmov<condition_code> <%reg1> <%reg2>
+    fn cmov(
+        code: &mut GeneratedCode,
+        condition_code: ConditionCode,
+        reg1: Register,
+        reg2: Register,
+    ) {
+        code.lib_functions
+            .push(AsmLine::Instruction(Instr::BinaryControl(
+                BinaryControl::new(
+                    InstrType::CMov(condition_code),
+                    Scale::default(),
+                    InstrOperand::Reg(reg1),
+                    InstrOperand::Reg(reg2),
                 ),
             )));
     }
@@ -439,17 +452,7 @@ impl CLibFunctions {
             )));
     }
 
-    // jne <label>
-    fn jne(code: &mut GeneratedCode, label: &str) {
-        code.lib_functions
-            .push(AsmLine::Instruction(Instr::UnaryControl(
-                UnaryNotScaled::new(
-                    InstrType::Jump(Some(ConditionCode::NEQ)),
-                    InstrOperand::LabelRef(String::from(label)),
-                ),
-            )));
-    }
-
+    // j<condition_code> <label>
     fn jump_on_condition(code: &mut GeneratedCode, condition_code: ConditionCode, label: &str) {
         code.lib_functions
             .push(Instruction(UnaryControl(UnaryNotScaled::new(
@@ -562,6 +565,17 @@ impl CLibFunctions {
         Self::labelling(code, func_label);
     }
 
+    fn generate_print_call(code: &mut GeneratedCode, print_type: PrintType) {
+        match print_type {
+            PrintType::PrintString => Self::generate_print_string(code),
+            PrintType::PrintInt => Self::generate_print_int(code),
+            PrintType::PrintChar => Self::generate_print_char(code),
+            PrintType::PrintBool => Self::generate_print_bool(code),
+            PrintType::PrintRefs => Self::generate_print_reference(code),
+            PrintType::PrintLn => Self::generate_print_ln(code),
+        }
+    }
+
     fn generate_print_string(code: &mut GeneratedCode) {
         // .section .rodata
         // # length of .L._prints_str0
@@ -572,7 +586,7 @@ impl CLibFunctions {
         // _prints:
         Self::general_set_up(
             code,
-            4,
+            CONTENT_STRING_LITERAL.len() as i32,
             PRINT_STRING_LABEL,
             CONTENT_STRING_LITERAL,
             PRINT_LABEL_FOR_STRING,
@@ -610,7 +624,7 @@ impl CLibFunctions {
         // _println:
         Self::general_set_up(
             code,
-            0,
+            CONTENT_EMPTY.len() as i32,
             PRINT_STRING_LINE_LABEL,
             CONTENT_EMPTY,
             PRINT_LABEL_FOR_STRING_LINE,
@@ -641,7 +655,7 @@ impl CLibFunctions {
         // _printi:
         Self::general_set_up(
             code,
-            2,
+            CONTENT_INT_LITERAL.len() as i32,
             PRINT_INT_LABEL,
             CONTENT_INT_LITERAL,
             PRINT_LABEL_FOR_INT,
@@ -677,7 +691,7 @@ impl CLibFunctions {
         // _printc:
         Self::general_set_up(
             code,
-            2,
+            CONTENT_CHAR_LITERAL.len() as i32,
             PRINT_CHAR_LABEL,
             CONTENT_CHAR_LITERAL,
             PRINT_LABEL_FOR_CHAR,
@@ -720,9 +734,24 @@ impl CLibFunctions {
         // .text
         // _printb:
         Self::read_only_strings(code);
-        Self::create_string(code, 5, PRINT_BOOL_LABEL_0, CONTENT_BOOL_LITERAL_FALSE);
-        Self::create_string(code, 4, PRINT_BOOL_LABEL_1, CONTENT_BOOL_LITERAL_TRUE);
-        Self::create_string(code, 4, PRINT_BOOL_LABEL_2, CONTENT_STRING_LITERAL);
+        Self::create_string(
+            code,
+            CONTENT_BOOL_LITERAL_FALSE.len() as i32,
+            PRINT_BOOL_LABEL_0,
+            CONTENT_BOOL_LITERAL_FALSE,
+        );
+        Self::create_string(
+            code,
+            CONTENT_BOOL_LITERAL_TRUE.len() as i32,
+            PRINT_BOOL_LABEL_1,
+            CONTENT_BOOL_LITERAL_TRUE,
+        );
+        Self::create_string(
+            code,
+            CONTENT_STRING_LITERAL.len() as i32,
+            PRINT_BOOL_LABEL_2,
+            CONTENT_STRING_LITERAL,
+        );
         Self::assembler_text(code);
         Self::labelling(code, PRINT_LABEL_FOR_BOOL);
 
@@ -740,8 +769,8 @@ impl CLibFunctions {
         //   # on x86, al represents the number of SIMD registers used as variadic arguments
         //   movb $0, %al
         //   call printf@plt
-        Self::cmpb_register(code, Rdi);
-        Self::jne(code, PRINT_LABEL_FOR_BOOL_0);
+        Self::cmp_zero_with_reg(code, Byte, Rdi);
+        Self::jump_on_condition(code, ConditionCode::NEQ, PRINT_LABEL_FOR_BOOL_0);
         Self::leaq_rip_with_label(code, PRINT_BOOL_LABEL_0, Rdx);
         Self::jmp(code, PRINT_LABEL_FOR_BOOL_1);
 
@@ -765,7 +794,7 @@ impl CLibFunctions {
     fn generate_print_reference(code: &mut GeneratedCode) {
         Self::general_set_up(
             code,
-            2,
+            CONTENT_REF_LITERAL.len() as i32,
             PRINT_REF_LABEL,
             CONTENT_REF_LITERAL,
             PRINT_LABEL_FOR_REF,
@@ -799,7 +828,7 @@ impl CLibFunctions {
         // _readi:
         Self::general_set_up(
             code,
-            2,
+            CONTENT_INT_LITERAL.len() as i32,
             READ_INT_LABEL,
             CONTENT_INT_LITERAL,
             READ_LABEL_FOR_INT,
@@ -841,7 +870,7 @@ impl CLibFunctions {
         // _readc:
         Self::general_set_up(
             code,
-            3,
+            CONTENT_READ_CHAR_LITERAL.len() as i32,
             READ_CHAR_LABEL,
             CONTENT_READ_CHAR_LITERAL,
             READ_LABEL_FOR_CHAR,
@@ -900,21 +929,10 @@ impl CLibFunctions {
         Self::call_func(code, MALLOC_PLT);
 
         // cmpq $0, %rax
-        code.lib_functions.push(Instruction(BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Cmp,
-                Scale::default(),
-                InstrOperand::Imm(0),
-                InstrOperand::Reg(RESULT_REG),
-            ),
-        )));
+        Self::cmp_zero_with_reg(code, Quad, Rax);
 
         // je _errOutOfMemory
-        code.lib_functions
-            .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                InstrType::Jump(Some(ConditionCode::EQ)),
-                InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OUT_OF_MEMORY)),
-            ))));
+        Self::jump_on_condition(code, ConditionCode::EQ, ERROR_LABEL_FOR_OUT_OF_MEMORY);
 
         // movq %rbp, %rsp
         // popq %rbp
@@ -932,9 +950,9 @@ impl CLibFunctions {
         // _errOutOfMemory:
         Self::general_set_up(
             code,
-            27,
+            FATAL_OUT_OF_MEMORY.len() as i32,
             OUT_OF_MEMORY_LABEL,
-            "fatal error: out of memory\\n",
+            FATAL_OUT_OF_MEMORY,
             ERROR_LABEL_FOR_OUT_OF_MEMORY,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -960,9 +978,9 @@ impl CLibFunctions {
         // _errOutOfBounds:
         Self::general_set_up(
             code,
-            42,
+            FATAL_ARRAY_INDEX_OUT_OF_BOUND.len() as i32,
             OUT_OF_BOUNDS_LABEL,
-            "fatal error: array index %d out of bounds\\n",
+            FATAL_ARRAY_INDEX_OUT_OF_BOUND,
             ERROR_LABEL_FOR_OUT_OF_BOUNDS,
         );
 
@@ -996,9 +1014,9 @@ impl CLibFunctions {
         // _errOverflow:
         Self::general_set_up(
             code,
-            52,
+            FATAL_INTEGER_OVERFLOW_UNDERFLOW.len() as i32,
             OVERFLOW_LABEL,
-            "fatal error: integer overflow or underflow occurred\\n",
+            FATAL_INTEGER_OVERFLOW_UNDERFLOW,
             ERROR_LABEL_FOR_OVERFLOW,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1024,9 +1042,9 @@ impl CLibFunctions {
         // _errBadChar:
         Self::general_set_up(
             code,
-            50,
+            FATAL_BAD_CHAR.len() as i32,
             BAD_CHAR_LABEL,
-            "fatal error: int %d is not ascii character 0-127 \\n",
+            FATAL_BAD_CHAR,
             ERROR_LABEL_FOR_BAD_CHAR,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1059,9 +1077,9 @@ impl CLibFunctions {
         // _errDivZero:
         Self::general_set_up(
             code,
-            40,
+            FATAL_DIV_ZERO.len() as i32,
             DIV_ZERO_LABEL,
-            "fatal error: division or modulo by zero\\n",
+            FATAL_DIV_ZERO,
             ERROR_LABEL_FOR_DIV_ZERO,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1087,9 +1105,9 @@ impl CLibFunctions {
         // _errNull:
         Self::general_set_up(
             code,
-            45,
+            FATAL_NULL_PAIR_DEREF.len() as i32,
             NULL_PAIR_LABEL,
-            "fatal error: null pair dereferenced or freed\\n",
+            FATAL_NULL_PAIR_DEREF,
             ERROR_LABEL_FOR_NULL_PAIR,
         );
         // # external calls must be stack-aligned to 16 bytes, accomplished by masking with fffffffffffffff0
@@ -1123,61 +1141,17 @@ impl CLibFunctions {
         let load_label = get_array_load_label(&scale);
         Self::labelling(code, load_label.as_str());
         Self::pushq_rbx(code);
-        code.lib_functions
-            .push(AsmLine::Instruction(Instr::BinaryInstr(
-                BinaryInstruction::new_single_scale(
-                    InstrType::Cmp,
-                    Long,
-                    InstrOperand::Imm(0),
-                    InstrOperand::Reg(R10),
-                ),
-            )));
+        Self::cmp_zero_with_reg(code, Long, R10);
         // cmovl %r10, %rsi
-        code.lib_functions
-            .push(AsmLine::Instruction(Instr::BinaryControl(
-                BinaryControl::new(
-                    InstrType::CMov(LT),
-                    Quad,
-                    InstrOperand::Reg(R10),
-                    InstrOperand::Reg(Rsi),
-                ),
-            )));
+        Self::cmov(code, ConditionCode::LT, R10, Rsi);
         // jl
-        code.lib_functions
-            .push(AsmLine::Instruction(Instr::UnaryControl(
-                UnaryNotScaled::new(
-                    InstrType::Jump(Some(ConditionCode::LT)),
-                    InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OUT_OF_BOUNDS)),
-                ),
-            )));
+        Self::jump_on_condition(code, ConditionCode::LT, ERROR_LABEL_FOR_OUT_OF_BOUNDS);
         Self::mov_memory_ref_reg(code, Long, -REFERENCE_OFFSET_SIZE, true, R9, false, Rbx);
-        code.lib_functions
-            .push(AsmLine::Instruction(Instr::BinaryInstr(
-                BinaryInstruction::new_single_scale(
-                    InstrType::Cmp,
-                    Long,
-                    InstrOperand::Reg(Rbx),
-                    InstrOperand::Reg(R10),
-                ),
-            )));
+        Self::cmp_registers(code, Long, Rbx, R10);
         // cmovge %r10, %rsi
-        code.lib_functions
-            .push(AsmLine::Instruction(Instr::BinaryControl(
-                BinaryControl::new(
-                    InstrType::CMov(GTE),
-                    Quad,
-                    InstrOperand::Reg(R10),
-                    InstrOperand::Reg(Rsi),
-                ),
-            )));
+        Self::cmov(code, ConditionCode::GTE, R10, Rsi);
         // jge
-        code.lib_functions
-            .push(AsmLine::Instruction(Instr::UnaryControl(
-                UnaryNotScaled::new(
-                    InstrType::Jump(Some(ConditionCode::GTE)),
-                    InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OUT_OF_BOUNDS)),
-                ),
-            )));
+        Self::jump_on_condition(code, ConditionCode::GTE, ERROR_LABEL_FOR_OUT_OF_BOUNDS);
         // Byte: movsbq (%r9,%r10), %r9 // Long: movslq (%r9,%r10,4), %r9 // Quad: movq (%r9,%r10,8), %r9
         match scale {
             Byte => {
@@ -1185,12 +1159,11 @@ impl CLibFunctions {
                     BinaryInstruction::new_double_scale(
                         InstrType::MovS,
                         Byte,
-                        InstrOperand::Reference(MemoryReference::new(
-                            None,
-                            Some(R9),
-                            Some(R10),
-                            None,
-                        )),
+                        InstrOperand::Reference(
+                            MemoryReference::default()
+                                .with_base_reg(R9)
+                                .with_shift_unit_reg(R10),
+                        ),
                         Quad,
                         InstrOperand::Reg(R9),
                     ),
@@ -1201,12 +1174,12 @@ impl CLibFunctions {
                     BinaryInstruction::new_double_scale(
                         InstrType::MovS,
                         Long,
-                        InstrOperand::Reference(MemoryReference::new(
-                            None,
-                            Some(R9),
-                            Some(R10),
-                            Some(4),
-                        )),
+                        InstrOperand::Reference(
+                            MemoryReference::default()
+                                .with_base_reg(R9)
+                                .with_shift_unit_reg(R10)
+                                .with_shift_cnt(4),
+                        ),
                         Quad,
                         InstrOperand::Reg(R9),
                     ),
@@ -1217,12 +1190,12 @@ impl CLibFunctions {
                     BinaryInstruction::new_single_scale(
                         InstrType::Mov,
                         Quad,
-                        InstrOperand::Reference(MemoryReference::new(
-                            None,
-                            Some(R9),
-                            Some(R10),
-                            Some(8),
-                        )),
+                        InstrOperand::Reference(
+                            MemoryReference::default()
+                                .with_base_reg(R9)
+                                .with_shift_unit_reg(R10)
+                                .with_shift_cnt(8),
+                        ),
                         InstrOperand::Reg(R9),
                     ),
                 )));
@@ -1242,50 +1215,17 @@ impl CLibFunctions {
         Self::labelling(code, store_label.as_str());
         Self::pushq_rbx(code);
         // cmpl $0, %r10d
-        code.lib_functions
-            .push(AsmLine::Instruction(Instr::BinaryInstr(
-                BinaryInstruction::new_single_scale(
-                    InstrType::Cmp,
-                    Long,
-                    InstrOperand::Imm(0),
-                    InstrOperand::Reg(R10),
-                ),
-            )));
+        Self::cmp_zero_with_reg(code, Long, R10);
         // cmovl %r10, %rsi
-        code.lib_functions
-            .push(AsmLine::Instruction(Instr::BinaryControl(
-                BinaryControl::new(
-                    InstrType::CMov(LT),
-                    Scale::default(),
-                    InstrOperand::Reg(R10),
-                    InstrOperand::Reg(Rsi),
-                ),
-            )));
-
+        Self::cmov(code, ConditionCode::LT, R10, Rsi);
         // jl _errOutOfBounds
         Self::jump_on_condition(code, LT, ERROR_LABEL_FOR_OUT_OF_BOUNDS);
         // movl -4(%r9), %ebx
         Self::mov_memory_ref_reg(code, Long, -REFERENCE_OFFSET_SIZE, true, R9, false, Rbx);
         // cmpl %ebx, %r10d
-        code.lib_functions
-            .push(AsmLine::Instruction(Instr::BinaryInstr(
-                BinaryInstruction::new_single_scale(
-                    InstrType::Cmp,
-                    Long,
-                    InstrOperand::Reg(Rbx),
-                    InstrOperand::Reg(R10),
-                ),
-            )));
+        Self::cmp_registers(code, Long, Rbx, R10);
         // cmovge %r10, %rsi
-        code.lib_functions
-            .push(AsmLine::Instruction(Instr::BinaryControl(
-                BinaryControl::new(
-                    InstrType::CMov(GTE),
-                    Scale::default(),
-                    InstrOperand::Reg(R10),
-                    InstrOperand::Reg(Rsi),
-                ),
-            )));
+        Self::cmov(code, ConditionCode::GTE, R10, Rsi);
         // jge _errOutOfBounds
         Self::jump_on_condition(code, ConditionCode::GTE, ERROR_LABEL_FOR_OUT_OF_BOUNDS);
 
@@ -1297,12 +1237,11 @@ impl CLibFunctions {
                         InstrType::Mov,
                         Byte,
                         InstrOperand::Reg(Rax),
-                        InstrOperand::Reference(MemoryReference::new(
-                            None,
-                            Some(R9),
-                            Some(R10),
-                            None,
-                        )),
+                        InstrOperand::Reference(
+                            MemoryReference::default()
+                                .with_base_reg(R9)
+                                .with_shift_unit_reg(R10),
+                        ),
                     ),
                 )));
             }
@@ -1312,12 +1251,12 @@ impl CLibFunctions {
                         InstrType::Mov,
                         Long,
                         InstrOperand::Reg(Rax),
-                        InstrOperand::Reference(MemoryReference::new(
-                            None,
-                            Some(R9),
-                            Some(R10),
-                            Some(4),
-                        )),
+                        InstrOperand::Reference(
+                            MemoryReference::default()
+                                .with_base_reg(R9)
+                                .with_shift_unit_reg(R10)
+                                .with_shift_cnt(Long.size()),
+                        ),
                     ),
                 )));
             }
@@ -1327,12 +1266,12 @@ impl CLibFunctions {
                         InstrType::Mov,
                         Quad,
                         InstrOperand::Reg(Rax),
-                        InstrOperand::Reference(MemoryReference::new(
-                            None,
-                            Some(R9),
-                            Some(R10),
-                            Some(8),
-                        )),
+                        InstrOperand::Reference(
+                            MemoryReference::default()
+                                .with_base_reg(R9)
+                                .with_shift_unit_reg(R10)
+                                .with_shift_cnt(8),
+                        ),
                     ),
                 )));
             }
@@ -1369,15 +1308,7 @@ impl CLibFunctions {
         // andq $-16, %rsp
         Self::set_up_stack(code);
         // cmpq $0, %rdi
-        code.lib_functions
-            .push(AsmLine::Instruction(Instr::BinaryInstr(
-                BinaryInstruction::new_single_scale(
-                    InstrType::Cmp,
-                    Quad,
-                    InstrOperand::Imm(0),
-                    InstrOperand::Reg(Rdi),
-                ),
-            )));
+        Self::cmp_zero_with_reg(code, Quad, Rdi);
         // je _errNull
         Self::jump_on_condition(code, ConditionCode::EQ, ERROR_LABEL_FOR_NULL_PAIR);
         // call free@plt

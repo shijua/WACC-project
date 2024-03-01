@@ -2,6 +2,7 @@ use crate::ast::Type;
 use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::Instr::BinaryInstr;
 use crate::code_generator::asm::Register::{Rbp, Rsp};
+use crate::code_generator::asm_creator::{mov_immediate, mov_registers, pop, push};
 use crate::code_generator::def_libary::Directives;
 use lazy_static::lazy_static;
 use std::collections::HashSet;
@@ -24,7 +25,7 @@ pub fn get_rbp_size(regs: &Vec<Register>) -> i32 {
     }
 }
 
-// first register is for indicating the last register used so that we can record current stack location
+// first register is for indicating the last register used to record current stack location
 pub fn get_next_register(regs: &mut Vec<Register>, size: i32) -> Register {
     if regs.len() == 1 {
         match regs[0] {
@@ -51,7 +52,7 @@ pub fn push_arg_regs(code: &mut GeneratedCode) {
         BinaryInstruction::new_single_scale(
             InstrType::Sub,
             Scale::default(),
-            InstrOperand::Imm((ARG_REGS.len() * 8) as i32),
+            InstrOperand::Imm((ARG_REGS.len() as i32 * Scale::default().size())),
             InstrOperand::Reg(Register::Rsp),
         ),
     )));
@@ -62,15 +63,14 @@ pub fn push_arg_regs(code: &mut GeneratedCode) {
                 InstrType::Mov,
                 Scale::default(),
                 InstrOperand::Reg(*reg),
-                InstrOperand::Reference(MemoryReference::new(
-                    Some(MemoryReferenceImmediate::OffsetImm(count)),
-                    Some(Register::Rsp),
-                    None,
-                    None,
-                )),
+                InstrOperand::Reference(
+                    MemoryReference::default()
+                        .with_offset(MemoryReferenceImmediate::OffsetImm(count))
+                        .with_base_reg(Rsp),
+                ),
             ),
         )));
-        count += 8;
+        count += Scale::default().size();
     });
 }
 
@@ -94,22 +94,12 @@ pub fn pop_rax(code: &mut GeneratedCode) {
 
 pub fn push_register(code: &mut GeneratedCode, reg: Register) {
     assert!(!matches!(reg, Register::Stack(_)));
-    code.codes
-        .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-            InstrType::Push,
-            Scale::default(),
-            InstrOperand::Reg(reg),
-        ))));
+    push(code, reg);
 }
 
 pub fn pop_register(code: &mut GeneratedCode, reg: Register) {
     assert!(!matches!(reg, Register::Stack(_)));
-    code.codes
-        .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-            InstrType::Pop,
-            Scale::default(),
-            InstrOperand::Reg(reg),
-        ))));
+    pop(code, reg);
 }
 
 // pop argument registers
@@ -120,12 +110,11 @@ pub fn pop_arg_regs(code: &mut GeneratedCode) {
             BinaryInstruction::new_single_scale(
                 InstrType::Mov,
                 Scale::default(),
-                InstrOperand::Reference(MemoryReference::new(
-                    Some(MemoryReferenceImmediate::OffsetImm(count)),
-                    Some(Register::Rsp),
-                    None,
-                    None,
-                )),
+                InstrOperand::Reference(
+                    MemoryReference::default()
+                        .with_offset(MemoryReferenceImmediate::OffsetImm(count))
+                        .with_base_reg(Rsp),
+                ),
                 InstrOperand::Reg(*reg),
             ),
         )));
@@ -136,7 +125,7 @@ pub fn pop_arg_regs(code: &mut GeneratedCode) {
         BinaryInstruction::new_single_scale(
             InstrType::Add,
             Scale::default(),
-            InstrOperand::Imm((ARG_REGS.len() * 8) as i32),
+            InstrOperand::Imm(((ARG_REGS.len() as i32) * Scale::default().size()) as i32),
             InstrOperand::Reg(Register::Rsp),
         ),
     )));
@@ -158,127 +147,43 @@ pub fn arg_register_mapping(reg: Register) -> Register {
 
 pub fn push_callee_saved_regs(code: &mut GeneratedCode) {
     // push RBP and link RBP with RSP
-    code.codes
-        .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-            InstrType::Push,
-            Scale::default(),
-            InstrOperand::Reg(Rbp),
-        ))));
+    push(code, Rbp);
 
     CALLEE_SAVED_REGS.iter().for_each(|reg| {
-        code.codes
-            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-                InstrType::Push,
-                Scale::default(),
-                InstrOperand::Reg(*reg),
-            ))));
+        push(code, *reg);
     });
 
     // movq rsp to rbp
-    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-        BinaryInstruction::new_single_scale(
-            InstrType::Mov,
-            Scale::default(),
-            InstrOperand::Reg(Rsp),
-            InstrOperand::Reg(Rbp),
-        ),
-    )));
+    mov_registers(code, Scale::default(), Rsp, Rbp);
 }
 
 pub fn pop_callee_saved_regs(code: &mut GeneratedCode) {
     // movq rbp to rsp
-    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-        BinaryInstruction::new_single_scale(
-            InstrType::Mov,
-            Scale::default(),
-            InstrOperand::Reg(Rbp),
-            InstrOperand::Reg(Rsp),
-        ),
-    )));
+    mov_registers(code, Scale::default(), Rbp, Rsp);
 
     // pop callee saved registers
     CALLEE_SAVED_REGS.iter().rev().for_each(|reg| {
-        code.codes
-            .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-                InstrType::Pop,
-                Scale::default(),
-                InstrOperand::Reg(*reg),
-            ))));
+        pop(code, *reg);
     });
 
     // pop RBP
-    code.codes
-        .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-            InstrType::Pop,
-            Scale::default(),
-            InstrOperand::Reg(Rbp),
-        ))));
+    pop(code, Register::Rbp);
 }
 
 pub fn next_to_rax(code: &mut GeneratedCode, next: Register, scale: Scale) {
-    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-        BinaryInstruction::new_single_scale(
-            InstrType::Mov,
-            scale,
-            InstrOperand::Reg(next),
-            InstrOperand::Reg(RESULT_REG),
-        ),
-    )));
+    mov_registers(code, scale, next, RESULT_REG);
 }
 
 pub fn rax_to_next(code: &mut GeneratedCode, next: Register, scale: Scale) {
-    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-        BinaryInstruction::new_single_scale(
-            InstrType::Mov,
-            scale,
-            InstrOperand::Reg(RESULT_REG),
-            InstrOperand::Reg(next),
-        ),
-    )));
+    mov_registers(code, scale, RESULT_REG, next);
 }
 
 pub fn next_to_r11(code: &mut GeneratedCode, next: Register, scale: Scale) {
-    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-        BinaryInstruction::new_single_scale(
-            InstrType::Mov,
-            scale,
-            InstrOperand::Reg(next),
-            InstrOperand::Reg(Register::R11),
-        ),
-    )));
-}
-
-pub fn given_to_result(code: &mut GeneratedCode, given: Register, scale: Scale) {
-    code.codes.push(Instruction(BinaryInstr(
-        BinaryInstruction::new_single_scale(
-            InstrType::Mov,
-            scale,
-            InstrOperand::Reg(given),
-            InstrOperand::Reg(RESULT_REG),
-        ),
-    )));
-}
-
-pub fn result_to_given(code: &mut GeneratedCode, given: Register, scale: Scale) {
-    code.codes.push(Instruction(BinaryInstr(
-        BinaryInstruction::new_single_scale(
-            InstrType::Mov,
-            scale,
-            InstrOperand::Reg(RESULT_REG),
-            InstrOperand::Reg(given),
-        ),
-    )));
+    mov_registers(code, scale, next, ADDR_REG);
 }
 
 pub fn r11_to_next(code: &mut GeneratedCode, next: Register, scale: Scale) {
-    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-        BinaryInstruction::new_single_scale(
-            InstrType::Mov,
-            scale,
-            InstrOperand::Reg(Register::R11),
-            InstrOperand::Reg(next),
-        ),
-    )));
+    mov_registers(code, scale, ADDR_REG, next);
 }
 
 pub fn function_arguments_calculate_extra_size(
@@ -367,10 +272,6 @@ pub const ARG_REGS: [Register; ARG_REGS_N] = [
     Register::R9,
 ];
 
-// const ARG_REGS: [&str; ARG_REGS_N] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
-// const ARG_REGS8: [&str; ARG_REGS_N] = ["dil", "sil", "dl", "cl", "r8b", "r9b"];
-// const ARG_REGS32: [&str; ARG_REGS_N] = ["edi", "esi", "edx", "ecx", "r8d", "r9d"];
-
 pub const CALLEE_SAVED_REGS: [Register; CALLEE_SAVED_N] = [
     Register::Rbx,
     Register::R12,
@@ -391,28 +292,35 @@ pub const GENERAL_REGS: [Register; REGS_N] = [
     Register::R8,
     Register::R9,
 ];
-// const REGS8: [&str; REGS_N] = ["r10b", "r11b", "bl", "r12b", "r13b", "r14b", "r15b"];
-// const REGS32: [&str; REGS_N] = ["r10d", "r11d", "ebx", "r12d", "r13d", "r14d", "r15d"];
 
 #[derive(PartialEq, Debug, Clone, Copy, Hash, Eq)]
-pub enum CLibFunctions {
+pub enum PrintType {
     PrintString,
     PrintLn,
     PrintInt,
     PrintChar,
     PrintBool,
     PrintRefs,
+}
+
+#[derive(PartialEq, Debug, Clone, Copy, Hash, Eq)]
+pub enum CLibFunctions {
+    // PrintString,
+    // PrintLn,
+    // PrintInt,
+    // PrintChar,
+    // PrintBool,
+    // PrintRefs,
+    PrintCall(PrintType),
     ReadInt,
     ReadChar,
     SystemExit,
-    // CheckNullPointer,
     OutOfMemoryError,
     OutOfBoundsError,
     OverflowError,
     BadCharError,
     DivZeroError,
     NullPairError,
-
     Malloc,
     Free,
     FreePair,
@@ -428,7 +336,8 @@ pub enum Scale {
     // 2 bytes
     Long,
     // 4 bytes
-    Quad, // 8 bytes
+    Quad,
+    // 8 bytes
 }
 
 impl Default for Scale {
@@ -473,7 +382,7 @@ impl Scale {
 
 // Memory Addressing Mode:
 // Imm(r_b, r_i, s) => Memory [Imm + R[r_b] + R[r_i] * s]
-// somehow from the WACC code we know that Imm can be numbers OR labels
+// From the WACC code we know that Imm can be numbers OR labels
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum MemoryReferenceImmediate {
@@ -678,10 +587,6 @@ impl BinaryInstruction {
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Instr {
-    // Push(Scale, Register),
-    // Pop(Scale, Register),
-    // Neg(Scale, Register),
-    // Call(String),
     UnaryControl(UnaryNotScaled),
     UnaryInstr(UnaryInstruction),
     BinaryInstr(BinaryInstruction),

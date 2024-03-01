@@ -1,8 +1,8 @@
 use crate::ast::Type::Array;
-use crate::ast::{ArrayElem, BinaryOperator, Expr, Ident, Type, UnaryOperator};
+use crate::ast::{BinaryOperator, Expr, Ident, Type, UnaryOperator};
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
 use crate::code_generator::asm::CLibFunctions::{BadCharError, DivZeroError, OverflowError};
-use crate::code_generator::asm::ConditionCode::{GTE, NEQ};
+use crate::code_generator::asm::ConditionCode::OverFlow;
 use crate::code_generator::asm::Instr::{BinaryInstr, CltdInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
 use crate::code_generator::asm::Register::{Rax, Rsi, R10, R9};
@@ -14,16 +14,21 @@ use crate::code_generator::asm::{
     GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
     UnaryInstruction, UnaryNotScaled, ADDR_REG, RESULT_REG,
 };
+use crate::code_generator::asm_creator::{
+    binary_double_scale, binary_single_scale, jump, jump_on_condition, mov_immediate,
+    mov_registers, pop, push,
+};
 use crate::code_generator::clib_functions::{
     BAD_CHAR_LABEL, ERROR_LABEL_FOR_BAD_CHAR, ERROR_LABEL_FOR_DIV_ZERO, OVERFLOW_LABEL,
 };
 use crate::code_generator::clib_functions::{ERROR_LABEL_FOR_OVERFLOW, SYS_EXIT_LABEL};
 use crate::code_generator::def_libary::{get_array_load_label, Directives};
 use crate::code_generator::x86_generate::Generator;
-use crate::code_generator::REFERENCE_OFFSET_SIZE;
+use crate::code_generator::{PAIR_ELEM_SIZE, POINTER_SIZE, REFERENCE_OFFSET_SIZE};
 use crate::semantic_checker::util::SemanticType;
 use crate::symbol_table::ScopeInfo;
 use crate::Spanned;
+use chumsky::text::int;
 
 impl Generator<'_> for Expr {
     type Input = ();
@@ -56,59 +61,44 @@ impl Generator<'_> for Expr {
                 let final_reg = match op {
                     // addl, jo _errOverflow, movslq
                     BinaryOperator::Add => {
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Add,
-                                Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        code.codes
-                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                                InstrType::Jump(Some(ConditionCode::OverFlow)),
-                                InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OVERFLOW)),
-                            ))));
+                        binary_single_scale(
+                            code,
+                            InstrType::Add,
+                            Scale::Long,
+                            InstrOperand::Reg(rhs_reg),
+                            InstrOperand::Reg(ADDR_REG),
+                        );
+                        jump_on_condition(code, ConditionCode::OverFlow, ERROR_LABEL_FOR_OVERFLOW);
                         code.required_clib.insert(OverflowError);
                         r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
 
-                    // subl, jo _errOverflow, movslq
+                    // subl, jo _errOverflow
                     BinaryOperator::Sub => {
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Sub,
-                                Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        code.codes
-                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                                InstrType::Jump(Some(ConditionCode::OverFlow)),
-                                InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OVERFLOW)),
-                            ))));
+                        binary_single_scale(
+                            code,
+                            InstrType::Sub,
+                            Scale::Long,
+                            InstrOperand::Reg(rhs_reg),
+                            InstrOperand::Reg(ADDR_REG),
+                        );
+                        jump_on_condition(code, OverFlow, ERROR_LABEL_FOR_OVERFLOW);
                         code.required_clib.insert(OverflowError);
                         r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
 
-                    // imull, jo _errOverflow, movslq
+                    // imull, jo _errOverflow
                     BinaryOperator::Mul => {
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::IMul,
-                                Scale::Long,
-                                InstrOperand::Reg(rhs_reg),
-                                InstrOperand::Reg(ADDR_REG),
-                            ),
-                        )));
-                        code.codes
-                            .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                                InstrType::Jump(Some(ConditionCode::OverFlow)),
-                                InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OVERFLOW)),
-                            ))));
+                        binary_single_scale(
+                            code,
+                            InstrType::IMul,
+                            Scale::Long,
+                            InstrOperand::Reg(rhs_reg),
+                            InstrOperand::Reg(ADDR_REG),
+                        );
+                        jump_on_condition(code, OverFlow, ERROR_LABEL_FOR_OVERFLOW);
                         code.required_clib.insert(OverflowError);
                         r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
@@ -156,7 +146,7 @@ impl Generator<'_> for Expr {
                         ConditionCode::LTE,
                     ),
 
-                    // cmpq, sete, movsbq
+                    // cmpq, sete
                     BinaryOperator::Eq => Self::generate_expr_binary_logical_compare(
                         code,
                         lhs_reg,
@@ -165,7 +155,7 @@ impl Generator<'_> for Expr {
                         ConditionCode::EQ,
                     ),
 
-                    // cmpq, setne, movsbq
+                    // cmpq, setne
                     BinaryOperator::Neq => Self::generate_expr_binary_logical_compare(
                         code,
                         lhs_reg,
@@ -183,21 +173,12 @@ impl Generator<'_> for Expr {
                     }
                 };
 
-                // push_back_register(regs, rhs_reg);
-
                 final_reg
             }
 
             Expr::PairLiter => {
-                let next_reg = get_next_register(regs, 8);
-                code.codes.push(Instruction(BinaryInstr(
-                    BinaryInstruction::new_single_scale(
-                        InstrType::Mov,
-                        Scale::Long,
-                        InstrOperand::Imm(0),
-                        InstrOperand::Reg(next_reg),
-                    ),
-                )));
+                let next_reg = get_next_register(regs, PAIR_ELEM_SIZE);
+                mov_immediate(code, Long, 0, next_reg);
                 next_reg
             }
             Expr::Ident(id) => Self::generate_expr_ident(scope, code, regs, id),
@@ -207,14 +188,7 @@ impl Generator<'_> for Expr {
                 let arr_reg = scope.get_register(id).unwrap();
 
                 // now RESULT_REG stores the address of array
-                code.codes.push(Instruction(BinaryInstr(
-                    BinaryInstruction::new_single_scale(
-                        InstrType::Mov,
-                        Scale::default(),
-                        InstrOperand::Reg(arr_reg),
-                        InstrOperand::Reg(RESULT_REG),
-                    ),
-                )));
+                mov_registers(code, Scale::default(), arr_reg, RESULT_REG);
 
                 let mut arr_type = scope.get_type(id).unwrap().clone();
                 let current_indices = arr_elem.clone().indices;
@@ -231,36 +205,19 @@ impl Generator<'_> for Expr {
                     let mut current_index = current_indices.get(index_cnt).unwrap().0.clone();
 
                     push_rax(code);
-
                     let index_reg = current_index.generate(scope, code, regs, ());
-
                     pop_rax(code);
 
                     // calling convention: array ptr passed in R9, index in R10, and return into R9
-
-                    push_register(code, R10);
+                    push(code, R10);
 
                     // put index_reg into r10
-                    code.codes.push(Instruction(BinaryInstr(
-                        BinaryInstruction::new_single_scale(
-                            InstrType::Mov,
-                            Scale::Long,
-                            InstrOperand::Reg(index_reg),
-                            InstrOperand::Reg(R10),
-                        ),
-                    )));
+                    mov_registers(code, Long, index_reg, R10);
 
                     push_arg_regs(code);
 
-                    // put array register into R9 (how?)
-                    code.codes.push(Instruction(BinaryInstr(
-                        BinaryInstruction::new_single_scale(
-                            InstrType::Mov,
-                            Scale::default(),
-                            InstrOperand::Reg(RESULT_REG),
-                            InstrOperand::Reg(R9),
-                        ),
-                    )));
+                    // put array register into R9
+                    mov_registers(code, Scale::default(), RESULT_REG, R9);
 
                     // call _arrLoadScale
                     let load_label = get_array_load_label(&scale);
@@ -275,20 +232,11 @@ impl Generator<'_> for Expr {
                         ))));
 
                     // move R9 back to rax
-                    code.codes.push(Instruction(BinaryInstr(
-                        BinaryInstruction::new_single_scale(
-                            InstrType::Mov,
-                            scale,
-                            InstrOperand::Reg(R9),
-                            InstrOperand::Reg(RESULT_REG),
-                        ),
-                    )));
+                    mov_registers(code, scale, R9, RESULT_REG);
 
                     pop_arg_regs(code);
 
-                    pop_register(code, R10);
-
-                    // push_back_register(regs, index_reg);
+                    pop(code, R10);
 
                     arr_type = inner_type.clone();
                     index_cnt = index_cnt + 1;
@@ -297,14 +245,7 @@ impl Generator<'_> for Expr {
                 // mov value in rax back to the next register
                 let target = get_next_register(regs, scale.size());
 
-                code.codes.push(Instruction(BinaryInstr(
-                    BinaryInstruction::new_single_scale(
-                        InstrType::Mov,
-                        scale,
-                        InstrOperand::Reg(RESULT_REG),
-                        InstrOperand::Reg(target),
-                    ),
-                )));
+                mov_registers(code, scale, RESULT_REG, target);
 
                 target
             }
@@ -339,23 +280,17 @@ impl Expr {
             UnaryOperator::Ord => {
                 // rax is needed to prevent moving by reference
                 let next_reg = get_next_register(regs, 4);
-                code.codes.push(Instruction(BinaryInstr(
-                    BinaryInstruction::new_double_scale(
-                        InstrType::MovS,
-                        Scale::Byte,
-                        InstrOperand::Reg(reg),
-                        Scale::Long,
-                        InstrOperand::Reg(RESULT_REG),
-                    ),
-                )));
-                code.codes.push(Instruction(BinaryInstr(
-                    BinaryInstruction::new_single_scale(
-                        InstrType::Mov,
-                        Scale::Long,
-                        InstrOperand::Reg(RESULT_REG),
-                        InstrOperand::Reg(next_reg),
-                    ),
-                )));
+
+                binary_double_scale(
+                    code,
+                    InstrType::MovS,
+                    Byte,
+                    InstrOperand::Reg(reg),
+                    Long,
+                    InstrOperand::Reg(RESULT_REG),
+                );
+
+                mov_registers(code, Long, RESULT_REG, next_reg);
                 next_reg
             }
             // however, when it comes to the terms of using the 'chr' function
@@ -378,7 +313,7 @@ impl Expr {
                 code.required_clib.insert(BadCharError);
                 code.codes
                     .push(Instruction(Instr::BinaryControl(BinaryControl::new(
-                        InstrType::CMov(NEQ),
+                        InstrType::CMov(ConditionCode::NEQ),
                         Quad,
                         InstrOperand::Reg(arg_register_mapping(reg)),
                         InstrOperand::Reg(Rsi),
@@ -416,12 +351,11 @@ impl Expr {
             BinaryInstruction::new_double_scale(
                 InstrType::MovS,
                 Scale::Long,
-                InstrOperand::Reference(MemoryReference {
-                    imm: Some(OffsetImm(-REFERENCE_OFFSET_SIZE)),
-                    base_reg: Some(RESULT_REG),
-                    shift_unit_reg: None,
-                    shift_cnt: None,
-                }),
+                InstrOperand::Reference(
+                    MemoryReference::default()
+                        .with_offset(OffsetImm(-REFERENCE_OFFSET_SIZE))
+                        .with_base_reg(RESULT_REG),
+                ),
                 Scale::default(),
                 InstrOperand::Reg(RESULT_REG),
             ),
@@ -469,11 +403,7 @@ impl Expr {
                 Scale::Long,
                 InstrOperand::Reg(reg),
             ))));
-        code.codes
-            .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                InstrType::Jump(Some(ConditionCode::OverFlow)),
-                InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_OVERFLOW)),
-            ))));
+        jump_on_condition(code, OverFlow, ERROR_LABEL_FOR_OVERFLOW);
         code.required_clib.insert(OverflowError);
         reg
     }
@@ -515,11 +445,7 @@ impl Expr {
 
         let false_label = code.get_control_label();
         // jne NEW_CONTROL
-        code.codes
-            .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
-                InstrType::Jump(Some(ConditionCode::NEQ)),
-                InstrOperand::LabelRef(false_label.clone()),
-            ))));
+        jump_on_condition(code, ConditionCode::NEQ, false_label.as_str());
 
         // mov rhs rax
         next_to_rax(code, rhs_reg, Scale::default());
@@ -570,11 +496,7 @@ impl Expr {
 
         let true_label = code.get_control_label();
         // je NEW_CONTROL
-        code.codes
-            .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
-                InstrType::Jump(Some(ConditionCode::EQ)),
-                InstrOperand::LabelRef(true_label.clone()),
-            ))));
+        jump_on_condition(code, ConditionCode::EQ, true_label.as_str());
 
         // mov rhs rax
         next_to_rax(code, rhs_reg, Scale::default());
@@ -617,12 +539,7 @@ impl Expr {
         next_to_r11(code, rhs_reg, lhs_scale);
         next_to_rax(code, lhs_reg, lhs_scale);
         // push rdx
-        code.codes
-            .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
-                InstrType::Push,
-                Scale::Quad,
-                InstrOperand::Reg(Register::Rdx),
-            ))));
+        push(code, Register::Rdx);
 
         code.codes.push(Instruction(BinaryInstr(
             BinaryInstruction::new_single_scale(
@@ -632,11 +549,8 @@ impl Expr {
                 InstrOperand::Reg(ADDR_REG),
             ),
         )));
-        code.codes
-            .push(Instruction(UnaryControl(UnaryNotScaled::new(
-                InstrType::Jump(Some(ConditionCode::EQ)),
-                InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_DIV_ZERO)),
-            ))));
+        jump_on_condition(code, ConditionCode::EQ, ERROR_LABEL_FOR_DIV_ZERO);
+
         code.required_clib.insert(DivZeroError);
         code.codes.push(Instruction(CltdInstr(InstrType::Cltd)));
         code.codes
@@ -645,14 +559,9 @@ impl Expr {
                 Scale::Long,
                 InstrOperand::Reg(ADDR_REG),
             ))));
-        code.codes.push(Instruction(BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                Scale::Long,
-                InstrOperand::Reg(res),
-                InstrOperand::Reg(RESULT_REG),
-            ),
-        )));
+
+        mov_registers(code, Long, res, RESULT_REG);
+
         code.codes.push(Instruction(BinaryInstr(
             BinaryInstruction::new_double_scale(
                 InstrType::MovS,
@@ -664,12 +573,7 @@ impl Expr {
         )));
 
         // pop rdx
-        code.codes
-            .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
-                InstrType::Pop,
-                Scale::Quad,
-                InstrOperand::Reg(Register::Rdx),
-            ))));
+        pop(code, Register::Rdx);
 
         // the result is rax
         rax_to_next(code, lhs_reg, lhs_scale);
@@ -709,14 +613,7 @@ fn generate_int_liter(
     int_val: &i32,
 ) -> Register {
     let next_reg = get_next_register(regs, 4);
-    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-        BinaryInstruction::new_single_scale(
-            InstrType::Mov,
-            Scale::Long,
-            InstrOperand::Imm(*int_val),
-            InstrOperand::Reg(next_reg),
-        ),
-    )));
+    mov_immediate(code, Long, *int_val, next_reg);
     next_reg
 }
 
@@ -730,14 +627,7 @@ fn generate_bool_liter(
         true => 1,
         false => 0,
     };
-    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-        BinaryInstruction::new_single_scale(
-            InstrType::Mov,
-            Scale::Byte,
-            InstrOperand::Imm(move_val),
-            InstrOperand::Reg(next_reg),
-        ),
-    )));
+    mov_immediate(code, Byte, move_val, next_reg);
     next_reg
 }
 
@@ -748,15 +638,7 @@ fn generate_char_liter(
 ) -> Register {
     let next_reg = get_next_register(regs, 1);
     let char_imm = *char_val as u8;
-
-    code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-        BinaryInstruction::new_single_scale(
-            InstrType::Mov,
-            Scale::Byte,
-            InstrOperand::Imm(char_imm as i32),
-            InstrOperand::Reg(next_reg),
-        ),
-    )));
+    mov_immediate(code, Byte, char_imm as i32, next_reg);
     next_reg
 }
 
@@ -765,7 +647,7 @@ fn generate_string_liter(
     regs: &mut Vec<Register>,
     str_val: String,
 ) -> Register {
-    let next_reg = get_next_register(regs, 8);
+    let next_reg = get_next_register(regs, POINTER_SIZE);
     // string must be referred to as a global dereference
     let str_label = code.get_next_string_label(&str_val);
 
@@ -774,12 +656,11 @@ fn generate_string_liter(
         BinaryInstruction::new_single_scale(
             InstrType::Lea,
             Quad,
-            InstrOperand::Reference(MemoryReference::new(
-                Some(LabelledImm(str_label)),
-                Some(Register::Rip),
-                None,
-                None,
-            )),
+            InstrOperand::Reference(
+                MemoryReference::default()
+                    .with_offset(LabelledImm(str_label))
+                    .with_base_reg(Register::Rip),
+            ),
             InstrOperand::Reg(Rax),
         ),
     )));
@@ -787,19 +668,4 @@ fn generate_string_liter(
     rax_to_next(code, next_reg, Quad);
 
     next_reg
-}
-
-impl Generator<'_> for ArrayElem {
-    type Input = ();
-    type Output = ();
-
-    fn generate(
-        &mut self,
-        scope: &mut ScopeInfo,
-        code: &mut GeneratedCode,
-        regs: &mut Vec<Register>,
-        aux: Self::Input,
-    ) -> Self::Output {
-        todo!()
-    }
 }
