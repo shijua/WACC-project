@@ -396,7 +396,7 @@ impl Generator<'_> for Rvalue {
                     ),
                 )));
 
-                let next_reg = get_next_register(regs, 8);
+                let next_reg = get_next_register(regs, PAIR_SIZE);
 
                 rax_to_next(code, next_reg, elem_scale);
 
