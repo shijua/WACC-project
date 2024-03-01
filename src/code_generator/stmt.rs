@@ -228,10 +228,20 @@ impl Generator<'_> for Lvalue {
                 let offset = pair_elem.get_offset();
 
                 let stripped_pair;
-                println!("{:?}", aux);
                 match aux {
                     // cases for nested pairs
-                    Type::Pair(_, _) | Type::NestedPair => {
+                    (Type::Pair(_, ref Any))
+                        if matches!(pair_elem, PairElem::PairElemSnd(_))
+                            && matches!(Any.0, Type::Any) =>
+                    {
+                        stripped_pair =
+                            Rvalue::RPairElem(Box::from(boxed_pair_elem.clone())) // inner fst would use rpair
+                                .generate(scope, code, regs, aux);
+                    }
+                    (Type::Pair(ref Any, _))
+                        if matches!(pair_elem, PairElem::PairElemFst(_))
+                            && matches!(Any.0, Type::Any) =>
+                    {
                         stripped_pair =
                             Rvalue::RPairElem(Box::from(boxed_pair_elem.clone())) // inner fst would use rpair
                                 .generate(scope, code, regs, aux);
