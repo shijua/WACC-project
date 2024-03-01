@@ -238,8 +238,6 @@ impl Generator<'_> for Expr {
 
                     // calling convention: array ptr passed in R9, index in R10, and return into R9
 
-                    push_register(code, R9);
-
                     push_register(code, R10);
 
                     // put index_reg into r10
@@ -289,8 +287,6 @@ impl Generator<'_> for Expr {
                     pop_arg_regs(code);
 
                     pop_register(code, R10);
-
-                    pop_register(code, R9);
 
                     // push_back_register(regs, index_reg);
 

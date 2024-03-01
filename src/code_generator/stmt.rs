@@ -1009,9 +1009,8 @@ fn generate_malloc(code: &mut GeneratedCode, bytes: i32, reg: Register) {
 
     // call _malloc
     code.codes
-        .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
+        .push(Instruction(Instr::UnaryControl(UnaryNotScaled::new(
             InstrType::Call,
-            Scale::default(),
             InstrOperand::LabelRef(String::from(MALLOC_LABEL)),
         ))));
 
