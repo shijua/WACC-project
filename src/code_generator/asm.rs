@@ -106,7 +106,7 @@ pub fn pop_register(code: &mut GeneratedCode, reg: Register) {
     assert!(!matches!(reg, Register::Stack(_)));
     code.codes
         .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-            InstrType::Push,
+            InstrType::Pop,
             Scale::default(),
             InstrOperand::Reg(reg),
         ))));
