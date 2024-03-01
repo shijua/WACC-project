@@ -21,9 +21,9 @@ integrationTest:
   stage: test
   before_script:
     - git submodule update --init --recursive
-    - apt-get update
-    - apt-get install -y ruby
-    - gem install rest-client
+    - apt-get update || true
+    - apt-get install -y ruby || true
+    - gem install rest-client || true
   script:
     - python3 integration_test.py wacc-examples-36/valid/IO wacc-examples-36/valid/basic \
       wacc-examples-36/valid/if wacc-examples-36/valid/while \
