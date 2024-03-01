@@ -772,10 +772,18 @@ impl Stmt {
                         Reg(RESULT_REG),
                         Reference(MemoryReference::new(
                             Some(OffsetImm(offset)),
-                            Some(dst_reg),
+                            Some(RESULT_REG),
                             None,
                             None,
                         )),
+                    ),
+                )));
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Scale::Quad,
+                        Reg(RESULT_REG),
+                        Reg(dst_reg),
                     ),
                 )));
             }
