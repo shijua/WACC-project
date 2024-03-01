@@ -221,7 +221,7 @@ if __name__ == "__main__":
     # run the test cases
     for i in range(1, arg_items):
         path = f"{sys.argv[i]}"
-        running_test_cases(path)
+        running_test_cases(path.strip())
 
     total_test = get_total_test_cases()
 

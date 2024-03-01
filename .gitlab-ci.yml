@@ -31,4 +31,4 @@ integrationTest:
       wacc-examples-36/valid/sequence wacc-examples-36/valid/variables \
       wacc-examples-36/valid/function wacc-examples-36/valid/pairs \
       wacc-examples-36/valid/array wacc-examples-36/valid/runtimeErr \
-      wacc-examples-36/invalid/syntaxErr wacc-examples-36/invalid/semanticErr \
+      wacc-examples-36/invalid/syntaxErr wacc-examples-36/invalid/semanticErr
