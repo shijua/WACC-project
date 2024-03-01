@@ -1,5 +1,4 @@
 use crate::ast::ArgList::Arg;
-use crate::ast::Lvalue::LIdent;
 use crate::ast::Type::Array;
 use crate::ast::{ArrayLiter, Expr, Ident, Lvalue, PairElem, Rvalue, ScopedStmt, Stmt, Type};
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
@@ -8,15 +7,16 @@ use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl};
 use crate::code_generator::asm::InstrOperand::{Imm, Reference, Reg, RegVariant};
 use crate::code_generator::asm::InstrType::Jump;
 use crate::code_generator::asm::MemoryReferenceImmediate::OffsetImm;
+use crate::code_generator::asm::PrintType::PrintLn;
 use crate::code_generator::asm::Register::{Rax, Rdi, R10, R9};
 use crate::code_generator::asm::{
-    arg_register_mapping, function_arguments_calculate_extra_size, get_next_register,
-    given_to_result, next_to_rax, pop_arg_regs, pop_callee_saved_regs, pop_rax, pop_register,
-    push_arg_regs, push_back_register, push_callee_saved_regs, push_rax, push_register,
-    rax_to_next, result_to_given, AsmLine, BinaryInstruction, CLibFunctions, ConditionCode,
-    GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
-    UnaryInstruction, UnaryNotScaled, ADDR_REG, ARG_REGS, RESULT_REG,
+    arg_register_mapping, function_arguments_calculate_extra_size, get_next_register, next_to_rax,
+    pop_arg_regs, pop_callee_saved_regs, pop_rax, pop_register, push_arg_regs, push_back_register,
+    push_callee_saved_regs, push_rax, push_register, rax_to_next, AsmLine, BinaryInstruction,
+    CLibFunctions, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference,
+    PrintType, Register, Scale, UnaryInstruction, UnaryNotScaled, ADDR_REG, ARG_REGS, RESULT_REG,
 };
+use crate::code_generator::asm_creator::{mov_immediate, mov_registers};
 use crate::code_generator::clib_functions::{
     ERROR_LABEL_FOR_NULL_PAIR, FREE_LABEL, FREE_PAIR_LABEL, MALLOC_LABEL, PRINT_LABEL_FOR_BOOL,
     PRINT_LABEL_FOR_CHAR, PRINT_LABEL_FOR_INT, PRINT_LABEL_FOR_REF, PRINT_LABEL_FOR_STRING,
@@ -24,7 +24,7 @@ use crate::code_generator::clib_functions::{
 };
 use crate::code_generator::def_libary::{get_array_load_label, get_array_store_label, Directives};
 use crate::code_generator::x86_generate::Generator;
-use crate::code_generator::{PAIR_ELEM_SIZE, PAIR_SIZE, REFERENCE_OFFSET_SIZE};
+use crate::code_generator::{PAIR_ELEM_SIZE, PAIR_SIZE, POINTER_SIZE, REFERENCE_OFFSET_SIZE};
 use crate::semantic_checker::util::SemanticType;
 use crate::symbol_table::{ScopeInfo, SymbolTable};
 use crate::{new_spanned, Spanned};
@@ -111,14 +111,7 @@ impl Generator<'_> for Lvalue {
                 let arr_reg = scope.get_register(id).unwrap();
 
                 // now RESULT_REG stores the address of array
-                code.codes.push(Instruction(BinaryInstr(
-                    BinaryInstruction::new_single_scale(
-                        InstrType::Mov,
-                        Scale::default(),
-                        InstrOperand::Reg(arr_reg),
-                        InstrOperand::Reg(RESULT_REG),
-                    ),
-                )));
+                mov_registers(code, Scale::default(), arr_reg, RESULT_REG);
 
                 push_rax(code);
 
@@ -144,14 +137,7 @@ impl Generator<'_> for Lvalue {
                         // RAX now stores the current address of the array to visit
 
                         // then move the index into R10
-                        code.codes.push(Instruction(BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Mov,
-                                Scale::Long,
-                                InstrOperand::Reg(index_reg),
-                                InstrOperand::Reg(R10),
-                            ),
-                        )));
+                        mov_registers(code, Scale::Long, index_reg, R10);
 
                         let target = get_next_register(regs, Scale::default().size());
 
@@ -166,27 +152,13 @@ impl Generator<'_> for Lvalue {
 
                     push_register(code, R10);
 
-                    // put index_reg into r10 (and free it?)
-                    code.codes.push(Instruction(BinaryInstr(
-                        BinaryInstruction::new_single_scale(
-                            InstrType::Mov,
-                            Scale::Long,
-                            InstrOperand::Reg(index_reg),
-                            InstrOperand::Reg(R10),
-                        ),
-                    )));
+                    // put index_reg into r10
+                    mov_registers(code, Scale::Long, index_reg, R10);
 
                     push_arg_regs(code);
 
-                    // put array register into R9 (how?)
-                    code.codes.push(Instruction(BinaryInstr(
-                        BinaryInstruction::new_single_scale(
-                            InstrType::Mov,
-                            Scale::default(),
-                            InstrOperand::Reg(RESULT_REG),
-                            InstrOperand::Reg(R9),
-                        ),
-                    )));
+                    // put array register into R9
+                    mov_registers(code, Scale::default(), RESULT_REG, R9);
 
                     // call _arrLoadScale
                     let load_label = get_array_load_label(&scale);
@@ -201,14 +173,7 @@ impl Generator<'_> for Lvalue {
                         ))));
 
                     // move R9 back to rax
-                    code.codes.push(Instruction(BinaryInstr(
-                        BinaryInstruction::new_single_scale(
-                            InstrType::Mov,
-                            scale,
-                            InstrOperand::Reg(R9),
-                            InstrOperand::Reg(RESULT_REG),
-                        ),
-                    )));
+                    mov_registers(code, scale, R9, RESULT_REG);
 
                     pop_arg_regs(code);
                     pop_register(code, R10);
@@ -276,9 +241,9 @@ impl Generator<'_> for Lvalue {
                         InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_NULL_PAIR)),
                     ))));
 
-                given_to_result(code, stripped_pair, elem_scale);
+                next_to_rax(code, stripped_pair, elem_scale);
 
-                result_to_given(code, stripped_pair, Scale::Quad);
+                rax_to_next(code, stripped_pair, Scale::Quad);
 
                 (stripped_pair, PAIR_ELEM_SIZE)
             }
@@ -303,17 +268,17 @@ impl Generator<'_> for Rvalue {
             Rvalue::RNewPair(boxed_pair1, boxed_pair2) => {
                 // by default, pair will attempt to store a 16-byte malloc-ed memory
                 // with the lhs 8 bytes for fst, and rhs 8 bytes for snd
-                let pair_addr = get_next_register(regs, 8);
+                let pair_addr = get_next_register(regs, POINTER_SIZE);
                 generate_malloc(code, PAIR_SIZE, ADDR_REG);
                 let calculated_elem = &mut boxed_pair1.0;
                 let calculated_reg = calculated_elem.generate(scope, code, regs, ());
-                given_to_result(code, calculated_reg.clone(), Scale::default());
+                next_to_rax(code, calculated_reg.clone(), Scale::default());
                 code.codes.push(Instruction(Instr::BinaryInstr(
                     BinaryInstruction::new_single_scale(
                         InstrType::Mov,
                         Scale::default(),
                         Reg(RESULT_REG),
-                        Reference(MemoryReference::new(None, Some(ADDR_REG), None, None)),
+                        Reference(MemoryReference::default().with_base_reg(ADDR_REG)),
                     ),
                 )));
 
@@ -321,32 +286,24 @@ impl Generator<'_> for Rvalue {
 
                 let calculated_elem = &mut boxed_pair2.0;
                 let calculated_reg = calculated_elem.generate(scope, code, regs, ());
-                given_to_result(code, calculated_reg.clone(), Scale::default());
+                next_to_rax(code, calculated_reg.clone(), Scale::default());
 
                 code.codes.push(Instruction(Instr::BinaryInstr(
                     BinaryInstruction::new_single_scale(
                         InstrType::Mov,
                         Scale::default(),
                         Reg(RESULT_REG),
-                        Reference(MemoryReference::new(
-                            Some(OffsetImm(PAIR_ELEM_SIZE)),
-                            Some(ADDR_REG),
-                            None,
-                            None,
-                        )),
+                        Reference(
+                            MemoryReference::default()
+                                .with_offset(OffsetImm(PAIR_ELEM_SIZE))
+                                .with_base_reg(ADDR_REG),
+                        ),
                     ),
                 )));
 
                 push_back_register(regs, calculated_reg);
 
-                code.codes.push(Instruction(Instr::BinaryInstr(
-                    BinaryInstruction::new_single_scale(
-                        InstrType::Mov,
-                        Scale::default(),
-                        Reg(ADDR_REG),
-                        Reg(pair_addr),
-                    ),
-                )));
+                mov_registers(code, Scale::default(), ADDR_REG, pair_addr);
 
                 pair_addr
             }
@@ -376,7 +333,7 @@ impl Generator<'_> for Rvalue {
                         InstrOperand::LabelRef(String::from(ERROR_LABEL_FOR_NULL_PAIR)),
                     ))));
 
-                given_to_result(code, stripped_pair, elem_scale);
+                next_to_rax(code, stripped_pair, elem_scale);
 
                 code.codes.push(Instruction(Instr::BinaryInstr(
                     BinaryInstruction::new_single_scale(
@@ -390,8 +347,8 @@ impl Generator<'_> for Rvalue {
                 code.codes.push(Instruction(Instr::BinaryInstr(
                     BinaryInstruction::new_single_scale(
                         InstrType::Mov,
-                        elem_scale, // type needed
-                        Reference(MemoryReference::new(None, Some(RESULT_REG), None, None)),
+                        elem_scale, // type neede
+                        Reference(MemoryReference::default().with_base_reg(RESULT_REG)),
                         Reg(RESULT_REG),
                     ),
                 )));
@@ -442,32 +399,26 @@ impl Generator<'_> for Rvalue {
                     match arg_reg {
                         // if the argument is a stack argument, we need to move it rax first
                         Register::RspStack(i) => {
-                            code.codes.push(Instruction(Instr::BinaryInstr(
-                                BinaryInstruction::new_single_scale(
-                                    InstrType::Mov,
-                                    Scale::from_size(_type.size() as i32), // type needed
-                                    Reg(reg.clone()),
-                                    Reg(RESULT_REG),
-                                ),
-                            )));
-                            code.codes.push(Instruction(Instr::BinaryInstr(
-                                BinaryInstruction::new_single_scale(
-                                    InstrType::Mov,
-                                    Scale::from_size(_type.size() as i32), // type needed
-                                    Reg(RESULT_REG),
-                                    Reg(arg_reg),
-                                ),
-                            )));
+                            mov_registers(
+                                code,
+                                Scale::from_size(_type.size() as i32),
+                                reg.clone(),
+                                RESULT_REG,
+                            );
+                            mov_registers(
+                                code,
+                                Scale::from_size(_type.size() as i32),
+                                RESULT_REG,
+                                arg_reg,
+                            );
                         }
                         _ => {
-                            code.codes.push(Instruction(Instr::BinaryInstr(
-                                BinaryInstruction::new_single_scale(
-                                    InstrType::Mov,
-                                    Scale::from_size(_type.size() as i32), // type needed
-                                    Reg(reg.clone()),
-                                    Reg(arg_reg),
-                                ),
-                            )));
+                            mov_registers(
+                                code,
+                                Scale::from_size(_type.size() as i32),
+                                reg.clone(),
+                                arg_reg,
+                            );
                         }
                     }
                 });
@@ -516,7 +467,7 @@ impl<'a> Generator<'a> for Stmt {
             }
             Stmt::Println(print_type, (exp, _)) => {
                 Self::generate_stmt_print(scope, code, regs, (), print_type, exp, true);
-                code.required_clib.insert(CLibFunctions::PrintLn);
+                code.required_clib.insert(CLibFunctions::PrintCall(PrintLn));
             }
             Stmt::Read(read_type, (lvalue, _)) => {
                 let (mut next_reg, _) = lvalue.generate(scope, code, regs, read_type.clone());
@@ -590,7 +541,7 @@ impl<'a> Generator<'a> for Stmt {
                             BinaryInstruction::new_single_scale(
                                 InstrType::Sub,
                                 Scale::Quad,
-                                Imm(4),
+                                Imm(Scale::Long.size()),
                                 Reg(Rdi),
                             ),
                         )));
@@ -619,30 +570,20 @@ impl Stmt {
         exp: &mut Expr,
         is_println: bool,
     ) {
-        match print_type {
-            Type::StringType => {
-                code.required_clib.insert(CLibFunctions::PrintString);
-            }
-            Type::IntType => {
-                code.required_clib.insert(CLibFunctions::PrintInt);
-            }
-            Type::CharType => {
-                code.required_clib.insert(CLibFunctions::PrintChar);
-            }
-            Type::BoolType => {
-                code.required_clib.insert(CLibFunctions::PrintBool);
-            }
-            Type::Array(inner_type) if inner_type.0 == Type::CharType => {
-                code.required_clib.insert(CLibFunctions::PrintString);
-            }
+        let print_config = match print_type {
+            Type::StringType => PrintType::PrintString,
+            Type::IntType => PrintType::PrintInt,
+            Type::BoolType => PrintType::PrintBool,
+            Type::CharType => PrintType::PrintChar,
+            Type::Array(inner_type) if inner_type.0 == Type::CharType => PrintType::PrintString,
             Type::Array(_) | Type::Pair(_, _) | Type::NestedPair | Type::Any => {
-                code.required_clib.insert(CLibFunctions::PrintRefs);
+                PrintType::PrintRefs
             }
-            Type::Func(_) => (),
-            _ => (),
+            _ => unreachable!("Unprintable object"),
         };
+        code.required_clib
+            .insert(CLibFunctions::PrintCall(print_config));
 
-        // not sure the comment below is essential or not
         // # Set up R11 as a temporary second base pointer for the caller saved things
         let next_reg = arg_register_mapping(exp.generate(scope, code, regs, aux));
         let _type = exp.analyse(scope).unwrap();
@@ -749,42 +690,26 @@ impl Stmt {
 
         next_to_rax(code, src_reg, Scale::from_size(size));
 
-        // todo:
         // special case when Lvalue is of type LArrElem:
         // we would then need to implement arrStore
         match lvalue {
             Lvalue::LIdent(_) => {
-                code.codes.push(Instruction(Instr::BinaryInstr(
-                    BinaryInstruction::new_single_scale(
-                        InstrType::Mov,
-                        Scale::from_size(size),
-                        Reg(RESULT_REG),
-                        Reg(dst_reg),
-                    ),
-                )));
+                mov_registers(code, Scale::from_size(size), RESULT_REG, dst_reg);
             }
             Lvalue::LPairElem((inner, _)) => {
                 let offset = inner.get_offset();
                 push_register(code, ADDR_REG);
-                code.codes.push(Instruction(Instr::BinaryInstr(
-                    BinaryInstruction::new_single_scale(
-                        InstrType::Mov,
-                        Scale::default(),
-                        Reg(dst_reg),
-                        Reg(ADDR_REG),
-                    ),
-                )));
+                mov_registers(code, Scale::default(), dst_reg, ADDR_REG);
                 code.codes.push(Instruction(Instr::BinaryInstr(
                     BinaryInstruction::new_single_scale(
                         InstrType::Mov,
                         Scale::from_size(size),
                         Reg(RESULT_REG),
-                        Reference(MemoryReference::new(
-                            Some(OffsetImm(offset)),
-                            Some(ADDR_REG),
-                            None,
-                            None,
-                        )),
+                        Reference(
+                            MemoryReference::default()
+                                .with_offset(OffsetImm(offset))
+                                .with_base_reg(ADDR_REG),
+                        ),
                     ),
                 )));
                 pop_register(code, ADDR_REG);
@@ -795,21 +720,14 @@ impl Stmt {
                 // and hence we need to move the value at dst to r9
                 let scale = Scale::from_size(size);
 
-                code.codes.push(Instruction(BinaryInstr(
-                    BinaryInstruction::new_single_scale(
-                        InstrType::Mov,
-                        Scale::default(),
-                        InstrOperand::Reg(dst_reg),
-                        InstrOperand::Reg(R9),
-                    ),
-                )));
+                mov_registers(code, Scale::default(), dst_reg, R9);
 
-                // // call array_storeScale
+                // call array_storeScale
 
                 code.required_clib
                     .insert(CLibFunctions::ArrayStore(scale.clone()));
-                //
-                // // add instruction dependency: system exit
+
+                // add instruction dependency: system exit
                 code.codes
                     .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
                         InstrType::Call,
@@ -871,24 +789,10 @@ impl Stmt {
         let res = exit_val.generate(scope, code, regs, ());
 
         // move result into the rax register
-        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                Scale::default(),
-                Reg(res),
-                Reg(RESULT_REG),
-            ),
-        )));
+        mov_registers(code, Scale::default(), res, RESULT_REG);
 
         // move result stored in rax into the rdi register
-        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                Scale::default(),
-                Reg(RESULT_REG),
-                Reg(Rdi),
-            ),
-        )));
+        mov_registers(code, Scale::default(), RESULT_REG, Rdi);
 
         // call predefined exit
         code.required_clib.insert(CLibFunctions::SystemExit);
@@ -955,14 +859,7 @@ impl Stmt {
         // r0 = return_val
         // check whether size need to be scaled
         if _type.size() as i32 == 0 || _type.size() as i32 == 8 {
-            code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-                BinaryInstruction::new_single_scale(
-                    InstrType::Mov,
-                    Scale::default(),
-                    Reg(res),
-                    Reg(RESULT_REG),
-                ),
-            )));
+            mov_registers(code, Scale::default(), res, RESULT_REG);
         } else {
             code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_double_scale(
@@ -978,44 +875,16 @@ impl Stmt {
         aux.push(code.codes.len());
         pop_callee_saved_regs(code);
         code.codes.push(AsmLine::Instruction(Instr::Ret));
-        // push back offset space
-        // let final_offset = scope.get_total_offset();
-
-        // // link rsp back
-        // code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-        //     BinaryInstruction::new_single_scale(
-        //         InstrType::Mov,
-        //         Scale::default(),
-        //         Reg(Rbp),
-        //         Reg(Rsp),
-        //     ),
-        // )));
-        //
-        // // take back rbp
-        // code.codes.push(AsmLine::Instruction(Instr::UnaryInstr(
-        //     UnaryInstruction::new_unary(InstrType::Pop, Scale::default(), Reg(Rbp)),
-        // )));
     }
 }
 
 fn generate_malloc(code: &mut GeneratedCode, bytes: i32, reg: Register) {
     code.required_clib.insert(CLibFunctions::Malloc);
-    // push rdi
-    // code.codes.push(AsmLine::Instruction(Instr::UnaryInstr(
-    //     UnaryInstruction::new_unary(InstrType::Push, Scale::default(), Reg(ARG_REGS[0])),
-    // )));
 
     push_arg_regs(code);
 
     // movl bytes edi
-    code.codes.push(Instruction(Instr::BinaryInstr(
-        BinaryInstruction::new_single_scale(
-            InstrType::Mov,
-            Scale::Long,
-            Imm(bytes),
-            Reg(ARG_REGS[0]),
-        ),
-    )));
+    mov_immediate(code, Scale::Long, bytes, ARG_REGS[0]);
 
     // call _malloc
     code.codes
@@ -1032,14 +901,7 @@ fn generate_malloc(code: &mut GeneratedCode, bytes: i32, reg: Register) {
     pop_arg_regs(code);
 
     // mov RESULT_REG reg
-    code.codes.push(Instruction(Instr::BinaryInstr(
-        BinaryInstruction::new_single_scale(
-            InstrType::Mov,
-            Scale::default(),
-            Reg(RESULT_REG),
-            Reg(reg),
-        ),
-    )));
+    mov_registers(code, Scale::default(), RESULT_REG, reg);
 }
 
 impl Generator<'_> for ArrayLiter {
@@ -1061,7 +923,7 @@ impl Generator<'_> for ArrayLiter {
             }
         };
         let aux = inner_type.0;
-        let reg = get_next_register(regs, 8);
+        let reg = get_next_register(regs, POINTER_SIZE);
         let arr_len = self.val.len();
         let arr_size = ((arr_len * aux.size()) as i32) + REFERENCE_OFFSET_SIZE;
         generate_malloc(code, arr_size, ADDR_REG);
@@ -1071,7 +933,7 @@ impl Generator<'_> for ArrayLiter {
                 InstrType::Mov,
                 Scale::Long,
                 Imm(arr_len as i32),
-                Reference(MemoryReference::new(None, Some(ADDR_REG), None, None)),
+                Reference(MemoryReference::default().with_base_reg(ADDR_REG)),
             ),
         )));
         // shift forward 4 bytes to adhere to array conventions
@@ -1087,38 +949,24 @@ impl Generator<'_> for ArrayLiter {
         // push all array elements into it
         for (arr_index, (exp, _)) in self.val.iter().enumerate() {
             let expr_reg = exp.clone().generate(scope, code, regs, ());
-            code.codes.push(Instruction(Instr::BinaryInstr(
-                BinaryInstruction::new_single_scale(
-                    InstrType::Mov,
-                    Scale::default(),
-                    Reg(expr_reg),
-                    Reg(RESULT_REG),
-                ),
-            )));
+            mov_registers(code, Scale::default(), expr_reg, RESULT_REG);
             code.codes.push(Instruction(Instr::BinaryInstr(
                 BinaryInstruction::new_single_scale(
                     InstrType::Mov,
                     Scale::from_size(aux.size() as i32),
                     Reg(RESULT_REG),
-                    Reference(MemoryReference::new(
-                        Some(OffsetImm((aux.size() * arr_index) as i32)),
-                        Some(ADDR_REG),
-                        None,
-                        None,
-                    )),
+                    Reference(
+                        MemoryReference::default()
+                            .with_offset(OffsetImm((aux.size() * arr_index) as i32))
+                            .with_base_reg(ADDR_REG),
+                    ),
                 ),
             )));
             // push_back_register(regs, expr_reg);
         }
 
-        code.codes.push(Instruction(Instr::BinaryInstr(
-            BinaryInstruction::new_single_scale(
-                InstrType::Mov,
-                Scale::default(),
-                Reg(ADDR_REG),
-                Reg(reg),
-            ),
-        )));
+        mov_registers(code, Scale::default(), ADDR_REG, reg);
+
         reg
     }
 }

@@ -11,6 +11,7 @@ use crate::code_generator::asm::{
 };
 use crate::code_generator::def_libary::{Directives, MAIN_FUNCTION_TITLE};
 use crate::code_generator::x86_generate::{Generator, DEFAULT_EXIT_CODE};
+use crate::code_generator::POINTER_SIZE;
 use crate::new_spanned;
 use crate::symbol_table::ScopeInfo;
 
@@ -58,7 +59,7 @@ impl Generator<'_> for Function {
         let s = function_arguments_calculate_extra_size(
             &mut arg_regs,
             args_type,
-            (ARG_REGS.len() * 8 + 8) as i32, // 8 is the size of return address
+            (ARG_REGS.len() as i32 * POINTER_SIZE) + POINTER_SIZE, // 8 is the size of return address
         );
         // insert the stack size after the function body
         self.parameters
