@@ -32,11 +32,11 @@ class Result:
                 continue
             if other[countother:countother+6] == '#addrs':
                 countother += 6
-                countself += 13
+                countself += 14
                 continue
             if other[countother:countother+6] == 'addrs#':
                 countother += 6
-                countself += 13
+                countself += 14
                 continue
             if this[countself] != other[countother]:
                 return False

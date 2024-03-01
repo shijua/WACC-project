@@ -765,6 +765,15 @@ impl Stmt {
             }
             Lvalue::LPairElem((inner, _)) => {
                 let offset = inner.get_offset();
+                push_register(code, ADDR_REG);
+                code.codes.push(Instruction(Instr::BinaryInstr(
+                    BinaryInstruction::new_single_scale(
+                        InstrType::Mov,
+                        Scale::default(),
+                        Reg(dst_reg),
+                        Reg(ADDR_REG),
+                    ),
+                )));
                 code.codes.push(Instruction(Instr::BinaryInstr(
                     BinaryInstruction::new_single_scale(
                         InstrType::Mov,
@@ -772,20 +781,13 @@ impl Stmt {
                         Reg(RESULT_REG),
                         Reference(MemoryReference::new(
                             Some(OffsetImm(offset)),
-                            Some(RESULT_REG),
+                            Some(ADDR_REG),
                             None,
                             None,
                         )),
                     ),
                 )));
-                code.codes.push(Instruction(Instr::BinaryInstr(
-                    BinaryInstruction::new_single_scale(
-                        InstrType::Mov,
-                        Scale::Quad,
-                        Reg(RESULT_REG),
-                        Reg(dst_reg),
-                    ),
-                )));
+                pop_register(code, ADDR_REG);
             }
             Lvalue::LArrElem(_) => {
                 // after evaluating, the address for array elem saving is already at dst_reg,
