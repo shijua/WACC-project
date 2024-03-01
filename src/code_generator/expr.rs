@@ -236,11 +236,13 @@ impl Generator<'_> for Expr {
 
                     pop_rax(code);
 
-                    push_arg_regs(code);
-
                     // calling convention: array ptr passed in R9, index in R10, and return into R9
 
-                    // put index_reg into r10 (and free it?)
+                    push_register(code, R9);
+
+                    push_register(code, R10);
+
+                    // put index_reg into r10
                     code.codes.push(Instruction(BinaryInstr(
                         BinaryInstruction::new_single_scale(
                             InstrType::Mov,
@@ -250,9 +252,7 @@ impl Generator<'_> for Expr {
                         ),
                     )));
 
-                    push_register(code, R9);
-
-                    push_register(code, R10);
+                    push_arg_regs(code);
 
                     // put array register into R9 (how?)
                     code.codes.push(Instruction(BinaryInstr(
@@ -288,9 +288,9 @@ impl Generator<'_> for Expr {
 
                     pop_arg_regs(code);
 
-                    pop_register(code, R9);
-
                     pop_register(code, R10);
+
+                    pop_register(code, R9);
 
                     // push_back_register(regs, index_reg);
 
