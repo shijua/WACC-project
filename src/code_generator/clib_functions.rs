@@ -1,17 +1,16 @@
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
-use crate::code_generator::asm::CLibFunctions::{
-    NullPairError, OutOfBoundsError, OutOfMemoryError, OverflowError, PrintCall,
-};
-use crate::code_generator::asm::ConditionCode::{OverFlow, GTE, LT};
+use crate::code_generator::asm::CLibFunctions::{PrintCall, RuntimeError};
+use crate::code_generator::asm::ConditionCode::{OverFlow, EQ, GTE, LT, NEQ};
 use crate::code_generator::asm::Instr::{BinaryInstr, UnaryControl};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
 use crate::code_generator::asm::PrintType::PrintString;
 use crate::code_generator::asm::Register::*;
+use crate::code_generator::asm::RuntimeErrorType::{NullPair, OutOfBounds, OutOfMemory};
 use crate::code_generator::asm::Scale::{Byte, Long, Quad};
 use crate::code_generator::asm::{
     AsmLine, BinaryControl, BinaryInstruction, CLibFunctions, ConditionCode, GeneratedCode, Instr,
-    InstrOperand, InstrType, MemoryReference, MemoryReferenceImmediate, PrintType, Register, Scale,
-    UnaryInstruction, UnaryNotScaled, RESULT_REG,
+    InstrOperand, InstrType, MemoryReference, MemoryReferenceImmediate, PrintType, Register,
+    RuntimeErrorType, Scale, UnaryInstruction, UnaryNotScaled, RESULT_REG,
 };
 use crate::code_generator::def_libary::{
     get_array_load_label, get_array_store_label, Directives, FormatLabel,
@@ -19,6 +18,7 @@ use crate::code_generator::def_libary::{
 use crate::code_generator::x86_generate::Generator;
 use crate::code_generator::{POINTER_SIZE, REFERENCE_OFFSET_SIZE};
 use crate::symbol_table::ScopeInfo;
+use std::io::ErrorKind;
 
 pub const PRINT_STRING_LABEL: &str = ".L._prints_str0";
 pub const PRINT_LABEL_FOR_STRING: &str = "_prints";
@@ -104,34 +104,25 @@ pub const FATAL_BAD_CHAR: &str = "fatal error: int %d is not ascii character 0-1
 pub const FATAL_DIV_ZERO: &str = "fatal error: division or modulo by zero\\n";
 pub const FATAL_NULL_PAIR_DEREF: &str = "fatal error: null pair dereferenced or freed\\n";
 
-// #[derive(PartialEq, Debug, Clone)]
-
 impl CLibFunctions {
     pub fn generate_dependency(&self, code: &mut GeneratedCode) {
         match self {
-            CLibFunctions::OverflowError => {
-                code.required_clib.insert(PrintCall(PrintString));
-            }
-
             CLibFunctions::Malloc => {
                 code.required_clib.insert(PrintCall(PrintString));
-                code.required_clib.insert(OutOfMemoryError);
+                code.required_clib.insert(RuntimeError(OutOfMemory));
             }
 
             CLibFunctions::FreePair => {
                 code.required_clib.insert(PrintCall(PrintString));
-                code.required_clib.insert(NullPairError);
+                code.required_clib.insert(RuntimeError(NullPair));
             }
 
-            CLibFunctions::OutOfMemoryError
-            | CLibFunctions::OverflowError
-            | CLibFunctions::DivZeroError
-            | CLibFunctions::NullPairError => {
+            CLibFunctions::RuntimeError(_) => {
                 code.required_clib.insert(PrintCall(PrintString));
             }
 
             CLibFunctions::ArrayStore(_) | CLibFunctions::ArrayLoad(_) => {
-                code.required_clib.insert(OutOfBoundsError);
+                code.required_clib.insert(RuntimeError(OutOfBounds));
             }
             _ => {}
         }
@@ -178,28 +169,8 @@ impl Generator<'_> for CLibFunctions {
                 Self::generate_free_pair(code);
             }
 
-            CLibFunctions::OutOfMemoryError => {
-                Self::generate_out_of_memory_error(code);
-            }
-
-            CLibFunctions::OutOfBoundsError => {
-                Self::generate_out_of_bounds_error(code);
-            }
-
-            CLibFunctions::OverflowError => {
-                Self::generate_overflow_error(code);
-            }
-
-            CLibFunctions::BadCharError => {
-                Self::generate_bad_char_error(code);
-            }
-
-            CLibFunctions::DivZeroError => {
-                Self::generate_div_zero_error(code);
-            }
-
-            CLibFunctions::NullPairError => {
-                Self::generate_null_pair_error(code);
+            CLibFunctions::RuntimeError(error_type) => {
+                Self::generate_runtime_error(code, error_type.clone());
             }
 
             CLibFunctions::ArrayLoad(scale) => {
@@ -446,7 +417,7 @@ impl CLibFunctions {
         code.lib_functions
             .push(AsmLine::Instruction(Instr::UnaryControl(
                 UnaryNotScaled::new(
-                    InstrType::Jump(Some(ConditionCode::EQ)),
+                    InstrType::Jump(None),
                     InstrOperand::LabelRef(String::from(label)),
                 ),
             )));
@@ -573,6 +544,17 @@ impl CLibFunctions {
             PrintType::PrintBool => Self::generate_print_bool(code),
             PrintType::PrintRefs => Self::generate_print_reference(code),
             PrintType::PrintLn => Self::generate_print_ln(code),
+        }
+    }
+
+    fn generate_runtime_error(code: &mut GeneratedCode, runtime_error_type: RuntimeErrorType) {
+        match runtime_error_type {
+            RuntimeErrorType::OutOfMemory => Self::generate_out_of_memory_error(code),
+            RuntimeErrorType::OutOfBounds => Self::generate_out_of_bounds_error(code),
+            RuntimeErrorType::Overflowed => Self::generate_overflow_error(code),
+            RuntimeErrorType::BadChar => Self::generate_bad_char_error(code),
+            RuntimeErrorType::DivZero => Self::generate_div_zero_error(code),
+            RuntimeErrorType::NullPair => Self::generate_null_pair_error(code),
         }
     }
 
@@ -770,7 +752,7 @@ impl CLibFunctions {
         //   movb $0, %al
         //   call printf@plt
         Self::cmp_zero_with_reg(code, Byte, Rdi);
-        Self::jump_on_condition(code, ConditionCode::NEQ, PRINT_LABEL_FOR_BOOL_0);
+        Self::jump_on_condition(code, NEQ, PRINT_LABEL_FOR_BOOL_0);
         Self::leaq_rip_with_label(code, PRINT_BOOL_LABEL_0, Rdx);
         Self::jmp(code, PRINT_LABEL_FOR_BOOL_1);
 
@@ -932,7 +914,7 @@ impl CLibFunctions {
         Self::cmp_zero_with_reg(code, Quad, Rax);
 
         // je _errOutOfMemory
-        Self::jump_on_condition(code, ConditionCode::EQ, ERROR_LABEL_FOR_OUT_OF_MEMORY);
+        Self::jump_on_condition(code, EQ, ERROR_LABEL_FOR_OUT_OF_MEMORY);
 
         // movq %rbp, %rsp
         // popq %rbp
@@ -1143,15 +1125,15 @@ impl CLibFunctions {
         Self::pushq_rbx(code);
         Self::cmp_zero_with_reg(code, Long, R10);
         // cmovl %r10, %rsi
-        Self::cmov(code, ConditionCode::LT, R10, Rsi);
+        Self::cmov(code, LT, R10, Rsi);
         // jl
-        Self::jump_on_condition(code, ConditionCode::LT, ERROR_LABEL_FOR_OUT_OF_BOUNDS);
+        Self::jump_on_condition(code, LT, ERROR_LABEL_FOR_OUT_OF_BOUNDS);
         Self::mov_memory_ref_reg(code, Long, -REFERENCE_OFFSET_SIZE, true, R9, false, Rbx);
         Self::cmp_registers(code, Long, Rbx, R10);
         // cmovge %r10, %rsi
-        Self::cmov(code, ConditionCode::GTE, R10, Rsi);
+        Self::cmov(code, GTE, R10, Rsi);
         // jge
-        Self::jump_on_condition(code, ConditionCode::GTE, ERROR_LABEL_FOR_OUT_OF_BOUNDS);
+        Self::jump_on_condition(code, GTE, ERROR_LABEL_FOR_OUT_OF_BOUNDS);
         // Byte: movsbq (%r9,%r10), %r9 // Long: movslq (%r9,%r10,4), %r9 // Quad: movq (%r9,%r10,8), %r9
         match scale {
             Byte => {
@@ -1217,7 +1199,7 @@ impl CLibFunctions {
         // cmpl $0, %r10d
         Self::cmp_zero_with_reg(code, Long, R10);
         // cmovl %r10, %rsi
-        Self::cmov(code, ConditionCode::LT, R10, Rsi);
+        Self::cmov(code, LT, R10, Rsi);
         // jl _errOutOfBounds
         Self::jump_on_condition(code, LT, ERROR_LABEL_FOR_OUT_OF_BOUNDS);
         // movl -4(%r9), %ebx
@@ -1225,9 +1207,9 @@ impl CLibFunctions {
         // cmpl %ebx, %r10d
         Self::cmp_registers(code, Long, Rbx, R10);
         // cmovge %r10, %rsi
-        Self::cmov(code, ConditionCode::GTE, R10, Rsi);
+        Self::cmov(code, GTE, R10, Rsi);
         // jge _errOutOfBounds
-        Self::jump_on_condition(code, ConditionCode::GTE, ERROR_LABEL_FOR_OUT_OF_BOUNDS);
+        Self::jump_on_condition(code, GTE, ERROR_LABEL_FOR_OUT_OF_BOUNDS);
 
         // Byte: movb %al, (%r9,%r10) // Long: movl %eax, (%r9,%r10,4) // Quad: movq %rax, (%r9,%r10,8)
         match scale {
@@ -1310,7 +1292,7 @@ impl CLibFunctions {
         // cmpq $0, %rdi
         Self::cmp_zero_with_reg(code, Quad, Rdi);
         // je _errNull
-        Self::jump_on_condition(code, ConditionCode::EQ, ERROR_LABEL_FOR_NULL_PAIR);
+        Self::jump_on_condition(code, EQ, ERROR_LABEL_FOR_NULL_PAIR);
         // call free@plt
         Self::call_func(code, FREE_PLT);
         // movq %rbp, %rsp

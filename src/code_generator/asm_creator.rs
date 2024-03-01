@@ -2,9 +2,8 @@ use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::Instr::UnaryControl;
 use crate::code_generator::asm::InstrOperand::Reg;
 use crate::code_generator::asm::{
-    AsmLine, BinaryInstruction, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
+    BinaryInstruction, ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType,
     MemoryReference, MemoryReferenceImmediate, Register, Scale, UnaryInstruction, UnaryNotScaled,
-    RESULT_REG,
 };
 
 #[derive(PartialEq, Debug, Clone)]
@@ -121,7 +120,7 @@ pub fn jump_on_condition(code: &mut GeneratedCode, condition_code: ConditionCode
         ))));
 }
 
-pub fn jump(code: &mut GeneratedCode, condition_code: ConditionCode, label: &str) {
+pub fn jump(code: &mut GeneratedCode, label: &str) {
     code.codes
         .push(Instruction(UnaryControl(UnaryNotScaled::new(
             InstrType::Jump(None),

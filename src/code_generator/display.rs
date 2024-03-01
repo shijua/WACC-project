@@ -238,7 +238,7 @@ impl Display for ScaledRegister {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use crate::code_generator::asm::Register::*;
         match self.reg {
-            Stack(_) | Register::RspStack(_) => (),
+            Stack(_) | RspStack(_) => (),
             _ => write!(f, "%")?,
         }
 

@@ -1,14 +1,13 @@
 use crate::ast::Param::Parameter;
 use crate::ast::{Function, Program, Type};
-use crate::code_generator::asm::AsmLine::Instruction;
-use crate::code_generator::asm::InstrOperand::{Imm, Reg};
-use crate::code_generator::asm::Register::{Rbp, Rsp, RspStack};
+use crate::code_generator::asm::InstrOperand::Reg;
+use crate::code_generator::asm::Register::RspStack;
 use crate::code_generator::asm::{
     function_arguments_calculate_extra_size, get_next_register, get_rbp_size,
     pop_callee_saved_regs, push_callee_saved_regs, AsmLine, BinaryInstruction, GeneratedCode,
-    Instr, InstrOperand, InstrType, Register, Scale, UnaryInstruction, ARG_REGS, CALLEE_SAVED_REGS,
-    GENERAL_REGS, RESULT_REG,
+    Instr, InstrOperand, InstrType, Register, Scale, ARG_REGS, GENERAL_REGS, RESULT_REG,
 };
+use crate::code_generator::asm_creator::{mov_immediate, mov_registers};
 use crate::code_generator::def_libary::{Directives, MAIN_FUNCTION_TITLE};
 use crate::code_generator::x86_generate::{Generator, DEFAULT_EXIT_CODE};
 use crate::code_generator::POINTER_SIZE;
@@ -56,7 +55,7 @@ impl Generator<'_> for Function {
         self.parameters
             .iter()
             .for_each(|(Parameter((_type, _), _), _)| args_type.push(_type.clone()));
-        let s = function_arguments_calculate_extra_size(
+        let _s = function_arguments_calculate_extra_size(
             &mut arg_regs,
             args_type,
             (ARG_REGS.len() as i32 * POINTER_SIZE) + POINTER_SIZE, // 8 is the size of return address
@@ -66,38 +65,22 @@ impl Generator<'_> for Function {
             .iter()
             .for_each(|(Parameter((_type, _), (ident, _)), _)| {
                 let reg = get_next_register(regs, _type.size() as i32);
-                scope.add_with_reg(&ident.clone(), _type.clone(), reg);
+                let _result = scope.add_with_reg(&ident.clone(), _type.clone(), reg);
                 let arg_reg = arg_regs.remove(0);
                 match arg_reg {
                     // if the argument is a stack argument, we need to move it rax first
-                    Register::RspStack(i) => {
-                        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Mov,
-                                Scale::from_size(_type.size() as i32),
-                                InstrOperand::Reg(arg_reg),
-                                InstrOperand::Reg(RESULT_REG),
-                            ),
-                        )));
-                        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Mov,
-                                Scale::from_size(_type.size() as i32),
-                                InstrOperand::Reg(RESULT_REG),
-                                InstrOperand::Reg(reg),
-                            ),
-                        )));
+                    Register::RspStack(_) => {
+                        mov_registers(
+                            code,
+                            Scale::from_size(_type.size() as i32),
+                            arg_reg,
+                            RESULT_REG,
+                        );
+                        mov_registers(code, Scale::from_size(_type.size() as i32), RESULT_REG, reg);
                         arg_pos_end += 2;
                     }
                     _ => {
-                        code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-                            BinaryInstruction::new_single_scale(
-                                InstrType::Mov,
-                                Scale::from_size(_type.size() as i32),
-                                InstrOperand::Reg(arg_reg),
-                                InstrOperand::Reg(reg),
-                            ),
-                        )));
+                        mov_registers(code, Scale::from_size(_type.size() as i32), arg_reg, reg);
                         arg_pos_end += 1;
                     }
                 }
@@ -154,15 +137,7 @@ impl Generator<'_> for Function {
                     InstrOperand::Reg(Register::Rsp),
                 ),
             )));
-
-            code.codes.push(AsmLine::Instruction(Instr::BinaryInstr(
-                BinaryInstruction::new_single_scale(
-                    InstrType::Mov,
-                    Scale::default(),
-                    InstrOperand::Imm(DEFAULT_EXIT_CODE),
-                    InstrOperand::Reg(RESULT_REG),
-                ),
-            )));
+            mov_immediate(code, Scale::default(), DEFAULT_EXIT_CODE, RESULT_REG);
             pop_callee_saved_regs(code);
             // return
             code.codes.push(AsmLine::Instruction(Instr::Ret));
@@ -190,10 +165,10 @@ impl Generator<'_> for Program {
 
     fn generate(
         &mut self,
-        scope: &mut ScopeInfo,
+        _scope: &mut ScopeInfo,
         code: &mut GeneratedCode,
         regs: &mut Vec<Register>,
-        aux: Self::Input,
+        _aux: Self::Input,
     ) -> Self::Output {
         // push global main directive
         code.pre_defined
@@ -205,7 +180,6 @@ impl Generator<'_> for Program {
 
         let mut scope = ScopeInfo::new(&mut self.symbol_table);
 
-        // todo: generate assembly for main
         code.codes
             .push(AsmLine::Directive(Directives::AssemblerText));
         Function {

@@ -1,8 +1,6 @@
 use crate::ast::Type;
-use crate::code_generator::asm::AsmLine::Instruction;
-use crate::code_generator::asm::Instr::BinaryInstr;
 use crate::code_generator::asm::Register::{Rbp, Rsp};
-use crate::code_generator::asm_creator::{mov_immediate, mov_registers, pop, push};
+use crate::code_generator::asm_creator::{mov_registers, pop, push};
 use crate::code_generator::def_libary::Directives;
 use lazy_static::lazy_static;
 use std::collections::HashSet;
@@ -52,8 +50,8 @@ pub fn push_arg_regs(code: &mut GeneratedCode) {
         BinaryInstruction::new_single_scale(
             InstrType::Sub,
             Scale::default(),
-            InstrOperand::Imm((ARG_REGS.len() as i32 * Scale::default().size())),
-            InstrOperand::Reg(Register::Rsp),
+            InstrOperand::Imm(ARG_REGS.len() as i32 * Scale::default().size()),
+            InstrOperand::Reg(Rsp),
         ),
     )));
 
@@ -72,34 +70,6 @@ pub fn push_arg_regs(code: &mut GeneratedCode) {
         )));
         count += Scale::default().size();
     });
-}
-
-pub fn push_rax(code: &mut GeneratedCode) {
-    code.codes
-        .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-            InstrType::Push,
-            Scale::default(),
-            InstrOperand::Reg(RESULT_REG),
-        ))));
-}
-
-pub fn pop_rax(code: &mut GeneratedCode) {
-    code.codes
-        .push(Instruction(Instr::UnaryInstr(UnaryInstruction::new_unary(
-            InstrType::Pop,
-            Scale::default(),
-            InstrOperand::Reg(RESULT_REG),
-        ))));
-}
-
-pub fn push_register(code: &mut GeneratedCode, reg: Register) {
-    assert!(!matches!(reg, Register::Stack(_)));
-    push(code, reg);
-}
-
-pub fn pop_register(code: &mut GeneratedCode, reg: Register) {
-    assert!(!matches!(reg, Register::Stack(_)));
-    pop(code, reg);
 }
 
 // pop argument registers
@@ -125,8 +95,8 @@ pub fn pop_arg_regs(code: &mut GeneratedCode) {
         BinaryInstruction::new_single_scale(
             InstrType::Add,
             Scale::default(),
-            InstrOperand::Imm(((ARG_REGS.len() as i32) * Scale::default().size()) as i32),
-            InstrOperand::Reg(Register::Rsp),
+            InstrOperand::Imm((ARG_REGS.len() as i32) * Scale::default().size()),
+            InstrOperand::Reg(Rsp),
         ),
     )));
 }
@@ -167,7 +137,7 @@ pub fn pop_callee_saved_regs(code: &mut GeneratedCode) {
     });
 
     // pop RBP
-    pop(code, Register::Rbp);
+    pop(code, Rbp);
 }
 
 pub fn next_to_rax(code: &mut GeneratedCode, next: Register, scale: Scale) {
@@ -304,23 +274,22 @@ pub enum PrintType {
 }
 
 #[derive(PartialEq, Debug, Clone, Copy, Hash, Eq)]
+pub enum RuntimeErrorType {
+    OutOfMemory,
+    OutOfBounds,
+    Overflowed,
+    BadChar,
+    DivZero,
+    NullPair,
+}
+
+#[derive(PartialEq, Debug, Clone, Copy, Hash, Eq)]
 pub enum CLibFunctions {
-    // PrintString,
-    // PrintLn,
-    // PrintInt,
-    // PrintChar,
-    // PrintBool,
-    // PrintRefs,
     PrintCall(PrintType),
     ReadInt,
     ReadChar,
     SystemExit,
-    OutOfMemoryError,
-    OutOfBoundsError,
-    OverflowError,
-    BadCharError,
-    DivZeroError,
-    NullPairError,
+    RuntimeError(RuntimeErrorType),
     Malloc,
     Free,
     FreePair,

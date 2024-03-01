@@ -1,34 +1,31 @@
 use crate::ast::Type::Array;
-use crate::ast::{BinaryOperator, Expr, Ident, Type, UnaryOperator};
+use crate::ast::{BinaryOperator, Expr, Ident, UnaryOperator};
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
-use crate::code_generator::asm::CLibFunctions::{BadCharError, DivZeroError, OverflowError};
+use crate::code_generator::asm::CLibFunctions::RuntimeError;
 use crate::code_generator::asm::ConditionCode::OverFlow;
 use crate::code_generator::asm::Instr::{BinaryInstr, CltdInstr, UnaryControl, UnaryInstr};
 use crate::code_generator::asm::MemoryReferenceImmediate::{LabelledImm, OffsetImm};
 use crate::code_generator::asm::Register::{Rax, Rsi, R10, R9};
+use crate::code_generator::asm::RuntimeErrorType::{BadChar, DivZero, Overflowed};
 use crate::code_generator::asm::Scale::{Byte, Long, Quad};
 use crate::code_generator::asm::{
-    arg_register_mapping, get_next_register, next_to_r11, next_to_rax, pop_arg_regs, pop_rax,
-    pop_register, push_arg_regs, push_back_register, push_rax, push_register, r11_to_next,
-    rax_to_next, AsmLine, BinaryControl, BinaryInstruction, CLibFunctions, ConditionCode,
-    GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
+    arg_register_mapping, get_next_register, next_to_r11, next_to_rax, pop_arg_regs, push_arg_regs,
+    r11_to_next, rax_to_next, AsmLine, BinaryControl, BinaryInstruction, CLibFunctions,
+    ConditionCode, GeneratedCode, Instr, InstrOperand, InstrType, MemoryReference, Register, Scale,
     UnaryInstruction, UnaryNotScaled, ADDR_REG, RESULT_REG,
 };
 use crate::code_generator::asm_creator::{
-    binary_double_scale, binary_single_scale, jump, jump_on_condition, mov_immediate,
-    mov_registers, pop, push,
+    binary_double_scale, binary_single_scale, jump_on_condition, mov_immediate, mov_registers, pop,
+    push,
 };
-use crate::code_generator::clib_functions::{
-    BAD_CHAR_LABEL, ERROR_LABEL_FOR_BAD_CHAR, ERROR_LABEL_FOR_DIV_ZERO, OVERFLOW_LABEL,
-};
-use crate::code_generator::clib_functions::{ERROR_LABEL_FOR_OVERFLOW, SYS_EXIT_LABEL};
+use crate::code_generator::clib_functions::ERROR_LABEL_FOR_OVERFLOW;
+use crate::code_generator::clib_functions::{ERROR_LABEL_FOR_BAD_CHAR, ERROR_LABEL_FOR_DIV_ZERO};
 use crate::code_generator::def_libary::{get_array_load_label, Directives};
 use crate::code_generator::x86_generate::Generator;
 use crate::code_generator::{PAIR_ELEM_SIZE, POINTER_SIZE, REFERENCE_OFFSET_SIZE};
 use crate::semantic_checker::util::SemanticType;
 use crate::symbol_table::ScopeInfo;
 use crate::Spanned;
-use chumsky::text::int;
 
 impl Generator<'_> for Expr {
     type Input = ();
@@ -69,7 +66,7 @@ impl Generator<'_> for Expr {
                             InstrOperand::Reg(ADDR_REG),
                         );
                         jump_on_condition(code, ConditionCode::OverFlow, ERROR_LABEL_FOR_OVERFLOW);
-                        code.required_clib.insert(OverflowError);
+                        code.required_clib.insert(RuntimeError(Overflowed));
                         r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
@@ -84,7 +81,7 @@ impl Generator<'_> for Expr {
                             InstrOperand::Reg(ADDR_REG),
                         );
                         jump_on_condition(code, OverFlow, ERROR_LABEL_FOR_OVERFLOW);
-                        code.required_clib.insert(OverflowError);
+                        code.required_clib.insert(RuntimeError(Overflowed));
                         r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
@@ -99,7 +96,7 @@ impl Generator<'_> for Expr {
                             InstrOperand::Reg(ADDR_REG),
                         );
                         jump_on_condition(code, OverFlow, ERROR_LABEL_FOR_OVERFLOW);
-                        code.required_clib.insert(OverflowError);
+                        code.required_clib.insert(RuntimeError(Overflowed));
                         r11_to_next(code, lhs_reg, lhs_scale);
                         lhs_reg
                     }
@@ -204,9 +201,9 @@ impl Generator<'_> for Expr {
                     scale = inner_type.get_scale();
                     let mut current_index = current_indices.get(index_cnt).unwrap().0.clone();
 
-                    push_rax(code);
+                    push(code, RESULT_REG);
                     let index_reg = current_index.generate(scope, code, regs, ());
-                    pop_rax(code);
+                    pop(code, RESULT_REG);
 
                     // calling convention: array ptr passed in R9, index in R10, and return into R9
                     push(code, R10);
@@ -310,7 +307,7 @@ impl Expr {
                         InstrOperand::Reg(reg),
                     ),
                 )));
-                code.required_clib.insert(BadCharError);
+                code.required_clib.insert(RuntimeError(BadChar));
                 code.codes
                     .push(Instruction(Instr::BinaryControl(BinaryControl::new(
                         InstrType::CMov(ConditionCode::NEQ),
@@ -341,8 +338,8 @@ impl Expr {
         // we only need to fetch the first 4 bytes stored in the location specified by the register
         // as arrays would have been malloced.
         //
-        // the length of array is stored 4 bytes before the given location as -4(something)
-        push_rax(code);
+        // the length of array is stored 4 bytes before the given location as -4(somethi
+        push(code, RESULT_REG);
         let dst_reg = get_next_register(regs, 4);
 
         next_to_rax(code, reg, Scale::Quad);
@@ -363,7 +360,7 @@ impl Expr {
 
         rax_to_next(code, dst_reg, Scale::default());
 
-        pop_rax(code);
+        pop(code, RESULT_REG);
         dst_reg
     }
 
@@ -404,7 +401,7 @@ impl Expr {
                 InstrOperand::Reg(reg),
             ))));
         jump_on_condition(code, OverFlow, ERROR_LABEL_FOR_OVERFLOW);
-        code.required_clib.insert(OverflowError);
+        code.required_clib.insert(RuntimeError(Overflowed));
         reg
     }
 
@@ -551,7 +548,7 @@ impl Expr {
         )));
         jump_on_condition(code, ConditionCode::EQ, ERROR_LABEL_FOR_DIV_ZERO);
 
-        code.required_clib.insert(DivZeroError);
+        code.required_clib.insert(RuntimeError(DivZero));
         code.codes.push(Instruction(CltdInstr(InstrType::Cltd)));
         code.codes
             .push(Instruction(UnaryInstr(UnaryInstruction::new_unary(
