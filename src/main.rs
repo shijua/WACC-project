@@ -18,6 +18,8 @@ mod parser;
 mod semantic_checker;
 mod symbol_table;
 
+mod interpreter;
+
 const READ_ERROR: i32 = -1;
 const VALID_CODE: i32 = 0;
 const SYNTAX_ERROR_CODE: i32 = 100;
