@@ -260,9 +260,14 @@ fn interpret_binary_app(
 }
 
 impl Interpretable for Expr {
+    type Input = ();
     type Output = Evaluated;
 
-    fn interpret(&self, stack: &mut Vec<(String, u32, Evaluated)>) -> Self::Output {
+    fn interpret(
+        &self,
+        stack: &mut Vec<(String, u32, Evaluated)>,
+        aux: Self::Input,
+    ) -> Self::Output {
         match self {
             Expr::IntLiter(x) => Evaluated::from_int(*x),
             Expr::BoolLiter(x) => Evaluated::from_bool(*x),
@@ -284,12 +289,12 @@ impl Interpretable for Expr {
                 todo!()
             }
             Expr::UnaryApp(op, exp) => {
-                let target = exp.0.interpret(stack);
+                let target = exp.0.interpret(stack, ());
                 interpret_unary_app(op, target)
             }
             Expr::BinaryApp(boxed_lhs, op, boxed_rhs) => {
-                let lhs = boxed_lhs.0.interpret(stack);
-                let rhs = boxed_rhs.0.interpret(stack);
+                let lhs = boxed_lhs.0.interpret(stack, ());
+                let rhs = boxed_rhs.0.interpret(stack, ());
                 interpret_binary_app(lhs, op, rhs)
             }
         }
@@ -305,7 +310,7 @@ mod expr_interpreter_tests {
     #[test]
     fn basic_expression_test() {
         let expr = Expr::IntLiter(17);
-        assert_eq!(expr.interpret(&mut vec![]), Evaluated::IntValue(17));
+        assert_eq!(expr.interpret(&mut vec![], ()), Evaluated::IntValue(17));
     }
 
     #[test]
@@ -317,6 +322,6 @@ mod expr_interpreter_tests {
             BinaryOperator::Add,
             Box::new(new_spanned(expr2)),
         );
-        assert_eq!(expr3.interpret(&mut vec![]), Evaluated::IntValue(35));
+        assert_eq!(expr3.interpret(&mut vec![], ()), Evaluated::IntValue(35));
     }
 }

@@ -69,6 +69,11 @@ pub fn level_clear(stack: &mut Vec<(String, u32, Evaluated)>) {
 }
 
 pub trait Interpretable {
+    type Input;
     type Output; // Evaluated or ()
-    fn interpret(&self, stack: &mut Vec<(String, u32, Evaluated)>) -> Self::Output; // new variable stack, new function list, and probably basic value
+    fn interpret(
+        &self,
+        stack: &mut Vec<(String, u32, Evaluated)>,
+        aux: Self::Input,
+    ) -> Self::Output; // new variable stack, new function list, and probably basic value
 }
