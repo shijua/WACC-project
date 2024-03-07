@@ -6,31 +6,33 @@ use crate::{any_span, MessageResult};
 // Expression Analysis starts here
 impl SemanticType for Expr {
     fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
-        Ok(match self {
-            Expr::IntLiter(_) => Type::IntType,
-            Expr::BoolLiter(_) => Type::BoolType,
-            Expr::CharLiter(_) => Type::CharType,
-            Expr::StrLiter(_) => Type::StringType,
-            Expr::PairLiter => Type::Pair(Box::new(any_span()), Box::new(any_span())),
-            Expr::Ident(id) => id.analyse(scope)?,
-            Expr::ArrayElem(arr_elem) => arr_elem.0.analyse(scope)?,
+        match self {
+            Expr::IntLiter(_) => Ok(Type::IntType),
+            Expr::BoolLiter(_) => Ok(Type::BoolType),
+            Expr::CharLiter(_) => Ok(Type::CharType),
+            Expr::StrLiter(_) => Ok(Type::StringType),
+            Expr::PairLiter => Ok(Type::Pair(Box::new(any_span()), Box::new(any_span()))),
+            Expr::Ident(id) => id.analyse(scope),
+            Expr::ArrayElem(arr_elem) => arr_elem.0.analyse(scope),
             Expr::UnaryApp(op, exp) => match op {
                 UnaryOperator::Ord => {
-                    match_given_type(scope, &Type::CharType, &mut exp.0)?;
-                    Type::IntType
+                    let result = match_given_type(scope, &Type::CharType, &mut exp.0);
+                    if result.is_err() {
+                        return result;
+                    }
+                    Ok(Type::IntType)
                 }
                 UnaryOperator::Chr => {
-                    match_given_type(scope, &Type::IntType, &mut exp.0)?;
-                    Type::CharType
+                    let result = match_given_type(scope, &Type::IntType, &mut exp.0);
+                    if result.is_err() {
+                        return result;
+                    }
+                    Ok(Type::CharType)
                 }
-                UnaryOperator::Bang => {
-                    match_given_type(scope, &Type::BoolType, &mut exp.0)?.clone()
-                }
-                UnaryOperator::Negative => {
-                    match_given_type(scope, &Type::IntType, &mut exp.0)?.clone()
-                }
+                UnaryOperator::Bang => match_given_type(scope, &Type::BoolType, &mut exp.0),
+                UnaryOperator::Negative => match_given_type(scope, &Type::IntType, &mut exp.0),
                 UnaryOperator::Len => match exp.clone().0.analyse(scope)? {
-                    Type::Array(_) => Type::IntType,
+                    Type::Array(_) => Ok(Type::IntType),
                     t => return Err(format!("Expected array type, found {:?}", t)),
                 },
             },
@@ -44,24 +46,24 @@ impl SemanticType for Expr {
                     | BinaryOperator::Modulo
                     | BinaryOperator::Add
                     | BinaryOperator::Sub => match expr_type {
-                        Type::IntType => Type::IntType,
-                        t => return Err(format!("Expected Int Types, Found {:?}\n", t)),
+                        Type::IntType => Ok(Type::IntType),
+                        t => Err(format!("Expected Int Types, Found {:?}\n", t)),
                     },
                     BinaryOperator::Gt
                     | BinaryOperator::Gte
                     | BinaryOperator::Lt
                     | BinaryOperator::Lte => match expr_type {
-                        Type::IntType | Type::CharType => Type::BoolType,
-                        t => return Err(format!("Expected Int or Char Types, Found {:?}\n", t)),
+                        Type::IntType | Type::CharType => Ok(Type::BoolType),
+                        t => Err(format!("Expected Int or Char Types, Found {:?}\n", t)),
                     },
-                    BinaryOperator::Eq | BinaryOperator::Neq => Type::BoolType,
+                    BinaryOperator::Eq | BinaryOperator::Neq => Ok(Type::BoolType),
                     BinaryOperator::And | BinaryOperator::Or => match expr_type {
-                        Type::BoolType => Type::BoolType,
+                        Type::BoolType => Ok(Type::BoolType),
                         t => return Err(format!("Expected Boolean Types, Found {:?}\n", t)),
                     },
                 }
             }
-        })
+        }
     }
 }
 

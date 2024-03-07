@@ -33,19 +33,29 @@ impl SemanticType for Rvalue {
             Rvalue::RPairElem(pair_elem) => pair_elem.0.analyse(scope),
             Rvalue::RExpr(exp) => exp.0.analyse(scope),
             Rvalue::RNewPair(lhs, rhs) => {
-                let lhs_type = lhs.clone().0.analyse(scope)?;
-                let rhs_type = rhs.clone().0.analyse(scope)?;
+                let mut lhs_type = lhs.clone().0.analyse(scope);
+                if lhs_type.is_err() {
+                    return lhs_type;
+                }
+                let rhs_type = rhs.clone().0.analyse(scope);
+                if rhs_type.is_err() {
+                    return rhs_type;
+                }
                 let lhs_span = lhs.clone().1;
                 let rhs_span = rhs.clone().1;
                 Ok(Type::Pair(
-                    Box::new((lhs_type, lhs_span)),
-                    Box::new((rhs_type, rhs_span)),
+                    Box::new((lhs_type.unwrap(), lhs_span)),
+                    Box::new((rhs_type.unwrap(), rhs_span)),
                 ))
             }
             Rvalue::RArrLit(arr_liter) => arr_liter.0.analyse(scope),
             Rvalue::RCall(fn_name, args) => {
                 let original_name = fn_name.clone();
-                match fn_name.0.func_analyse(scope)? {
+                let function = fn_name.0.func_analyse(scope);
+                if function.is_err() {
+                    return function;
+                }
+                match function? {
                     Type::Func(boxed_sig) => {
                         *fn_name = original_name;
 
@@ -64,7 +74,10 @@ impl SemanticType for Rvalue {
                         //
                         for paired in paired_args {
                             let ((arg_provided, _), (param_type, _param_id)) = paired;
-                            match_given_type(scope, param_type, arg_provided)?;
+                            let result = match_given_type(scope, param_type, arg_provided);
+                            if result.is_err() {
+                                return result;
+                            }
                         }
 
                         Ok(return_type)
@@ -92,16 +105,27 @@ pub fn stmt_check(scope: &mut ScopeInfo, statement: &mut Stmt) -> MessageResult<
     match statement {
         Stmt::Skip => Ok(NoReturn),
         Stmt::Declare(expected, id, value) => {
-            match_given_type(scope, &mut expected.0, &mut value.0)?;
+            let result = match_given_type(scope, &mut expected.0, &mut value.0);
+            if result.is_err() {
+                return Err(result.err().unwrap());
+            }
 
-            let new_name = scope.add(&id.0, expected.0.clone())?;
+            let new_name = scope.add(&id.0, expected.0.clone());
+            if new_name.is_err() {
+                return Err(new_name.err().unwrap());
+            }
 
-            id.0 = new_name;
+            id.0 = new_name?;
 
             Ok(NoReturn)
         }
         Stmt::Assign(expected, lhs, rhs) => {
-            *expected = same_type(scope, &mut lhs.0, &mut rhs.0)?;
+            let result = same_type(scope, &mut lhs.0, &mut rhs.0);
+            if result.is_err() {
+                return Err(result.err().unwrap());
+            }
+            // *expected = same_type(scope, &mut lhs.0, &mut rhs.0)?;
+            *expected = result?;
             Ok(NoReturn)
         }
         Stmt::Read(expected, lhs) => match lhs.0.analyse(scope)? {
@@ -121,19 +145,44 @@ pub fn stmt_check(scope: &mut ScopeInfo, statement: &mut Stmt) -> MessageResult<
                 actual_type
             )),
         },
-        Stmt::Return(exp) => Ok(EndReturn(exp.0.analyse(scope)?)),
+        Stmt::Return(exp) => {
+            let result = exp.0.analyse(scope);
+            if result.is_err() {
+                return Err(result.err().unwrap());
+            }
+            Ok(EndReturn(result?))
+        }
         Stmt::Exit(exp) => {
-            match_given_type(scope, &Type::IntType, &mut exp.0)?;
+            let result = match_given_type(scope, &Type::IntType, &mut exp.0);
+            if result.is_err() {
+                return Err(result.err().unwrap());
+            }
             Ok(EndReturn(Type::Any))
         }
         Stmt::Print(t, exp) | Stmt::Println(t, exp) => {
-            *t = exp.0.analyse(scope)?;
+            let result = exp.0.analyse(scope);
+            if result.is_err() {
+                return Err(result.err().unwrap());
+            }
+            *t = result?;
             Ok(NoReturn)
         }
         Stmt::If(cond, st1, st2) => {
-            match_given_type(scope, &Type::BoolType, &mut cond.0)?;
-            let st1_returning = scoped_stmt(scope, st1)?;
-            let st2_returning = scoped_stmt(scope, st2)?;
+            let condition = match_given_type(scope, &Type::BoolType, &mut cond.0);
+            if condition.is_err() {
+                return Err(condition.err().unwrap());
+            }
+            let st1_returning_wrap = scoped_stmt(scope, st1);
+            if st1_returning_wrap.is_err() {
+                return st1_returning_wrap;
+            }
+            let st2_returning_wrap = scoped_stmt(scope, st2);
+            if st2_returning_wrap.is_err() {
+                return st2_returning_wrap;
+            }
+
+            let st1_returning = st1_returning_wrap?;
+            let st2_returning = st2_returning_wrap?;
 
             // If branches should not have different returning types
             if !st1_returning.clone().same_return_type(&st2_returning) {
@@ -152,17 +201,31 @@ pub fn stmt_check(scope: &mut ScopeInfo, statement: &mut Stmt) -> MessageResult<
             }
         }
         Stmt::While(cond, body_st) => {
-            match_given_type(scope, &Type::BoolType, &mut cond.0)?;
-            let inner_scope = scoped_stmt(scope, body_st)?;
-            Ok(match inner_scope {
+            let condition = match_given_type(scope, &Type::BoolType, &mut cond.0);
+            if condition.is_err() {
+                return Err(condition.err().unwrap());
+            }
+            let inner_scope = scoped_stmt(scope, body_st);
+            if inner_scope.is_err() {
+                return inner_scope;
+            }
+            Ok(match inner_scope? {
                 EndReturn(t) => PartialReturn(t),
                 not_end => not_end,
             })
         }
         Stmt::Scope(scoped_body) => scoped_stmt(scope, scoped_body),
         Stmt::Serial(st1, st2) => {
-            let lhs = stmt_check(scope, &mut st1.0)?;
-            let rhs = stmt_check(scope, &mut st2.0)?;
+            let lhs_wrap = stmt_check(scope, &mut st1.0);
+            if lhs_wrap.is_err() {
+                return lhs_wrap;
+            }
+            let rhs_wrap = stmt_check(scope, &mut st2.0);
+            if rhs_wrap.is_err() {
+                return rhs_wrap;
+            }
+            let lhs = lhs_wrap?;
+            let rhs = rhs_wrap?;
             match (lhs, rhs.clone()) {
                 (EndReturn(t1) | PartialReturn(t1), EndReturn(t2) | PartialReturn(t2))
                     if t1.clone().unify(t2.clone()).is_none() =>

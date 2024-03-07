@@ -63,24 +63,24 @@ impl SemanticType for ArrayElem {
 
 impl SemanticType for PairElem {
     fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
-        Ok(match self {
+        match self {
             PairElem::PairElemFst(lvalue) => {
                 let elem_type = lvalue.clone().0.analyse(scope)?;
                 match elem_type {
-                    Type::Pair(inner1, _) => inner1.0.clone(),
-                    Type::NestedPair => Type::Any,
+                    Type::Pair(inner1, _) => Ok(inner1.0.clone()),
+                    Type::NestedPair => Ok(Type::Any),
                     _ => return Err("pair element type is invalid".to_string()),
                 }
             }
             PairElem::PairElemSnd(lvalue) => {
                 let elem_type = lvalue.clone().0.analyse(scope)?;
                 match elem_type {
-                    Type::Pair(_, inner2) => inner2.0.clone(),
-                    Type::NestedPair => Type::Any,
+                    Type::Pair(_, inner2) => Ok(inner2.0.clone()),
+                    Type::NestedPair => Ok(Type::Any),
                     _ => return Err("pair element type is invalid".to_string()),
                 }
             }
-        })
+        }
     }
 }
 

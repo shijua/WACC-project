@@ -165,6 +165,7 @@ fn main() {
 
     let result = program_checker(&mut program);
     if result.is_err() {
+        println!("Semantic Error: {}", result.unwrap_err());
         exit(SEMANTIC_ERROR_CODE);
     }
 
