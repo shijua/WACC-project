@@ -1,4 +1,5 @@
 use crate::ast::Type;
+use crate::interpreter::interpret::interpret_program;
 use crate::parser::lexer::lexer;
 use crate::parser::program::program;
 use crate::semantic_checker::program::program_checker;
@@ -165,6 +166,8 @@ fn main() {
 
     let mut program = ast.unwrap().0 .0;
 
+    let mut program_interpreter = program.clone();
+
     let result = program_checker(&mut program);
     if result.is_err() {
         exit(SEMANTIC_ERROR_CODE);
@@ -192,6 +195,8 @@ fn main() {
 
         fs::write(destination_path, asm_output).unwrap();
     }
+
+    interpret_program(&mut program_interpreter);
 
     exit(VALID_CODE);
 }

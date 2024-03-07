@@ -40,7 +40,6 @@ Of two booleans:
 use crate::ast::{BinaryOperator, Expr, UnaryOperator};
 use crate::interpreter::Evaluated::{BoolValue, IntValue};
 use crate::interpreter::{Evaluated, Interpretable};
-use std::cell::Cell;
 use std::cmp::Ordering;
 use std::ops::{Add, Div, Mul, Neg, Not, Rem, Sub};
 
@@ -68,12 +67,9 @@ impl Evaluated {
 
     pub fn from_array(given: Vec<Evaluated>) -> Evaluated {
         use crate::interpreter::Evaluated::*;
-        Evaluated::ArrayValue(
-            given
-                .iter()
-                .map(|x| Box::new(x.clone()))
-                .collect::<Vec<_>>(),
-        )
+        Evaluated::ArrayValue(Box::new(
+            given.iter().map(|x| x.clone()).collect::<Vec<_>>(),
+        ))
     }
 
     pub fn from_null() -> Evaluated {
@@ -83,7 +79,7 @@ impl Evaluated {
 
     pub fn from_pair(given_left: Evaluated, given_right: Evaluated) -> Evaluated {
         use crate::interpreter::Evaluated::*;
-        PairValue(Box::new(given_left), Box::new(given_right))
+        PairValue(Box::new((given_left.clone(), given_right.clone())))
     }
 }
 
@@ -302,12 +298,25 @@ impl Interpretable for Expr {
 
 #[cfg(test)]
 mod expr_interpreter_tests {
-    use crate::ast::Expr;
+    use crate::ast::{BinaryOperator, Expr};
     use crate::interpreter::{Evaluated, Interpretable};
+    use crate::new_spanned;
 
     #[test]
     fn basic_expression_test() {
         let expr = Expr::IntLiter(17);
         assert_eq!(expr.interpret(&mut vec![]), Evaluated::IntValue(17));
+    }
+
+    #[test]
+    fn compound_expression_test() {
+        let expr1 = Expr::IntLiter(17);
+        let expr2 = Expr::IntLiter(18);
+        let expr3 = Expr::BinaryApp(
+            Box::new(new_spanned(expr1)),
+            BinaryOperator::Add,
+            Box::new(new_spanned(expr2)),
+        );
+        assert_eq!(expr3.interpret(&mut vec![]), Evaluated::IntValue(35));
     }
 }

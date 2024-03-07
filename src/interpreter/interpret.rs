@@ -1,8 +1,6 @@
 use crate::ast::Program;
-use crate::interpreter::Evaluated;
+use crate::interpreter::Interpretable;
 
-impl Program {
-    pub fn interpret(&self) -> Evaluated {
-        todo!()
-    }
+pub fn interpret_program(ast: &mut Program) {
+    ast.interpret(&mut vec![]);
 }

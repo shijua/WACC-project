@@ -1,5 +1,5 @@
-use crate::ast::{Rvalue, Stmt};
-use crate::interpreter::{Evaluated, Interpretable};
+use crate::ast::{Rvalue, ScopedStmt, Stmt};
+use crate::interpreter::{level_clear, level_up, Evaluated, Interpretable};
 
 impl Interpretable for Rvalue {
     type Output = ();
@@ -27,12 +27,35 @@ impl Interpretable for Stmt {
             Stmt::Free(_, _) => {}
             Stmt::Return(_) => {}
             Stmt::Exit(_) => {}
-            Stmt::Print(_, _) => {}
-            Stmt::Println(_, _) => {}
-            Stmt::Serial(_, _) => {}
-            Stmt::If(_, _, _) => {}
+            Stmt::Print(_, content_) => {
+                let content = content_.clone().0;
+                let value = content.interpret(stack);
+                print!("{}", value);
+            }
+            Stmt::Println(_, content_) => {
+                let content = content_.clone().0;
+                let value = content.interpret(stack);
+                println!("{}", value);
+            }
+            Stmt::Serial(boxed_st1, boxed_st2) => {
+                let st1 = boxed_st1.0.clone();
+                let st2 = boxed_st2.0.clone();
+                st1.interpret(stack);
+                st2.interpret(stack);
+            }
+            Stmt::If(cond, true_st, false_st) => {}
             Stmt::While(_, _) => {}
-            Stmt::Scope(_) => {}
+            Stmt::Scope(scoped) => {}
         }
+    }
+}
+
+impl Interpretable for ScopedStmt {
+    type Output = ();
+
+    fn interpret(&self, stack: &mut Vec<(String, u32, Evaluated)>) -> Self::Output {
+        level_up();
+        self.stmt.0.interpret(stack);
+        level_clear(stack);
     }
 }
