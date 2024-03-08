@@ -17,6 +17,7 @@ pub fn type_parse<'tokens, 'src: 'tokens>() -> impl Parser<
         Token::Keyword("bool") => Type::BoolType,
         Token::Keyword("char") => Type::CharType,
         Token::Keyword("string") => Type::StringType,
+        Token::Keyword("val") => Type::InferedType,
     };
 
     let base_type = basic_cases
