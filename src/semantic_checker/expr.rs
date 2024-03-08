@@ -1,43 +1,51 @@
-use crate::ast::{BinaryOperator, Expr, Type, UnaryOperator};
+use crate::ast::{BinaryOperator, Expr, Function, Type, UnaryOperator};
 use crate::semantic_checker::util::{match_given_type, same_type, SemanticType};
 use crate::symbol_table::ScopeInfo;
-use crate::{any_span, MessageResult};
+use crate::{any_span, MessageResult, Spanned};
 
 // Expression Analysis starts here
 impl SemanticType for Expr {
-    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
+    fn analyse(
+        &mut self,
+        scope: &mut ScopeInfo,
+        functions: &mut Vec<Spanned<Function>>,
+    ) -> MessageResult<Type> {
         match self {
             Expr::IntLiter(_) => Ok(Type::IntType),
             Expr::BoolLiter(_) => Ok(Type::BoolType),
             Expr::CharLiter(_) => Ok(Type::CharType),
             Expr::StrLiter(_) => Ok(Type::StringType),
             Expr::PairLiter => Ok(Type::Pair(Box::new(any_span()), Box::new(any_span()))),
-            Expr::Ident(id) => id.analyse(scope),
-            Expr::ArrayElem(arr_elem) => arr_elem.0.analyse(scope),
+            Expr::Ident(id) => id.analyse(scope, functions),
+            Expr::ArrayElem(arr_elem) => arr_elem.0.analyse(scope, functions),
             Expr::UnaryApp(op, exp) => match op {
                 UnaryOperator::Ord => {
-                    let result = match_given_type(scope, &Type::CharType, &mut exp.0);
+                    let result = match_given_type(scope, &Type::CharType, &mut exp.0, functions);
                     if result.is_err() {
                         return result;
                     }
                     Ok(Type::IntType)
                 }
                 UnaryOperator::Chr => {
-                    let result = match_given_type(scope, &Type::IntType, &mut exp.0);
+                    let result = match_given_type(scope, &Type::IntType, &mut exp.0, functions);
                     if result.is_err() {
                         return result;
                     }
                     Ok(Type::CharType)
                 }
-                UnaryOperator::Bang => match_given_type(scope, &Type::BoolType, &mut exp.0),
-                UnaryOperator::Negative => match_given_type(scope, &Type::IntType, &mut exp.0),
-                UnaryOperator::Len => match exp.clone().0.analyse(scope)? {
+                UnaryOperator::Bang => {
+                    match_given_type(scope, &Type::BoolType, &mut exp.0, functions)
+                }
+                UnaryOperator::Negative => {
+                    match_given_type(scope, &Type::IntType, &mut exp.0, functions)
+                }
+                UnaryOperator::Len => match exp.clone().0.analyse(scope, functions)? {
                     Type::Array(_) => Ok(Type::IntType),
                     t => return Err(format!("Expected array type, found {:?}", t)),
                 },
             },
             Expr::BinaryApp(exp1, op, exp2) => {
-                let expr_type = same_type(scope, &mut exp1.0, &mut exp2.0)?;
+                let expr_type = same_type(scope, &mut exp1.0, &mut exp2.0, functions)?;
 
                 match op {
                     // int op int
@@ -77,6 +85,9 @@ mod expr_semantic_tests {
     fn literals() {
         let mut symbol_table = SymbolTable::default();
         let scope = &mut initialise(&mut symbol_table);
-        assert_eq!(Expr::IntLiter(5).analyse(scope), Ok(Type::IntType));
+        assert_eq!(
+            Expr::IntLiter(5).analyse(scope, &mut Vec::new()),
+            Ok(Type::IntType)
+        );
     }
 }

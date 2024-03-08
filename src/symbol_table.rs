@@ -1,4 +1,4 @@
-use crate::ast::{Ident, Type};
+use crate::ast::{FuncSig, Function, Ident, Type};
 
 use crate::code_generator::asm::Register;
 use crate::MessageResult;

@@ -1,39 +1,77 @@
-use crate::ast::{ArrayElem, ArrayLiter, Ident, PairElem, Type};
+use crate::ast::{ArrayElem, ArrayLiter, FuncSig, Function, Ident, PairElem, Param, Type};
 use crate::symbol_table::ScopeInfo;
-use crate::{any_span, get_span, MessageResult};
+use crate::{any_span, get_span, MessageResult, Spanned};
 
 pub trait SemanticType {
-    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type>;
-    fn func_analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
+    fn analyse(
+        &mut self,
+        scope: &mut ScopeInfo,
+        functions: &mut Vec<Spanned<Function>>,
+    ) -> MessageResult<Type>;
+    fn func_analyse(
+        &mut self,
+        scope: &mut ScopeInfo,
+        functions: &mut Vec<Spanned<Function>>,
+    ) -> MessageResult<Type> {
         Err("Function analysis not implemented for this type".to_string())
     }
 }
 
 impl<T: SemanticType> SemanticType for &mut T {
-    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
-        (**self).analyse(scope)
+    fn analyse(
+        &mut self,
+        scope: &mut ScopeInfo,
+        functions: &mut Vec<Spanned<Function>>,
+    ) -> MessageResult<Type> {
+        (**self).analyse(scope, functions)
     }
 }
 
 impl<T: SemanticType> SemanticType for Box<T> {
-    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
-        (**self).analyse(scope)
+    fn analyse(
+        &mut self,
+        scope: &mut ScopeInfo,
+        functions: &mut Vec<Spanned<Function>>,
+    ) -> MessageResult<Type> {
+        (**self).analyse(scope, functions)
     }
 }
 
 impl SemanticType for Ident {
-    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
+    fn analyse(
+        &mut self,
+        scope: &mut ScopeInfo,
+        functions: &mut Vec<Spanned<Function>>,
+    ) -> MessageResult<Type> {
         match scope.get_type_ident(self) {
             Some((t, renamed_id)) => Ok(t.clone()),
             None => Err(format!("identifier {} undeclared", self)),
         }
     }
 
-    fn func_analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
+    fn func_analyse(
+        &mut self,
+        scope: &mut ScopeInfo,
+        functions: &mut Vec<Spanned<Function>>,
+    ) -> MessageResult<Type> {
         match scope.get_func(self) {
             Some((t, renamed_id)) => {
-                *self = renamed_id;
-                Ok(t.clone())
+                // get functions from functions so that it is the updated version
+                let index = functions
+                    .iter()
+                    .position(|f| f.0.ident.0 == self.to_string())
+                    .unwrap();
+
+                let function = functions[index].clone().0;
+                let params: Vec<(Type, Ident)> = function
+                    .parameters
+                    .iter()
+                    .map(|(Param::Parameter(_type, _ident), _)| (_type.clone().0, _ident.clone().0))
+                    .collect();
+                Ok(Type::Func(Box::new(FuncSig {
+                    return_type: function.return_type.0,
+                    parameters: params,
+                })))
             }
             None => Err(format!("function {} undeclared", self)),
         }
@@ -41,12 +79,16 @@ impl SemanticType for Ident {
 }
 
 impl SemanticType for ArrayElem {
-    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
+    fn analyse(
+        &mut self,
+        scope: &mut ScopeInfo,
+        functions: &mut Vec<Spanned<Function>>,
+    ) -> MessageResult<Type> {
         for mut exp in self.indices.clone() {
-            match_given_type(scope, &Type::IntType, &mut exp.0)?;
+            match_given_type(scope, &Type::IntType, &mut exp.0, functions)?;
         }
 
-        let mut array_elem_type = self.ident.analyse(scope)?;
+        let mut array_elem_type = self.ident.analyse(scope, functions)?;
 
         for _ in self.indices.clone() {
             array_elem_type = match array_elem_type {
@@ -62,10 +104,14 @@ impl SemanticType for ArrayElem {
 }
 
 impl SemanticType for PairElem {
-    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
+    fn analyse(
+        &mut self,
+        scope: &mut ScopeInfo,
+        functions: &mut Vec<Spanned<Function>>,
+    ) -> MessageResult<Type> {
         match self {
             PairElem::PairElemFst(lvalue) => {
-                let elem_type = lvalue.clone().0.analyse(scope)?;
+                let elem_type = lvalue.clone().0.analyse(scope, functions)?;
                 match elem_type {
                     Type::Pair(inner1, _) => Ok(inner1.0.clone()),
                     Type::NestedPair => Ok(Type::Any),
@@ -73,7 +119,7 @@ impl SemanticType for PairElem {
                 }
             }
             PairElem::PairElemSnd(lvalue) => {
-                let elem_type = lvalue.clone().0.analyse(scope)?;
+                let elem_type = lvalue.clone().0.analyse(scope, functions)?;
                 match elem_type {
                     Type::Pair(_, inner2) => Ok(inner2.0.clone()),
                     Type::NestedPair => Ok(Type::Any),
@@ -85,7 +131,11 @@ impl SemanticType for PairElem {
 }
 
 impl SemanticType for ArrayLiter {
-    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
+    fn analyse(
+        &mut self,
+        scope: &mut ScopeInfo,
+        functions: &mut Vec<Spanned<Function>>,
+    ) -> MessageResult<Type> {
         // assume the first element is the specified type of all
         let mut array_type = Some(Type::Any);
 
@@ -94,7 +144,7 @@ impl SemanticType for ArrayLiter {
         for element in self.clone().val {
             let mut expr = element.clone().0;
             e = element.clone().1;
-            if let Ok(expr_type) = expr.analyse(scope) {
+            if let Ok(expr_type) = expr.analyse(scope, functions) {
                 if let Some(current_type) = array_type.clone() {
                     // check in different direction is needed (for the case between String and Char[])
                     array_type = current_type.clone().unify(expr_type.clone());
@@ -116,8 +166,13 @@ pub fn match_given_type<'a, A: SemanticType>(
     scope: &mut ScopeInfo,
     expected_type: &'a Type,
     actual: &mut A,
+    functions: &mut Vec<Spanned<Function>>,
 ) -> MessageResult<Type> {
-    let actual_type = actual.analyse(scope)?;
+    let actual_type = actual.analyse(scope, functions)?;
+
+    if expected_type == &Type::InferedType {
+        return Ok(actual_type);
+    }
 
     match expected_type.clone().unify(actual_type.clone()) {
         Some(_) => Ok(expected_type.clone()),
@@ -132,9 +187,10 @@ pub fn same_type<L: SemanticType, R: SemanticType>(
     scope: &mut ScopeInfo,
     lhs: &mut L,
     rhs: &mut R,
+    functions: &mut Vec<Spanned<Function>>,
 ) -> MessageResult<Type> {
-    let lhs_type = lhs.analyse(scope)?;
-    let rhs_type = rhs.analyse(scope)?;
+    let lhs_type = lhs.analyse(scope, functions)?;
+    let rhs_type = rhs.analyse(scope, functions)?;
 
     if lhs_type == Type::Any && rhs_type == Type::Any {
         return Err("both sides cannot be of type in assignment".to_string());
