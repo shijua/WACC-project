@@ -33,7 +33,7 @@ fn func_check(
         ReturningInfo::EndReturn(t)
             if t.clone().unify(function.return_type.clone().0).is_none() =>
         {
-            Err(format!(
+            return Err(format!(
                 "Type Mismatch: Expected function to return {:?} but {:?} found",
                 function.return_type.clone(),
                 t.clone()
@@ -41,10 +41,16 @@ fn func_check(
         }
         ReturningInfo::EndReturn(o) => {
             let _debug_type = o.clone();
-            Ok(())
         }
         _ => unreachable!("Missing Returns: Impossible in Semantic Analysis"),
     }
+    let body = build_statement(&mut stmts);
+    let index = functions
+        .iter()
+        .position(|(f, _)| f.ident.0 == function.ident.0)
+        .unwrap();
+    functions[index].0.body = body;
+    Ok(())
 }
 
 pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
@@ -113,6 +119,20 @@ pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
         }
     }
 
+    let body = build_statement(&mut stmts);
+
+    // return a new ast format
+    Ok(Program {
+        functions: functions,
+        body: ScopedStmt {
+            stmt: Box::new(body),
+            symbol_table: SymbolTable::default(),
+        },
+        symbol_table: SymbolTable::default(),
+    })
+}
+
+fn build_statement(stmts: &mut Vec<Stmt>) -> Spanned<Stmt> {
     // build up the body of the main function
     let mut body: Option<Spanned<Stmt>> = None;
     stmts.iter().rev().for_each(|stmt| {
@@ -125,14 +145,5 @@ pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
             )));
         }
     });
-
-    // return a new ast format
-    Ok(Program {
-        functions: functions,
-        body: ScopedStmt {
-            stmt: Box::new(body.unwrap()),
-            symbol_table: SymbolTable::default(),
-        },
-        symbol_table: SymbolTable::default(),
-    })
+    body.unwrap()
 }
