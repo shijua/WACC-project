@@ -5,7 +5,7 @@ use crate::ast::{
 use crate::semantic_checker::program::{AVAILABLE_FUNCTIONS, CALLING_STACK, CURRENT_FUNCTION};
 use crate::semantic_checker::stmt::ReturningInfo::{EndReturn, NoReturn, PartialReturn};
 use crate::semantic_checker::util::{match_given_type, same_type, Compatible, SemanticType};
-use crate::symbol_table::ScopeInfo;
+use crate::symbol_table::{ScopeInfo, SymbolTable};
 use crate::{new_spanned, MessageResult, Spanned};
 
 #[derive(PartialEq, Debug, Clone)]
@@ -161,8 +161,16 @@ pub fn stmt_check(
     functions: &mut Vec<Spanned<Function>>,
 ) -> MessageResult<ReturningInfo> {
     match statement {
-        Stmt::Serial(..) => (),
-        Stmt::Declare(..) => (),
+        Stmt::Serial(..)
+        | Stmt::If(..)
+        | Stmt::While(..)
+        | Stmt::Scope(..)
+        | Stmt::Declare(..)
+        | Stmt::Print(..)
+        | Stmt::Println(..)
+        | Stmt::Assign(..)
+        | Stmt::Read(..)
+        | Stmt::Free(..) => (),
         _ => stmts.push(statement.clone()),
     };
 
@@ -194,13 +202,14 @@ pub fn stmt_check(
             if result.is_err() {
                 return Err(result.err().unwrap());
             }
-            // *expected = same_type(scope, &mut lhs.0, &mut rhs.0)?;
             *expected = result?;
+            stmts.push(statement.clone());
             Ok(NoReturn)
         }
         Stmt::Read(expected, lhs) => match lhs.0.analyse(scope, functions)? {
             new_type @ (Type::IntType | Type::CharType) => {
                 *expected = new_type;
+                stmts.push(statement.clone());
                 Ok(NoReturn)
             }
             _ => Err("Read Statements must read char or ints".to_string()),
@@ -208,6 +217,7 @@ pub fn stmt_check(
         Stmt::Free(expected, exp) => match exp.0.analyse(scope, functions)? {
             new_type @ (Type::Pair(_, _) | Type::Array(_)) => {
                 *expected = new_type;
+                stmts.push(statement.clone());
                 Ok(NoReturn)
             }
             actual_type => Err(format!(
@@ -222,19 +232,10 @@ pub fn stmt_check(
             }
             let func_name = &*CURRENT_FUNCTION.lock().unwrap().clone();
             if func_name != "MAIN" {
-                //     let mut new_func = functions
-                //         .iter_mut()
-                //         .find(|f| f.0.ident.0 == CURRENT_FUNCTION)
-                //         .unwrap()
-                //         .0
-                //         .clone();
-                //
-                //     new_func.return_type = new_spanned(result.unwrap());
                 let index = functions
                     .iter()
                     .position(|f| f.0.ident.0 == func_name)
                     .unwrap();
-                // functions[index] = new_spanned(new_func.clone());
                 functions[index].0.return_type = new_spanned(result.clone().unwrap());
             }
             Ok(EndReturn(result?))
@@ -252,6 +253,7 @@ pub fn stmt_check(
                 return Err(result.err().unwrap());
             }
             *t = result?;
+            stmts.push(statement.clone());
             Ok(NoReturn)
         }
         Stmt::If(cond, st1, st2) => {
@@ -259,11 +261,14 @@ pub fn stmt_check(
             if condition.is_err() {
                 return Err(condition.err().unwrap());
             }
-            let st1_returning_wrap = scoped_stmt(scope, st1, stmts, functions);
+            let mut st1_stmts = Vec::new();
+            let st1_returning_wrap = scoped_stmt(scope, st1, &mut st1_stmts, functions);
             if st1_returning_wrap.is_err() {
                 return st1_returning_wrap;
             }
-            let st2_returning_wrap = scoped_stmt(scope, st2, stmts, functions);
+
+            let mut st2_stmts = Vec::new();
+            let st2_returning_wrap = scoped_stmt(scope, st2, &mut st2_stmts, functions);
             if st2_returning_wrap.is_err() {
                 return st2_returning_wrap;
             }
@@ -275,6 +280,18 @@ pub fn stmt_check(
             if !st1_returning.clone().same_return_type(&st2_returning) {
                 return Err("If statement branches returns different types".to_string());
             }
+
+            stmts.push(Stmt::If(
+                cond.clone(),
+                ScopedStmt {
+                    stmt: Box::from(new_spanned(Stmt::Scope(st1.clone()))),
+                    symbol_table: SymbolTable::default(),
+                },
+                ScopedStmt {
+                    stmt: Box::from(new_spanned(Stmt::Scope(st2.clone()))),
+                    symbol_table: SymbolTable::default(),
+                },
+            ));
 
             let return_type = match (st1_returning.clone(), st2_returning.clone()) {
                 (NoReturn, NoReturn) => return Ok(NoReturn),
@@ -292,16 +309,35 @@ pub fn stmt_check(
             if condition.is_err() {
                 return Err(condition.err().unwrap());
             }
-            let inner_scope = scoped_stmt(scope, body_st, stmts, functions);
+
+            let mut stmt_inner = Vec::new();
+            let inner_scope = scoped_stmt(scope, body_st, &mut stmt_inner, functions);
             if inner_scope.is_err() {
                 return inner_scope;
             }
+
+            stmts.push(Stmt::While(
+                cond.clone(),
+                ScopedStmt {
+                    stmt: Box::from(new_spanned(Stmt::Scope(body_st.clone()))),
+                    symbol_table: SymbolTable::default(),
+                },
+            ));
+
             Ok(match inner_scope? {
                 EndReturn(t) => PartialReturn(t),
                 not_end => not_end,
             })
         }
-        Stmt::Scope(scoped_body) => scoped_stmt(scope, scoped_body, stmts, functions),
+        Stmt::Scope(scoped_body) => {
+            let mut scope_stmts = Vec::new();
+            let result = scoped_stmt(scope, scoped_body, &mut scope_stmts, functions);
+            stmts.push(Stmt::Scope(ScopedStmt {
+                stmt: Box::from(new_spanned(Stmt::Scope(scoped_body.clone()))),
+                symbol_table: SymbolTable::default(),
+            }));
+            result
+        }
         Stmt::Serial(st1, st2) => {
             let lhs_wrap = stmt_check(scope, &mut st1.0, stmts, functions);
             if lhs_wrap.is_err() {

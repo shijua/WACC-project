@@ -108,12 +108,23 @@ pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
 
     // check all functions and update their return types
     for i in 0..functions.len() {
+        if AVAILABLE_FUNCTIONS.lock().unwrap().len() <= i {
+            break;
+        }
         *CURRENT_FUNCTION.lock().unwrap() = functions[i].0.ident.0.clone();
         let res = func_check(
             &mut scope,
             &mut AVAILABLE_FUNCTIONS.lock().unwrap()[i],
             &mut functions,
         );
+        if res.is_err() {
+            return Err(res.err().unwrap());
+        }
+    }
+
+    // final check and update their statements
+    for i in 0..functions.len() {
+        let res = func_check(&mut scope, &mut functions[i].0.clone(), &mut functions);
         if res.is_err() {
             return Err(res.err().unwrap());
         }
@@ -130,6 +141,7 @@ pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
         },
         symbol_table: SymbolTable::default(),
     })
+    // Ok(program.clone())
 }
 
 fn build_statement(stmts: &mut Vec<Stmt>) -> Spanned<Stmt> {
