@@ -58,19 +58,65 @@ impl Interpretable for Lvalue {
         match self {
             Lvalue::LIdent(spanned_id) => {
                 let id = &spanned_id.0;
-                for (num, (id_, _, _)) in stack.iter().rev().enumerate() {
+                let total = stack.len();
+                for (num, (id_, level, _)) in stack.iter().rev().enumerate() {
                     if id_ == id {
-                        stack[num] = (id.clone(), get_level(), aux);
+                        stack[total - num - 1] = (id.clone(), *level, aux.clone());
                         break;
                     }
                 }
             }
+            // ArrayValue(Box<Vec<Evaluated>>),
             Lvalue::LArrElem(spanned_arr_elem) => {
-                let arr_elem = &spanned_arr_elem.0;
-                todo!()
+                let arr_elem = &spanned_arr_elem.0; // with ident and indices
+                let id = &arr_elem.ident;
+                let entry_stack = stack.clone();
+                let total = stack.len();
+                for (num, (id_, _, array_val)) in entry_stack.iter().rev().enumerate() {
+                    if id_ == id {
+                        let mut old_stack = stack.clone();
+                        let mut array_pointer = &mut stack[total - num - 1].2;
+                        let Evaluated::ArrayValue(boxed_arr) = array_pointer else {
+                            panic!("Impossible")
+                        };
+                        let mut arr_addr = boxed_arr;
+                        let dimensions = arr_elem.indices.len();
+                        for (inner_num, spanned_layer) in arr_elem.indices.iter().enumerate() {
+                            let layer = &spanned_layer.0;
+                            let index = layer.interpret(&mut old_stack, ());
+                            let Evaluated::IntValue(arr_index) = index else {
+                                panic!("Impossible")
+                            };
+                            let used_index = arr_index as usize;
+                            if inner_num == dimensions - 1 {
+                                (*arr_addr)[used_index] = aux.clone();
+                                return;
+                            }
+                            let Evaluated::ArrayValue(next_arr) = &mut arr_addr[used_index] else {
+                                // should be runtime error
+                                panic!("This is impossible")
+                            };
+                            let arr_addr_new = next_arr;
+                            arr_addr = arr_addr_new;
+                        }
+                        break;
+                    }
+                }
             }
+            // PairValue(Box<(Evaluated, Evaluated)>),
             Lvalue::LPairElem(spanned_pair_elem) => {
                 let pair_elem = &spanned_pair_elem.0;
+                match pair_elem {
+                    PairElem::PairElemFst(boxed) => {
+                        let x = &boxed.0;
+                        // x is guaranteed to be of type "Pair"
+
+                        todo!()
+                    }
+                    PairElem::PairElemSnd(boxed) => {
+                        todo!()
+                    }
+                }
                 todo!()
             }
         }
@@ -98,7 +144,7 @@ impl Interpretable for Stmt {
             Stmt::Assign(_, spanned_lvalue, spanned_rvalue) => {
                 let lvalue = spanned_lvalue.0.clone();
                 let rvalue = &spanned_rvalue.0;
-                let eval = rvalue.interpret(stack, ());
+                let eval = rvalue.interpret(stack, ()).clone();
                 lvalue.interpret(stack, eval);
                 None
             }

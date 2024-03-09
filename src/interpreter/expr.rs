@@ -39,7 +39,7 @@ Of two booleans:
 
 use crate::ast::{BinaryOperator, Expr, UnaryOperator};
 use crate::interpreter::Evaluated::{BoolValue, IntValue};
-use crate::interpreter::{Evaluated, Interpretable};
+use crate::interpreter::{get_level, Evaluated, Interpretable};
 use std::cmp::Ordering;
 use std::ops::{Add, Div, Mul, Neg, Not, Rem, Sub};
 
@@ -283,10 +283,42 @@ impl Interpretable for Expr {
                 .clone(),
             Expr::ArrayElem((arr_elem_, _)) => {
                 let arr_elem = arr_elem_.clone();
-                let id = arr_elem.ident;
+                let id = &arr_elem.ident;
                 let index = arr_elem.indices.iter().map(|(i, _)| i).collect::<Vec<_>>();
                 // in this case, id is guaranteed to be of Array type
-                todo!()
+                for (num, (id_, _, _)) in stack.iter().rev().enumerate() {
+                    if id_ == id {
+                        // stack[num] = (id.clone(), get_level(), aux);
+                        // break;
+                        // we've found the given array
+                        let Evaluated::ArrayValue(boxed_arr) = stack[num].2.clone() else {
+                            panic!("Impossible")
+                        };
+                        let mut arr_addr = boxed_arr;
+                        let dimensions = arr_elem.indices.len();
+                        for (inner_num, spanned_layer) in arr_elem.indices.iter().enumerate() {
+                            let layer = &spanned_layer.0;
+                            let index = layer.interpret(stack, ());
+                            let Evaluated::IntValue(arr_index) = index else {
+                                panic!("Impossible")
+                            };
+                            let used_index = arr_index as usize;
+                            if inner_num == dimensions - 1 {
+                                return arr_addr[used_index].clone();
+                            }
+                            let Evaluated::ArrayValue(mut next_arr) = arr_addr[used_index].clone()
+                            else {
+                                panic!("This is impossible")
+                            };
+                            let arr_addr_new = next_arr;
+                            arr_addr = arr_addr_new;
+                        }
+
+                        break;
+                    }
+                }
+                // todo: runtime error: array out of bounds
+                unreachable!("Must reach somewhere")
             }
             Expr::UnaryApp(op, exp) => {
                 let target = exp.0.interpret(stack, ());
