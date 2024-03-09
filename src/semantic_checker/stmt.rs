@@ -2,7 +2,9 @@ use crate::ast::Param::Parameter;
 use crate::ast::{
     ArgList, FuncSig, Function, Ident, Lvalue, Param, Rvalue, ScopedStmt, Stmt, Type,
 };
-use crate::semantic_checker::program::{AVAILABLE_FUNCTIONS, CALLING_STACK, CURRENT_FUNCTION};
+use crate::semantic_checker::program::{
+    func_check, AVAILABLE_FUNCTIONS, CALLING_STACK, CURRENT_FUNCTION,
+};
 use crate::semantic_checker::stmt::ReturningInfo::{EndReturn, NoReturn, PartialReturn};
 use crate::semantic_checker::util::{match_given_type, same_type, Compatible, SemanticType};
 use crate::symbol_table::{ScopeInfo, SymbolTable};
@@ -68,6 +70,10 @@ impl SemanticType for Rvalue {
                     return function;
                 }
                 let mut new_params: Vec<Spanned<Param>> = Vec::new();
+                let index = functions
+                    .iter()
+                    .position(|f| f.0.ident.0 == fn_name.0)
+                    .unwrap();
                 match function? {
                     Type::Func(boxed_sig) => {
                         *fn_name = original_name;
@@ -113,24 +119,22 @@ impl SemanticType for Rvalue {
                                 .0
                                 .clone();
                             new_func.parameters = new_params;
-                            let index = functions
-                                .iter()
-                                .position(|f| f.0.ident.0 == fn_name.0)
-                                .unwrap();
                             functions[index] = new_spanned(new_func.clone());
                             if !AVAILABLE_FUNCTIONS.lock().unwrap().contains(&new_func) {
                                 AVAILABLE_FUNCTIONS.lock().unwrap().push(new_func.clone());
                             }
                         }
-                        //TODO
-                        // if return_type == Type::InferedType {
-                        //     if !CALLING_STACK.lock().unwrap().contains(&fn_name.0.clone()) {
-                        //
-                        //         CALLING_STACK.lock().unwrap().push(fn_name.0.clone());
-                        //     }
-                        // } else {
-                        //     Ok(return_type)
-                        // }
+                        if return_type == Type::InferedType
+                            && !CALLING_STACK.lock().unwrap().contains(&fn_name.0.clone())
+                        {
+                            // recursion
+                            *CURRENT_FUNCTION.lock().unwrap() = fn_name.0.clone();
+                            // record for stack
+                            CALLING_STACK.lock().unwrap().push(fn_name.0.clone());
+                            func_check(scope, &mut functions[index].clone().0, functions);
+                            CALLING_STACK.lock().unwrap().pop();
+                            return self.analyse(scope, functions);
+                        }
                         Ok(return_type)
                     }
                     t => Err(format!("Type Error: Expecting Function, Actual {:?}", t)),
@@ -148,6 +152,8 @@ pub fn scoped_stmt(
 ) -> MessageResult<ReturningInfo> {
     /* Create a new scope, so declarations in {statement} don't bleed into
     surrounding scope. */
+    // clear previous record in the symbol table as function check may be called multiple times(for getting parameter stage and getting return value stage)
+    scoped_unit.symbol_table.table.clear();
     let mut new_scope = scope.make_scope(&mut scoped_unit.symbol_table);
 
     /* Analyse statement. */

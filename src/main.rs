@@ -163,17 +163,11 @@ fn main() {
 
     let mut program = ast.unwrap().0 .0;
 
-    println!("{:?}", program);
     let mut result = program_checker(&mut program);
     if result.is_err() {
         println!("Semantic Error: {}", result.unwrap_err());
         exit(SEMANTIC_ERROR_CODE);
     }
-    println!("qq");
-    println!("{:?}", result.clone().unwrap());
-    println!("qq");
-
-    println!("{:?}", program);
 
     let code = code_generator::x86_generate::gen_x86_for_program(&mut result.unwrap());
 

@@ -13,7 +13,7 @@ lazy_static! {
     pub static ref CURRENT_FUNCTION: Mutex<String> = Mutex::new("MAIN".parse().unwrap()); // current function
 }
 
-fn func_check(
+pub fn func_check(
     scope: &mut ScopeInfo,
     function: &mut Function,
     functions: &mut Vec<Spanned<Function>>,

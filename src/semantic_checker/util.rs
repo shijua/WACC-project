@@ -214,6 +214,10 @@ pub trait Compatible {
 impl Compatible for Type {
     fn unify(self, t: Type) -> Option<Type> {
         match (self.clone(), t.clone()) {
+            // if any of the type is infered, return the other type
+            (Type::InferedType, Type::InferedType) => Some(Type::InferedType),
+            (Type::InferedType, t) => Some(t),
+            (t, Type::InferedType) => Some(t),
             // we will only check this first recursion
             (Type::StringType, Type::Array(inner)) if (*inner).0 == Type::CharType => {
                 Some(Type::StringType)

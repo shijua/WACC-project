@@ -105,7 +105,7 @@ impl Type {
             IntType => 4,
             BoolType | CharType => 1,
             StringType | Array(_) | Func(_) | Pair(_, _) | NestedPair | Any => 8,
-            InferedType => unreachable!("Infered type has no size"),
+            InferedType => 8, // if we don't know the type, we assume it's a quad
         }
     }
 

@@ -40,7 +40,7 @@ impl SemanticType for Expr {
                     match_given_type(scope, &Type::IntType, &mut exp.0, functions)
                 }
                 UnaryOperator::Len => match exp.clone().0.analyse(scope, functions)? {
-                    Type::Array(_) => Ok(Type::IntType),
+                    Type::Array(_) | Type::InferedType => Ok(Type::IntType),
                     t => return Err(format!("Expected array type, found {:?}", t)),
                 },
             },
@@ -54,19 +54,19 @@ impl SemanticType for Expr {
                     | BinaryOperator::Modulo
                     | BinaryOperator::Add
                     | BinaryOperator::Sub => match expr_type {
-                        Type::IntType => Ok(Type::IntType),
+                        Type::IntType | Type::InferedType => Ok(Type::IntType),
                         t => Err(format!("Expected Int Types, Found {:?}\n", t)),
                     },
                     BinaryOperator::Gt
                     | BinaryOperator::Gte
                     | BinaryOperator::Lt
                     | BinaryOperator::Lte => match expr_type {
-                        Type::IntType | Type::CharType => Ok(Type::BoolType),
+                        Type::IntType | Type::CharType | Type::InferedType => Ok(Type::BoolType),
                         t => Err(format!("Expected Int or Char Types, Found {:?}\n", t)),
                     },
                     BinaryOperator::Eq | BinaryOperator::Neq => Ok(Type::BoolType),
                     BinaryOperator::And | BinaryOperator::Or => match expr_type {
-                        Type::BoolType => Ok(Type::BoolType),
+                        Type::BoolType | Type::InferedType => Ok(Type::BoolType),
                         t => return Err(format!("Expected Boolean Types, Found {:?}\n", t)),
                     },
                 }
