@@ -33,10 +33,18 @@ impl Interpretable for Rvalue {
             }
             Rvalue::RPairElem(boxed_pair_elem) => match &boxed_pair_elem.0 {
                 PairElem::PairElemFst(x) => {
-                    todo!()
+                    let result = x.0.interpret(stack, None);
+                    let Evaluated::PairValue(boxed_pair) = result else {
+                        panic!("Cannot take non-pairs")
+                    };
+                    return boxed_pair.0;
                 }
                 PairElem::PairElemSnd(x) => {
-                    todo!()
+                    let result = x.0.interpret(stack, None);
+                    let Evaluated::PairValue(boxed_pair) = result else {
+                        panic!("Cannot take non-pairs")
+                    };
+                    return boxed_pair.1;
                 }
             },
             Rvalue::RCall(_, _) => {
@@ -47,8 +55,8 @@ impl Interpretable for Rvalue {
 }
 
 impl Interpretable for Lvalue {
-    type Input = Evaluated;
-    type Output = ();
+    type Input = Option<Evaluated>;
+    type Output = Evaluated;
 
     fn interpret(
         &self,
@@ -59,12 +67,17 @@ impl Interpretable for Lvalue {
             Lvalue::LIdent(spanned_id) => {
                 let id = &spanned_id.0;
                 let total = stack.len();
-                for (num, (id_, level, _)) in stack.iter().rev().enumerate() {
+                for (num, (id_, level, old_value)) in stack.iter().rev().enumerate() {
                     if id_ == id {
-                        stack[total - num - 1] = (id.clone(), *level, aux.clone());
-                        break;
+                        if aux.is_some() {
+                            stack[total - num - 1] = (id.clone(), *level, aux.clone().unwrap());
+                            return aux.clone().unwrap();
+                        } else {
+                            return old_value.clone();
+                        }
                     }
                 }
+                panic!("Invalid identifier")
             }
             // ArrayValue(Box<Vec<Evaluated>>),
             Lvalue::LArrElem(spanned_arr_elem) => {
@@ -89,8 +102,12 @@ impl Interpretable for Lvalue {
                             };
                             let used_index = arr_index as usize;
                             if inner_num == dimensions - 1 {
-                                (*arr_addr)[used_index] = aux.clone();
-                                return;
+                                if aux.is_some() {
+                                    (*arr_addr)[used_index] = aux.clone().unwrap();
+                                    return aux.clone().unwrap();
+                                } else {
+                                    return (*arr_addr)[used_index].clone();
+                                }
                             }
                             let Evaluated::ArrayValue(next_arr) = &mut arr_addr[used_index] else {
                                 // should be runtime error
@@ -102,6 +119,7 @@ impl Interpretable for Lvalue {
                         break;
                     }
                 }
+                panic!("Invalid access")
             }
             // PairValue(Box<(Evaluated, Evaluated)>),
             Lvalue::LPairElem(spanned_pair_elem) => {
@@ -114,6 +132,9 @@ impl Interpretable for Lvalue {
                         todo!()
                     }
                     PairElem::PairElemSnd(boxed) => {
+                        let x = &boxed.0;
+                        // x is guaranteed to be of type "Pair"
+
                         todo!()
                     }
                 }
@@ -145,13 +166,13 @@ impl Interpretable for Stmt {
                 let lvalue = spanned_lvalue.0.clone();
                 let rvalue = &spanned_rvalue.0;
                 let eval = rvalue.interpret(stack, ()).clone();
-                lvalue.interpret(stack, eval);
+                lvalue.interpret(stack, Some(eval));
                 None
             }
             Stmt::Read(_, _) => {
                 todo!()
             }
-            Stmt::Free(_, _) => {
+            Stmt::Free(type_, object_) => {
                 todo!()
             }
             Stmt::Return(boxed_return) => {
