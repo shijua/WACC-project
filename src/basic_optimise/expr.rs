@@ -30,14 +30,14 @@ impl Expr {
                         UnaryOperator::Ord => {
                             // if (basic_value < BasicChar(' ')) || ()
                             let result = basic_value.get_ord();
-                            if (result < BasicInt(32)) || (result >= BasicInt(128)) {
+                            if !result.is_graphical() {
                                 NotBasic
                             } else {
                                 result.clone()
                             }
                         }
                         UnaryOperator::Chr => {
-                            if (basic_value < BasicInt(32)) || (basic_value >= BasicInt(128)) {
+                            if !basic_value.is_graphical() {
                                 NotBasic
                             } else {
                                 basic_value.get_chr()

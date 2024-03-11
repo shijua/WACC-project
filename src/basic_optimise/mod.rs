@@ -1,4 +1,5 @@
 use crate::ast::Expr;
+use crate::is_graphic_num;
 use std::cmp::Ordering;
 use std::ops::{Add, Div, Mul, Neg, Not, Rem, Sub};
 
@@ -34,6 +35,18 @@ impl PropagatedValue {
             PropagatedValue::BasicString(x) => Expr::StrLiter(x.clone()),
             PropagatedValue::NotBasic => unreachable!("Cannot fold back non-basic values"),
         }
+    }
+
+    pub fn is_graphical(&self) -> bool {
+        return if let PropagatedValue::BasicInt(x) = self {
+            let n = u8::try_from(*x);
+            if n.is_err() {
+                return false;
+            }
+            is_graphic_num(n.unwrap())
+        } else {
+            false
+        };
     }
 }
 

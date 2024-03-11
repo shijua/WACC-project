@@ -1,6 +1,5 @@
 use crate::ast::Type;
 use crate::basic_optimise::ASTOptimise;
-use crate::interpreter::interpret::interpret_program;
 use crate::parser::lexer::lexer;
 use crate::parser::program::program;
 use crate::semantic_checker::program::program_checker;
@@ -29,9 +28,16 @@ const VALID_CODE: i32 = 0;
 const SYNTAX_ERROR_CODE: i32 = 100;
 const SEMANTIC_ERROR_CODE: i32 = 200;
 
+const MIN_GRAPHICAL_ASCII: u8 = 32;
+const MAX_GRAPHICAL_ASCII: u8 = 127;
+
 pub type Span = SimpleSpan<usize>;
 
 pub type Spanned<T> = (T, Span);
+
+pub fn is_graphic_num(x: u8) -> bool {
+    return (x >= MIN_GRAPHICAL_ASCII) && (x <= MAX_GRAPHICAL_ASCII);
+}
 
 pub fn span_cmp<T: PartialEq>(span1: &Spanned<T>, span2: &Spanned<T>) -> bool {
     from_span(span1) == from_span(span2)
