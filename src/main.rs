@@ -1,4 +1,5 @@
 use crate::ast::Type;
+use crate::basic_optimise::ASTOptimise;
 use crate::interpreter::interpret::interpret_program;
 use crate::parser::lexer::lexer;
 use crate::parser::program::program;
@@ -20,6 +21,8 @@ mod semantic_checker;
 mod symbol_table;
 
 mod interpreter;
+
+mod basic_optimise;
 
 const READ_ERROR: i32 = -1;
 const VALID_CODE: i32 = 0;
@@ -166,12 +169,14 @@ fn main() {
 
     let mut program = ast.unwrap().0 .0;
 
-    let mut program_interpreter = program.clone();
+    // let mut program_interpreter = program.clone();
 
     let result = program_checker(&mut program);
     if result.is_err() {
         exit(SEMANTIC_ERROR_CODE);
     }
+
+    program = program.simple_optimise();
 
     let code = code_generator::x86_generate::gen_x86_for_program(&mut program);
 
@@ -196,7 +201,7 @@ fn main() {
         fs::write(destination_path, asm_output).unwrap();
     }
 
-    interpret_program(&mut program_interpreter);
+    // interpret_program(&mut program_interpreter);
 
     exit(VALID_CODE);
 }
