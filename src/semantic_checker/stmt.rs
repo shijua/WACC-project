@@ -1,9 +1,7 @@
 use crate::ast::Param::Parameter;
-use crate::ast::{
-    ArgList, FuncSig, Function, Ident, Lvalue, Param, Rvalue, ScopedStmt, Stmt, Type,
-};
+use crate::ast::{ArgList, FuncSig, Function, Lvalue, Param, Rvalue, ScopedStmt, Stmt, Type};
 use crate::semantic_checker::program::{
-    func_check, AVAILABLE_FUNCTIONS, CALLING_STACK, CURRENT_FUNCTION,
+    func_check, AVAILABLE_FUNCTIONS, CALLING_STACK, CURRENT_FUNCTION, FUNCTIONS,
 };
 use crate::semantic_checker::stmt::ReturningInfo::{EndReturn, NoReturn, PartialReturn};
 use crate::semantic_checker::util::{match_given_type, same_type, Compatible, SemanticType};
@@ -24,34 +22,26 @@ impl ReturningInfo {
 }
 
 impl SemanticType for Lvalue {
-    fn analyse(
-        &mut self,
-        scope: &mut ScopeInfo,
-        functions: &mut Vec<Spanned<Function>>,
-    ) -> MessageResult<Type> {
+    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
         match self {
-            Lvalue::LIdent(id) => id.0.analyse(scope, functions),
-            Lvalue::LPairElem(pair_elem) => pair_elem.0.analyse(scope, functions),
-            Lvalue::LArrElem(arr_elem) => arr_elem.0.analyse(scope, functions),
+            Lvalue::LIdent(id) => id.0.analyse(scope),
+            Lvalue::LPairElem(pair_elem) => pair_elem.0.analyse(scope),
+            Lvalue::LArrElem(arr_elem) => arr_elem.0.analyse(scope),
         }
     }
 }
 
 impl SemanticType for Rvalue {
-    fn analyse(
-        &mut self,
-        scope: &mut ScopeInfo,
-        functions: &mut Vec<Spanned<Function>>,
-    ) -> MessageResult<Type> {
+    fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type> {
         match self {
-            Rvalue::RPairElem(pair_elem) => pair_elem.0.analyse(scope, functions),
-            Rvalue::RExpr(exp) => exp.0.analyse(scope, functions),
+            Rvalue::RPairElem(pair_elem) => pair_elem.0.analyse(scope),
+            Rvalue::RExpr(exp) => exp.0.analyse(scope),
             Rvalue::RNewPair(lhs, rhs) => {
-                let mut lhs_type = lhs.clone().0.analyse(scope, functions);
+                let mut lhs_type = lhs.clone().0.analyse(scope);
                 if lhs_type.is_err() {
                     return lhs_type;
                 }
-                let rhs_type = rhs.clone().0.analyse(scope, functions);
+                let rhs_type = rhs.clone().0.analyse(scope);
                 if rhs_type.is_err() {
                     return rhs_type;
                 }
@@ -62,15 +52,17 @@ impl SemanticType for Rvalue {
                     Box::new((rhs_type.unwrap(), rhs_span)),
                 ))
             }
-            Rvalue::RArrLit(arr_liter) => arr_liter.0.analyse(scope, functions),
+            Rvalue::RArrLit(arr_liter) => arr_liter.0.analyse(scope),
             Rvalue::RCall(fn_name, args) => {
                 let original_name = fn_name.clone();
-                let function = fn_name.0.func_analyse(scope, functions);
+                let function = fn_name.0.func_analyse(scope);
                 if function.is_err() {
                     return function;
                 }
                 let mut new_params: Vec<Spanned<Param>> = Vec::new();
-                let index = functions
+                let index = FUNCTIONS
+                    .lock()
+                    .unwrap()
                     .iter()
                     .position(|f| f.0.ident.0 == fn_name.0)
                     .unwrap();
@@ -93,8 +85,8 @@ impl SemanticType for Rvalue {
                         // if the parameter type is inferred, we need to infer the type of the argument
                         for paired in paired_args {
                             let ((arg_provided, _), (param_type, _param_id)) = paired;
-                            if (param_type == &Type::InferedType) {
-                                let result = arg_provided.analyse(scope, functions);
+                            if param_type == &Type::InferedType {
+                                let result = arg_provided.analyse(scope);
                                 if result.is_err() {
                                     return result;
                                 }
@@ -104,36 +96,50 @@ impl SemanticType for Rvalue {
                                 )));
                                 continue;
                             }
-                            let result =
-                                match_given_type(scope, param_type, arg_provided, functions);
+                            let result = match_given_type(scope, param_type, arg_provided);
                             if result.is_err() {
                                 return result;
                             }
                         }
                         if !new_params.is_empty() {
                             // update the function signature with the inferred types
-                            let mut new_func = functions
+                            let mut new_func = FUNCTIONS
+                                .lock()
+                                .unwrap()
                                 .iter_mut()
                                 .find(|f| f.0.ident.0 == fn_name.0)
                                 .unwrap()
                                 .0
                                 .clone();
                             new_func.parameters = new_params;
-                            functions[index] = new_spanned(new_func.clone());
-                            if !AVAILABLE_FUNCTIONS.lock().unwrap().contains(&new_func) {
-                                AVAILABLE_FUNCTIONS.lock().unwrap().push(new_func.clone());
+                            FUNCTIONS.lock().unwrap()[index] = new_spanned(new_func.clone());
+                            // if the function is not in the available functions, add it
+                            if !AVAILABLE_FUNCTIONS
+                                .lock()
+                                .unwrap()
+                                .contains(&new_func.ident.0)
+                            {
+                                AVAILABLE_FUNCTIONS
+                                    .lock()
+                                    .unwrap()
+                                    .push(new_func.ident.0.clone());
                             }
                         }
                         if return_type == Type::InferedType
                             && !CALLING_STACK.lock().unwrap().contains(&fn_name.0.clone())
+                            && &*CURRENT_FUNCTION.lock().unwrap() != &fn_name.0
                         {
                             // recursion
                             *CURRENT_FUNCTION.lock().unwrap() = fn_name.0.clone();
                             // record for stack
                             CALLING_STACK.lock().unwrap().push(fn_name.0.clone());
-                            func_check(scope, &mut functions[index].clone().0, functions);
+                            let mut now_check = FUNCTIONS.lock().unwrap()[index].clone().0;
+                            let result = func_check(scope, &mut now_check);
+                            if result.is_err() {
+                                return Err(result.err().unwrap());
+                            }
                             CALLING_STACK.lock().unwrap().pop();
-                            return self.analyse(scope, functions);
+                            return self.analyse(scope);
                         }
                         Ok(return_type)
                     }
@@ -148,7 +154,6 @@ pub fn scoped_stmt(
     scope: &mut ScopeInfo,
     scoped_unit: &mut ScopedStmt,
     stmts: &mut Vec<Stmt>,
-    functions: &mut Vec<Spanned<Function>>,
 ) -> MessageResult<ReturningInfo> {
     /* Create a new scope, so declarations in {statement} don't bleed into
     surrounding scope. */
@@ -157,14 +162,13 @@ pub fn scoped_stmt(
     let mut new_scope = scope.make_scope(&mut scoped_unit.symbol_table);
 
     /* Analyse statement. */
-    stmt_check(&mut new_scope, &mut scoped_unit.stmt.0, stmts, functions)
+    stmt_check(&mut new_scope, &mut scoped_unit.stmt.0, stmts)
 }
 
 pub fn stmt_check(
     scope: &mut ScopeInfo,
     statement: &mut Stmt,
     stmts: &mut Vec<Stmt>,
-    functions: &mut Vec<Spanned<Function>>,
 ) -> MessageResult<ReturningInfo> {
     match statement {
         Stmt::Serial(..)
@@ -183,7 +187,7 @@ pub fn stmt_check(
     match statement {
         Stmt::Skip => Ok(NoReturn),
         Stmt::Declare(expected, id, value) => {
-            let result = match_given_type(scope, &mut expected.0, &mut value.0, functions);
+            let result = match_given_type(scope, &mut expected.0, &mut value.0);
             if result.is_err() {
                 return Err(result.err().unwrap());
             }
@@ -197,14 +201,14 @@ pub fn stmt_check(
             id.0 = new_name?;
 
             stmts.push(Stmt::Declare(
-                new_spanned(result_type),
+                new_spanned(result_type.clone()),
                 id.clone(),
                 value.clone(),
             ));
             Ok(NoReturn)
         }
         Stmt::Assign(expected, lhs, rhs) => {
-            let result = same_type(scope, &mut lhs.0, &mut rhs.0, functions);
+            let result = same_type(scope, &mut lhs.0, &mut rhs.0);
             if result.is_err() {
                 return Err(result.err().unwrap());
             }
@@ -212,7 +216,7 @@ pub fn stmt_check(
             stmts.push(statement.clone());
             Ok(NoReturn)
         }
-        Stmt::Read(expected, lhs) => match lhs.0.analyse(scope, functions)? {
+        Stmt::Read(expected, lhs) => match lhs.0.analyse(scope)? {
             new_type @ (Type::IntType | Type::CharType) => {
                 *expected = new_type;
                 stmts.push(statement.clone());
@@ -220,7 +224,7 @@ pub fn stmt_check(
             }
             _ => Err("Read Statements must read char or ints".to_string()),
         },
-        Stmt::Free(expected, exp) => match exp.0.analyse(scope, functions)? {
+        Stmt::Free(expected, exp) => match exp.0.analyse(scope)? {
             new_type @ (Type::Pair(_, _) | Type::Array(_)) => {
                 *expected = new_type;
                 stmts.push(statement.clone());
@@ -232,29 +236,32 @@ pub fn stmt_check(
             )),
         },
         Stmt::Return(exp) => {
-            let result = exp.0.analyse(scope, functions);
+            let result = exp.0.analyse(scope);
             if result.is_err() {
                 return Err(result.err().unwrap());
             }
             let func_name = &*CURRENT_FUNCTION.lock().unwrap().clone();
             if func_name != "MAIN" {
-                let index = functions
+                let index = FUNCTIONS
+                    .lock()
+                    .unwrap()
                     .iter()
                     .position(|f| f.0.ident.0 == func_name)
                     .unwrap();
-                functions[index].0.return_type = new_spanned(result.clone().unwrap());
+                FUNCTIONS.lock().unwrap()[index].0.return_type =
+                    new_spanned(result.clone().unwrap());
             }
             Ok(EndReturn(result?))
         }
         Stmt::Exit(exp) => {
-            let result = match_given_type(scope, &Type::IntType, &mut exp.0, functions);
+            let result = match_given_type(scope, &Type::IntType, &mut exp.0);
             if result.is_err() {
                 return Err(result.err().unwrap());
             }
             Ok(EndReturn(Type::Any))
         }
         Stmt::Print(t, exp) | Stmt::Println(t, exp) => {
-            let result = exp.0.analyse(scope, functions);
+            let result = exp.0.analyse(scope);
             if result.is_err() {
                 return Err(result.err().unwrap());
             }
@@ -263,18 +270,18 @@ pub fn stmt_check(
             Ok(NoReturn)
         }
         Stmt::If(cond, st1, st2) => {
-            let condition = match_given_type(scope, &Type::BoolType, &mut cond.0, functions);
+            let condition = match_given_type(scope, &Type::BoolType, &mut cond.0);
             if condition.is_err() {
                 return Err(condition.err().unwrap());
             }
             let mut st1_stmts = Vec::new();
-            let st1_returning_wrap = scoped_stmt(scope, st1, &mut st1_stmts, functions);
+            let st1_returning_wrap = scoped_stmt(scope, st1, &mut st1_stmts);
             if st1_returning_wrap.is_err() {
                 return st1_returning_wrap;
             }
 
             let mut st2_stmts = Vec::new();
-            let st2_returning_wrap = scoped_stmt(scope, st2, &mut st2_stmts, functions);
+            let st2_returning_wrap = scoped_stmt(scope, st2, &mut st2_stmts);
             if st2_returning_wrap.is_err() {
                 return st2_returning_wrap;
             }
@@ -311,13 +318,13 @@ pub fn stmt_check(
             }
         }
         Stmt::While(cond, body_st) => {
-            let condition = match_given_type(scope, &Type::BoolType, &mut cond.0, functions);
+            let condition = match_given_type(scope, &Type::BoolType, &mut cond.0);
             if condition.is_err() {
                 return Err(condition.err().unwrap());
             }
 
             let mut stmt_inner = Vec::new();
-            let inner_scope = scoped_stmt(scope, body_st, &mut stmt_inner, functions);
+            let inner_scope = scoped_stmt(scope, body_st, &mut stmt_inner);
             if inner_scope.is_err() {
                 return inner_scope;
             }
@@ -337,7 +344,7 @@ pub fn stmt_check(
         }
         Stmt::Scope(scoped_body) => {
             let mut scope_stmts = Vec::new();
-            let result = scoped_stmt(scope, scoped_body, &mut scope_stmts, functions);
+            let result = scoped_stmt(scope, scoped_body, &mut scope_stmts);
             stmts.push(Stmt::Scope(ScopedStmt {
                 stmt: Box::from(new_spanned(Stmt::Scope(scoped_body.clone()))),
                 symbol_table: SymbolTable::default(),
@@ -345,11 +352,11 @@ pub fn stmt_check(
             result
         }
         Stmt::Serial(st1, st2) => {
-            let lhs_wrap = stmt_check(scope, &mut st1.0, stmts, functions);
+            let lhs_wrap = stmt_check(scope, &mut st1.0, stmts);
             if lhs_wrap.is_err() {
                 return lhs_wrap;
             }
-            let rhs_wrap = stmt_check(scope, &mut st2.0, stmts, functions);
+            let rhs_wrap = stmt_check(scope, &mut st2.0, stmts);
             if rhs_wrap.is_err() {
                 return rhs_wrap;
             }

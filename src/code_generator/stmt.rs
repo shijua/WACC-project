@@ -365,7 +365,7 @@ impl Generator<'_> for Rvalue {
                 // eval arguments
                 let mut args_eval: Vec<(Register, Type)> = Vec::new();
                 arglist.iter().for_each(|(arg, _)| {
-                    let _type = arg.clone().analyse(scope, &mut Vec::new()).unwrap();
+                    let _type = arg.clone().analyse(scope).unwrap();
                     let reg = arg_register_mapping(arg.clone().generate(scope, code, regs, ()));
                     args_eval.push((reg, _type));
                 });
@@ -586,7 +586,7 @@ impl Stmt {
 
         // # Set up R11 as a temporary second base pointer for the caller saved things
         let next_reg = arg_register_mapping(exp.generate(scope, code, regs, aux));
-        let _type = exp.analyse(scope, &mut Vec::new()).unwrap();
+        let _type = exp.analyse(scope).unwrap();
         push_arg_regs(code);
 
         next_to_rax(code, next_reg, Scale::from_size(_type.size() as i32));
@@ -855,7 +855,7 @@ impl Stmt {
     ) {
         // evaluate(return_val)
         let res = return_val.generate(scope, code, regs, ());
-        let _type = return_val.analyse(scope, &mut Vec::new()).unwrap();
+        let _type = return_val.analyse(scope).unwrap();
         // r0 = return_val
         // check whether size need to be scaled
         if _type.size() as i32 == 0 || _type.size() as i32 == 8 {

@@ -7,17 +7,17 @@ use lazy_static::lazy_static;
 use std::sync::Mutex;
 
 lazy_static! {
-    pub static ref AVAILABLE_FUNCTIONS: Mutex<Vec<Function>> = Mutex::new(vec![]); // indicate functions have parameters
-    pub static ref BUILD_FUNCTIONS: Mutex<Vec<Function>> = Mutex::new(vec![]); // indicate functions have return type and parameters
+    pub static ref AVAILABLE_FUNCTIONS: Mutex<Vec<String>> = Mutex::new(vec![]); // indicate functions have parameters
+    pub static ref BUILD_FUNCTIONS: Mutex<Vec<String>> = Mutex::new(vec![]); // indicate functions have return type and parameters
     pub static ref CALLING_STACK: Mutex<Vec<String>> = Mutex::new(vec![]); // current calling stack
     pub static ref CURRENT_FUNCTION: Mutex<String> = Mutex::new("MAIN".parse().unwrap()); // current function
+    pub static ref FUNCTIONS: Mutex<Vec<Spanned<Function>>> = Mutex::new(vec![]);
 }
 
-pub fn func_check(
-    scope: &mut ScopeInfo,
-    function: &mut Function,
-    functions: &mut Vec<Spanned<Function>>,
-) -> MessageResult<()> {
+pub fn func_check(scope: &mut ScopeInfo, function: &mut Function) -> MessageResult<()> {
+    // clear previous records
+    function.param_symbol_table.table.clear();
+    function.body_symbol_table.table.clear();
     let scope = &mut scope.make_scope(&mut function.param_symbol_table);
 
     // add the parameters into the scope
@@ -29,7 +29,11 @@ pub fn func_check(
     // make scope for the body statements
     let scope = &mut scope.make_scope(&mut function.body_symbol_table);
     let mut stmts: Vec<Stmt> = Vec::new();
-    match stmt_check(scope, &mut function.body.0, &mut stmts, functions)? {
+    let result = stmt_check(scope, &mut function.body.0, &mut stmts);
+    if result.is_err() {
+        return Err(result.err().unwrap());
+    }
+    match result? {
         ReturningInfo::EndReturn(t)
             if t.clone().unify(function.return_type.clone().0).is_none() =>
         {
@@ -45,11 +49,13 @@ pub fn func_check(
         _ => unreachable!("Missing Returns: Impossible in Semantic Analysis"),
     }
     let body = build_statement(&mut stmts);
-    let index = functions
+    let index = FUNCTIONS
+        .lock()
+        .unwrap()
         .iter()
         .position(|(f, _)| f.ident.0 == function.ident.0)
         .unwrap();
-    functions[index].0.body = body;
+    FUNCTIONS.lock().unwrap()[index].0.body = body;
     Ok(())
 }
 
@@ -57,8 +63,10 @@ pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
     // the root scope
     let mut scope = initialise(&mut program.symbol_table);
 
+    // initialise the global variables
+    *FUNCTIONS.lock().unwrap() = program.functions.clone();
     // append all functions to the global symbol table and check if parameter contains inferred types
-    for (function, _) in program.functions.iter() {
+    for (function, _) in FUNCTIONS.lock().unwrap().iter() {
         scope.add(
             &function.ident.0,
             Type::Func(Box::new(FuncSig {
@@ -82,17 +90,22 @@ pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
             }
         }
         if flag && function.return_type.0 == Type::InferedType {
-            AVAILABLE_FUNCTIONS.lock().unwrap().push(function.clone());
-        } else {
-            BUILD_FUNCTIONS.lock().unwrap().push(function.clone());
+            AVAILABLE_FUNCTIONS
+                .lock()
+                .unwrap()
+                .push(function.ident.0.clone()); // if it has all gicen parameter given we will infer its return value
+        } else if flag && function.return_type.0 != Type::InferedType {
+            BUILD_FUNCTIONS
+                .lock()
+                .unwrap()
+                .push(function.ident.0.clone()); // if it has all parameter given and return value we will infer its declaration type
         }
     }
 
     // program body analysis: no return, but exit is legal
     let mut stmts: Vec<Stmt> = Vec::new();
-    let mut functions = program.functions.clone();
     // doing check for main functions
-    let res = scoped_stmt(&mut scope, &mut program.body, &mut stmts, &mut functions);
+    let res = scoped_stmt(&mut scope, &mut program.body, &mut stmts);
     if res.is_err() {
         return Err(res.err().unwrap());
     }
@@ -107,24 +120,30 @@ pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
     }
 
     // check all functions and update their return types
-    for i in 0..functions.len() {
+    for i in 0..program.functions.len() {
         if AVAILABLE_FUNCTIONS.lock().unwrap().len() <= i {
             break;
         }
-        *CURRENT_FUNCTION.lock().unwrap() = functions[i].0.ident.0.clone();
-        let res = func_check(
-            &mut scope,
-            &mut AVAILABLE_FUNCTIONS.lock().unwrap()[i],
-            &mut functions,
-        );
+        *CURRENT_FUNCTION.lock().unwrap() = FUNCTIONS.lock().unwrap()[i].0.ident.0.clone();
+
+        let mut function = FUNCTIONS
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|f| f.0.ident.0 == *CURRENT_FUNCTION.lock().unwrap())
+            .unwrap()
+            .0
+            .clone();
+        let res = func_check(&mut scope, &mut function);
         if res.is_err() {
             return Err(res.err().unwrap());
         }
     }
 
     // final check and update their statements
-    for i in 0..functions.len() {
-        let res = func_check(&mut scope, &mut functions[i].0.clone(), &mut functions);
+    for i in 0..program.functions.len() {
+        let mut check_next = FUNCTIONS.lock().unwrap()[i].0.clone();
+        let res = func_check(&mut scope, &mut check_next);
         if res.is_err() {
             return Err(res.err().unwrap());
         }
@@ -134,7 +153,7 @@ pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
 
     // return a new ast format
     Ok(Program {
-        functions: functions,
+        functions: FUNCTIONS.lock().unwrap().clone(),
         body: ScopedStmt {
             stmt: Box::new(body),
             symbol_table: SymbolTable::default(),

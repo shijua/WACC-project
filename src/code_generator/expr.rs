@@ -51,9 +51,7 @@ impl Generator<'_> for Expr {
                 let mut rhs_exp = &mut boxed_rhs.0;
                 let lhs_reg = lhs_exp.generate(scope, code, regs, ());
                 let rhs_reg = rhs_exp.generate(scope, code, regs, ());
-                let lhs_scale = Scale::from_size(
-                    lhs_exp.analyse(scope, &mut Vec::new()).unwrap().size() as i32,
-                );
+                let lhs_scale = Scale::from_size(lhs_exp.analyse(scope).unwrap().size() as i32);
                 next_to_r11(code, lhs_reg, lhs_scale);
 
                 // under the code we will put all the lhs_reg into rax
