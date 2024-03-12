@@ -181,10 +181,9 @@ fn main() {
         exit(SEMANTIC_ERROR_CODE);
     }
 
-    program = program.simple_optimise();
+    program = result.unwrap().simple_optimise();
 
     let code = code_generator::x86_generate::gen_x86_for_program(&mut program);
-    let code = code_generator::x86_generate::gen_x86_for_program(&mut result.unwrap());
 
     let mut asm_output = String::new();
 
