@@ -10,6 +10,8 @@ mod display;
 mod expr;
 mod program;
 mod stmt;
+
+mod peephole_optimise;
 pub mod x86_generate;
 
 pub const REFERENCE_OFFSET_SIZE: i32 = 4;
