@@ -8,11 +8,10 @@ use std::sync::Mutex;
 
 lazy_static! {
     pub static ref AVAILABLE_FUNCTIONS: Mutex<Vec<String>> = Mutex::new(vec![]); // indicate functions have parameters
-    pub static ref BUILD_FUNCTIONS: Mutex<Vec<String>> = Mutex::new(vec![]); // indicate functions have return type and parameters
     pub static ref CALLING_STACK: Mutex<Vec<String>> = Mutex::new(vec![]); // current calling stack
     pub static ref CURRENT_FUNCTION: Mutex<String> = Mutex::new("MAIN".parse().unwrap()); // current function
     pub static ref FUNCTIONS: Mutex<Vec<Spanned<Function>>> = Mutex::new(vec![]);
-    pub static ref CALLED_FUNCIONS: Mutex<Vec<String>> = Mutex::new(vec![]); // function that are called
+    pub static ref CALLED_FUNCIONS: Mutex<Vec<String>> = Mutex::new(vec!["MAIN".to_string()]); // function that are called
 }
 
 pub fn func_check(scope: &mut ScopeInfo, function: &mut Function) -> MessageResult<()> {
@@ -98,11 +97,6 @@ pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
                 .lock()
                 .unwrap()
                 .push(function.ident.0.clone()); // if it has all gicen parameter given we will infer its return value
-        } else if flag && function.return_type.0 != Type::InferedType {
-            BUILD_FUNCTIONS
-                .lock()
-                .unwrap()
-                .push(function.ident.0.clone()); // if it has all parameter given and return value we will infer its declaration type
         }
     }
 
@@ -130,7 +124,7 @@ pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
         if AVAILABLE_FUNCTIONS.lock().unwrap().len() <= i {
             break;
         }
-        *CURRENT_FUNCTION.lock().unwrap() = FUNCTIONS.lock().unwrap()[i].0.ident.0.clone();
+        *CURRENT_FUNCTION.lock().unwrap() = AVAILABLE_FUNCTIONS.lock().unwrap()[i].clone();
 
         let mut function = FUNCTIONS
             .lock()
@@ -157,6 +151,20 @@ pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
 
     let body = build_statement(&mut stmts);
 
+    // double check to see the function used
+    let mut count = 1;
+    while count < CALLED_FUNCIONS.lock().unwrap().len() {
+        let mut function = FUNCTIONS
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|f| f.0.ident.0 == CALLED_FUNCIONS.lock().unwrap()[count])
+            .unwrap()
+            .0
+            .clone();
+        func_check(&mut scope, &mut function);
+        count += 1;
+    }
     // remove the function that has not been called
     FUNCTIONS
         .lock()

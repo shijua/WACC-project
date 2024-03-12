@@ -42,14 +42,13 @@ impl SemanticType for Ident {
                     .unwrap();
 
                 let function = FUNCTIONS.lock().unwrap()[index].clone().0;
-                let params: Vec<Spanned<(Spanned<Type>, Spanned<Ident>)>> =
-                    function
-                        .parameters
-                        .iter()
-                        .map(|(Param::Parameter(_type, _ident), span)| {
-                            ((_type.clone(), _ident.clone()), span.clone())
-                        })
-                        .collect();
+                let params: Vec<Spanned<(Spanned<Type>, Spanned<Ident>)>> = function
+                    .parameters
+                    .iter()
+                    .map(|(Param::Parameter(_type, _ident), span)| {
+                        ((_type.clone(), _ident.clone()), span.clone())
+                    })
+                    .collect();
                 Ok(Type::Func(Box::new(FuncSig {
                     return_type: function.return_type,
                     parameters: params,

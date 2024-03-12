@@ -76,7 +76,10 @@ impl SemanticType for Rvalue {
                         } = *boxed_sig;
 
                         if !CALLED_FUNCIONS.lock().unwrap().contains(&fn_name.0)
-                            && CALLING_STACK.lock().unwrap()[0] == "MAIN"
+                            && CALLED_FUNCIONS
+                                .lock()
+                                .unwrap()
+                                .contains(&CALLING_STACK.lock().unwrap()[0])
                         {
                             CALLED_FUNCIONS.lock().unwrap().push(fn_name.0.clone());
                         }
