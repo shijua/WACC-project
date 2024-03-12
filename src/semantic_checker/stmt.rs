@@ -1,7 +1,7 @@
 use crate::ast::Param::Parameter;
 use crate::ast::{ArgList, FuncSig, Function, Lvalue, Param, Rvalue, ScopedStmt, Stmt, Type};
 use crate::semantic_checker::program::{
-    func_check, AVAILABLE_FUNCTIONS, CALLING_STACK, CURRENT_FUNCTION, FUNCTIONS,
+    func_check, AVAILABLE_FUNCTIONS, CALLED_FUNCIONS, CALLING_STACK, CURRENT_FUNCTION, FUNCTIONS,
 };
 use crate::semantic_checker::stmt::ReturningInfo::{EndReturn, NoReturn, PartialReturn};
 use crate::semantic_checker::util::{match_given_type, same_type, Compatible, SemanticType};
@@ -75,6 +75,12 @@ impl SemanticType for Rvalue {
                             return_type,
                         } = *boxed_sig;
 
+                        if !CALLED_FUNCIONS.lock().unwrap().contains(&fn_name.0)
+                            && CALLING_STACK.lock().unwrap()[0] == "MAIN"
+                        {
+                            CALLED_FUNCIONS.lock().unwrap().push(fn_name.0.clone());
+                        }
+
                         let ArgList::Arg(mut args_list) = args.clone().0;
 
                         if args_list.clone().len() != parameters.clone().len() {
@@ -132,13 +138,11 @@ impl SemanticType for Rvalue {
                             // recursion
                             *CURRENT_FUNCTION.lock().unwrap() = fn_name.0.clone();
                             // record for stack
-                            CALLING_STACK.lock().unwrap().push(fn_name.0.clone());
                             let mut now_check = FUNCTIONS.lock().unwrap()[index].clone().0;
                             let result = func_check(scope, &mut now_check);
                             if result.is_err() {
                                 return Err(result.err().unwrap());
                             }
-                            CALLING_STACK.lock().unwrap().pop();
                             return self.analyse(scope);
                         }
                         Ok(return_type)

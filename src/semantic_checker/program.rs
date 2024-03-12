@@ -12,6 +12,7 @@ lazy_static! {
     pub static ref CALLING_STACK: Mutex<Vec<String>> = Mutex::new(vec![]); // current calling stack
     pub static ref CURRENT_FUNCTION: Mutex<String> = Mutex::new("MAIN".parse().unwrap()); // current function
     pub static ref FUNCTIONS: Mutex<Vec<Spanned<Function>>> = Mutex::new(vec![]);
+    pub static ref CALLED_FUNCIONS: Mutex<Vec<String>> = Mutex::new(vec![]); // function that are called
 }
 
 pub fn func_check(scope: &mut ScopeInfo, function: &mut Function) -> MessageResult<()> {
@@ -29,7 +30,9 @@ pub fn func_check(scope: &mut ScopeInfo, function: &mut Function) -> MessageResu
     // make scope for the body statements
     let scope = &mut scope.make_scope(&mut function.body_symbol_table);
     let mut stmts: Vec<Stmt> = Vec::new();
+    CALLING_STACK.lock().unwrap().push(function.ident.0.clone());
     let result = stmt_check(scope, &mut function.body.0, &mut stmts);
+    CALLING_STACK.lock().unwrap().pop();
     if result.is_err() {
         return Err(result.err().unwrap());
     }
@@ -48,6 +51,7 @@ pub fn func_check(scope: &mut ScopeInfo, function: &mut Function) -> MessageResu
         }
         _ => unreachable!("Missing Returns: Impossible in Semantic Analysis"),
     }
+    // update the function body
     let body = build_statement(&mut stmts);
     let index = FUNCTIONS
         .lock()
@@ -105,7 +109,9 @@ pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
     // program body analysis: no return, but exit is legal
     let mut stmts: Vec<Stmt> = Vec::new();
     // doing check for main functions
+    CALLING_STACK.lock().unwrap().push("MAIN".parse().unwrap());
     let res = scoped_stmt(&mut scope, &mut program.body, &mut stmts);
+    CALLING_STACK.lock().unwrap().pop();
     if res.is_err() {
         return Err(res.err().unwrap());
     }
@@ -150,6 +156,12 @@ pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
     }
 
     let body = build_statement(&mut stmts);
+
+    // remove the function that has not been called
+    FUNCTIONS
+        .lock()
+        .unwrap()
+        .retain(|f| CALLED_FUNCIONS.lock().unwrap().contains(&f.0.ident.0));
 
     // return a new ast format
     Ok(Program {

@@ -1,4 +1,3 @@
-use crate::ast::Type::{Any, BoolType, CharType, InferedType, IntType, NestedPair, StringType};
 use crate::code_generator::asm::Scale;
 use crate::from_span;
 use crate::symbol_table::SymbolTable;
