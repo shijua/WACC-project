@@ -20,7 +20,7 @@ unitTest:
 integrationTest:
   stage: test
   before_script:
-    - git submodule update --init --recursive
+    - git submodule update --init --recursive --remote
     - apt-get update || true
     - apt-get install -y ruby || true
     - gem install rest-client || true
