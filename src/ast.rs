@@ -54,8 +54,8 @@ pub enum BinaryOperator {
 
 #[derive(PartialEq, Clone)]
 pub struct FuncSig {
-    pub return_type: Type,
-    pub parameters: Vec<(Type, Ident)>,
+    pub return_type: Spanned<Type>,
+    pub parameters: Vec<Spanned<(Spanned<Type>, Spanned<Ident>)>>,
 }
 
 #[derive(PartialEq, Clone)]

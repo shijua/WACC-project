@@ -74,13 +74,13 @@ pub fn program_checker(program: &mut Program) -> MessageResult<Program> {
         scope.add(
             &function.ident.0,
             Type::Func(Box::new(FuncSig {
-                return_type: function.clone().return_type.0,
+                return_type: function.clone().return_type,
                 parameters: function
                     .clone()
                     .parameters
                     .iter()
-                    .map(|(Param::Parameter((param_type, _), (param_ident, _)), _)| {
-                        (param_type.clone(), param_ident.clone())
+                    .map(|(Param::Parameter(_type, _ident), span)| {
+                        ((_type.clone(), _ident.clone()), span.clone())
                     })
                     .collect(),
             })),

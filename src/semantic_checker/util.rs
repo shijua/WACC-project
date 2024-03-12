@@ -1,7 +1,7 @@
 use crate::ast::{ArrayElem, ArrayLiter, FuncSig, Function, Ident, PairElem, Param, Type};
 use crate::semantic_checker::program::FUNCTIONS;
 use crate::symbol_table::ScopeInfo;
-use crate::{any_span, get_span, MessageResult};
+use crate::{any_span, get_span, MessageResult, Spanned};
 
 pub trait SemanticType {
     fn analyse(&mut self, scope: &mut ScopeInfo) -> MessageResult<Type>;
@@ -42,13 +42,16 @@ impl SemanticType for Ident {
                     .unwrap();
 
                 let function = FUNCTIONS.lock().unwrap()[index].clone().0;
-                let params: Vec<(Type, Ident)> = function
-                    .parameters
-                    .iter()
-                    .map(|(Param::Parameter(_type, _ident), _)| (_type.clone().0, _ident.clone().0))
-                    .collect();
+                let params: Vec<Spanned<(Spanned<Type>, Spanned<Ident>)>> =
+                    function
+                        .parameters
+                        .iter()
+                        .map(|(Param::Parameter(_type, _ident), span)| {
+                            ((_type.clone(), _ident.clone()), span.clone())
+                        })
+                        .collect();
                 Ok(Type::Func(Box::new(FuncSig {
-                    return_type: function.return_type.0,
+                    return_type: function.return_type,
                     parameters: params,
                 })))
             }

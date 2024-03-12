@@ -6,7 +6,7 @@ use crate::semantic_checker::program::{
 use crate::semantic_checker::stmt::ReturningInfo::{EndReturn, NoReturn, PartialReturn};
 use crate::semantic_checker::util::{match_given_type, same_type, Compatible, SemanticType};
 use crate::symbol_table::{ScopeInfo, SymbolTable};
-use crate::{create_span, new_spanned, MessageResult, Spanned};
+use crate::{create_span, get_span, new_spanned, MessageResult, Spanned};
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum ReturningInfo {
@@ -90,35 +90,39 @@ impl SemanticType for Rvalue {
                         let paired_args = args_list.iter_mut().zip(parameters.iter());
                         // if the parameter type is inferred, we need to infer the type of the argument
                         for paired in paired_args {
-                            let ((arg_provided, _), (param_type, _param_id)) = paired;
-                            if param_type == &Type::InferedType {
+                            let ((arg_provided, _), ((param_type, _param_id), whole_span)) = paired;
+                            if param_type.0 == Type::InferedType {
                                 let result = arg_provided.analyse(scope);
                                 if result.is_err() {
                                     return result;
                                 }
-                                new_params.push(new_spanned(Parameter(
-                                    new_spanned(result.unwrap()),
-                                    new_spanned(_param_id.clone()),
-                                )));
+                                new_params.push(create_span(
+                                    Parameter(
+                                        create_span(result.unwrap(), get_span(param_type)),
+                                        _param_id.clone(),
+                                    ),
+                                    whole_span.clone(),
+                                ));
                                 continue;
                             }
-                            let result = match_given_type(scope, param_type, arg_provided);
+                            let result = match_given_type(scope, &param_type.0, arg_provided);
                             if result.is_err() {
                                 return result;
                             }
                         }
                         if !new_params.is_empty() {
                             // update the function signature with the inferred types
-                            let mut new_func = FUNCTIONS
+                            let mut spanned_new_func = FUNCTIONS
                                 .lock()
                                 .unwrap()
                                 .iter_mut()
                                 .find(|f| f.0.ident.0 == fn_name.0)
                                 .unwrap()
-                                .0
                                 .clone();
+                            let new_func = &mut spanned_new_func.0;
                             new_func.parameters = new_params;
-                            FUNCTIONS.lock().unwrap()[index] = new_spanned(new_func.clone());
+                            FUNCTIONS.lock().unwrap()[index] =
+                                create_span(new_func.clone(), spanned_new_func.1);
                             // if the function is not in the available functions, add it
                             if !AVAILABLE_FUNCTIONS
                                 .lock()
@@ -131,7 +135,7 @@ impl SemanticType for Rvalue {
                                     .push(new_func.ident.0.clone());
                             }
                         }
-                        if return_type == Type::InferedType
+                        if return_type.0 == Type::InferedType
                             && !CALLING_STACK.lock().unwrap().contains(&fn_name.0.clone())
                             && &*CURRENT_FUNCTION.lock().unwrap() != &fn_name.0
                         {
@@ -145,7 +149,7 @@ impl SemanticType for Rvalue {
                             }
                             return self.analyse(scope);
                         }
-                        Ok(return_type)
+                        Ok(return_type.0)
                     }
                     t => Err(format!("Type Error: Expecting Function, Actual {:?}", t)),
                 }
@@ -249,8 +253,9 @@ pub fn stmt_check(
                     .iter()
                     .position(|f| f.0.ident.0 == func_name)
                     .unwrap();
+                let span = FUNCTIONS.lock().unwrap()[index].0.ident.1;
                 FUNCTIONS.lock().unwrap()[index].0.return_type =
-                    new_spanned(result.clone().unwrap());
+                    create_span(result.clone().unwrap(), span);
             }
             Ok(EndReturn(result?))
         }
