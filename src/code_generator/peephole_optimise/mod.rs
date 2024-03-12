@@ -1,3 +1,5 @@
+use crate::ast::Expr;
+use crate::basic_optimise::PropagatedValue;
 use crate::code_generator::asm::AsmLine::Instruction;
 use crate::code_generator::asm::{AsmLine, BinaryInstruction, GeneratedCode, Instr, InstrType};
 
@@ -27,13 +29,10 @@ impl GeneratedCode {
     pub fn peephole_move(&mut self) {
         self.codes.retain(|line| !line.is_redundant_move())
     }
+}
 
-    pub fn peephole_algebraic(&mut self) {
-        // x + 0 = x
-        // x - 0 = x
-        // x - x = 0
-        // x * 1 = x
-        // x / 1 = x
-        // x / x = 1 (given x != 0)
+impl Expr {
+    pub fn peephole_algebraic(&self, expected: i32) -> bool {
+        return self.get_propagated_value() == PropagatedValue::BasicInt(expected);
     }
 }

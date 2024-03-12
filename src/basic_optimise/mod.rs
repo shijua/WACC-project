@@ -132,7 +132,13 @@ impl Div for PropagatedValue {
     fn div(self, rhs: Self) -> Self::Output {
         use PropagatedValue::*;
         match (self, rhs) {
-            (BasicInt(x), BasicInt(y)) => BasicInt(x / y),
+            (BasicInt(x), BasicInt(y)) => {
+                if y != 0 {
+                    BasicInt(x / y)
+                } else {
+                    NotBasic
+                }
+            }
             // could do: catch div by zero
             _ => unreachable!("Cannot add two non-integers"),
         }

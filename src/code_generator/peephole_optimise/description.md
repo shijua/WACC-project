@@ -26,12 +26,9 @@ However, we would need to still
 ## Algebraic Simplification and Reduction in Strength
 
 - a ± 0 = a
-- a - a = 0
-- a * 2 = a + a
 - a * 1 = a
 - a * 0 = 0
 - a / 1 = a
-- a / a = 0 (given a != 0)
 
 
 ## Use of Machine Idioms

@@ -1,5 +1,6 @@
 use crate::ast::Type::Array;
 use crate::ast::{BinaryOperator, Expr, Ident, UnaryOperator};
+use crate::basic_optimise::PropagatedValue;
 use crate::code_generator::asm::AsmLine::{Directive, Instruction};
 use crate::code_generator::asm::CLibFunctions::RuntimeError;
 use crate::code_generator::asm::ConditionCode::OverFlow;
@@ -49,15 +50,20 @@ impl Generator<'_> for Expr {
             Expr::BinaryApp(boxed_lhs, op, boxed_rhs) => {
                 let mut lhs_exp = &mut boxed_lhs.0;
                 let mut rhs_exp = &mut boxed_rhs.0;
-                let lhs_reg = lhs_exp.generate(scope, code, regs, ());
-                let rhs_reg = rhs_exp.generate(scope, code, regs, ());
-                let lhs_scale = Scale::from_size(lhs_exp.analyse(scope).unwrap().size() as i32);
-                next_to_r11(code, lhs_reg, lhs_scale);
 
                 // under the code we will put all the lhs_reg into rax
                 let final_reg = match op {
-                    // addl, jo _errOverflow, movslq
                     BinaryOperator::Add => {
+                        // x + 0 = 0 + x = x
+                        if lhs_exp.peephole_algebraic(0) {
+                            return rhs_exp.generate(scope, code, regs, ());
+                        }
+                        if rhs_exp.peephole_algebraic(0) {
+                            return lhs_exp.generate(scope, code, regs, ());
+                        }
+                        let (lhs_reg, rhs_reg, lhs_scale) =
+                            Self::binary_app_setup(scope, code, regs, lhs_exp, rhs_exp);
+                        // addl, jo _errOverflow, movslq
                         binary_single_scale(
                             code,
                             InstrType::Add,
@@ -73,6 +79,12 @@ impl Generator<'_> for Expr {
 
                     // subl, jo _errOverflow
                     BinaryOperator::Sub => {
+                        // peephole case: x - 0 = x;
+                        if rhs_exp.peephole_algebraic(0) {
+                            return lhs_exp.generate(scope, code, regs, ());
+                        }
+                        let (lhs_reg, rhs_reg, lhs_scale) =
+                            Self::binary_app_setup(scope, code, regs, lhs_exp, rhs_exp);
                         binary_single_scale(
                             code,
                             InstrType::Sub,
@@ -88,6 +100,15 @@ impl Generator<'_> for Expr {
 
                     // imull, jo _errOverflow
                     BinaryOperator::Mul => {
+                        // peephole case: x * 1 = 1 * x = x
+                        if lhs_exp.peephole_algebraic(1) {
+                            return rhs_exp.generate(scope, code, regs, ());
+                        }
+                        if rhs_exp.peephole_algebraic(1) {
+                            return lhs_exp.generate(scope, code, regs, ());
+                        }
+                        let (lhs_reg, rhs_reg, lhs_scale) =
+                            Self::binary_app_setup(scope, code, regs, lhs_exp, rhs_exp);
                         binary_single_scale(
                             code,
                             InstrType::IMul,
@@ -103,69 +124,109 @@ impl Generator<'_> for Expr {
 
                     // cmpl, je _errDivZero, cltd, idivl, movl, movl, movslq
                     BinaryOperator::Div => {
+                        // peephole case: x / 1 = x
+                        if rhs_exp.peephole_algebraic(1) {
+                            return lhs_exp.generate(scope, code, regs, ());
+                        }
+                        let (lhs_reg, rhs_reg, lhs_scale) =
+                            Self::binary_app_setup(scope, code, regs, lhs_exp, rhs_exp);
                         Self::generate_expr_div_mod(code, lhs_reg, rhs_reg, lhs_scale, true)
                     }
 
                     // cmpl, je _errDivZero, cltd, idivl, movl, movl, movslq
                     BinaryOperator::Modulo => {
+                        // peephole case: x % 1 = 0
+                        if rhs_exp.peephole_algebraic(1) {
+                            return Expr::IntLiter(0).generate(scope, code, regs, ());
+                        }
+                        let (lhs_reg, rhs_reg, lhs_scale) =
+                            Self::binary_app_setup(scope, code, regs, lhs_exp, rhs_exp);
                         Self::generate_expr_div_mod(code, lhs_reg, rhs_reg, lhs_scale, false)
                     }
 
-                    BinaryOperator::Gt => Self::generate_expr_binary_logical_compare(
-                        code,
-                        lhs_reg,
-                        rhs_reg,
-                        lhs_scale,
-                        ConditionCode::GT,
-                    ),
+                    BinaryOperator::Gt => {
+                        let (lhs_reg, rhs_reg, lhs_scale) =
+                            Self::binary_app_setup(scope, code, regs, lhs_exp, rhs_exp);
+                        Self::generate_expr_binary_logical_compare(
+                            code,
+                            lhs_reg,
+                            rhs_reg,
+                            lhs_scale,
+                            ConditionCode::GT,
+                        )
+                    }
 
-                    BinaryOperator::Gte => Self::generate_expr_binary_logical_compare(
-                        code,
-                        lhs_reg,
-                        rhs_reg,
-                        lhs_scale,
-                        ConditionCode::GTE,
-                    ),
+                    BinaryOperator::Gte => {
+                        let (lhs_reg, rhs_reg, lhs_scale) =
+                            Self::binary_app_setup(scope, code, regs, lhs_exp, rhs_exp);
+                        Self::generate_expr_binary_logical_compare(
+                            code,
+                            lhs_reg,
+                            rhs_reg,
+                            lhs_scale,
+                            ConditionCode::GTE,
+                        )
+                    }
 
-                    BinaryOperator::Lt => Self::generate_expr_binary_logical_compare(
-                        code,
-                        lhs_reg,
-                        rhs_reg,
-                        lhs_scale,
-                        ConditionCode::LT,
-                    ),
+                    BinaryOperator::Lt => {
+                        let (lhs_reg, rhs_reg, lhs_scale) =
+                            Self::binary_app_setup(scope, code, regs, lhs_exp, rhs_exp);
+                        Self::generate_expr_binary_logical_compare(
+                            code,
+                            lhs_reg,
+                            rhs_reg,
+                            lhs_scale,
+                            ConditionCode::LT,
+                        )
+                    }
 
-                    BinaryOperator::Lte => Self::generate_expr_binary_logical_compare(
-                        code,
-                        lhs_reg,
-                        rhs_reg,
-                        lhs_scale,
-                        ConditionCode::LTE,
-                    ),
+                    BinaryOperator::Lte => {
+                        let (lhs_reg, rhs_reg, lhs_scale) =
+                            Self::binary_app_setup(scope, code, regs, lhs_exp, rhs_exp);
+                        Self::generate_expr_binary_logical_compare(
+                            code,
+                            lhs_reg,
+                            rhs_reg,
+                            lhs_scale,
+                            ConditionCode::LTE,
+                        )
+                    }
 
                     // cmpq, sete
-                    BinaryOperator::Eq => Self::generate_expr_binary_logical_compare(
-                        code,
-                        lhs_reg,
-                        rhs_reg,
-                        lhs_scale,
-                        ConditionCode::EQ,
-                    ),
+                    BinaryOperator::Eq => {
+                        let (lhs_reg, rhs_reg, lhs_scale) =
+                            Self::binary_app_setup(scope, code, regs, lhs_exp, rhs_exp);
+                        Self::generate_expr_binary_logical_compare(
+                            code,
+                            lhs_reg,
+                            rhs_reg,
+                            lhs_scale,
+                            ConditionCode::EQ,
+                        )
+                    }
 
                     // cmpq, setne
-                    BinaryOperator::Neq => Self::generate_expr_binary_logical_compare(
-                        code,
-                        lhs_reg,
-                        rhs_reg,
-                        lhs_scale,
-                        ConditionCode::NEQ,
-                    ),
+                    BinaryOperator::Neq => {
+                        let (lhs_reg, rhs_reg, lhs_scale) =
+                            Self::binary_app_setup(scope, code, regs, lhs_exp, rhs_exp);
+                        Self::generate_expr_binary_logical_compare(
+                            code,
+                            lhs_reg,
+                            rhs_reg,
+                            lhs_scale,
+                            ConditionCode::NEQ,
+                        )
+                    }
 
                     BinaryOperator::And => {
+                        let (lhs_reg, rhs_reg, _lhs_scale) =
+                            Self::binary_app_setup(scope, code, regs, lhs_exp, rhs_exp);
                         Self::generate_expr_binary_logical_and(code, lhs_reg, rhs_reg)
                     }
 
                     BinaryOperator::Or => {
+                        let (lhs_reg, rhs_reg, _lhs_scale) =
+                            Self::binary_app_setup(scope, code, regs, lhs_exp, rhs_exp);
                         Self::generate_expr_binary_logical_or(code, lhs_reg, rhs_reg)
                     }
                 };
@@ -251,6 +312,19 @@ impl Generator<'_> for Expr {
 }
 
 impl Expr {
+    fn binary_app_setup(
+        scope: &mut ScopeInfo,
+        code: &mut GeneratedCode,
+        regs: &mut Vec<Register>,
+        lhs_exp: &mut Expr,
+        rhs_exp: &mut Expr,
+    ) -> (Register, Register, Scale) {
+        let lhs_reg = lhs_exp.generate(scope, code, regs, ());
+        let rhs_reg = rhs_exp.generate(scope, code, regs, ());
+        let lhs_scale = Scale::from_size(lhs_exp.analyse(scope).unwrap().size() as i32);
+        next_to_r11(code, lhs_reg, lhs_scale);
+        (lhs_reg, rhs_reg, lhs_scale)
+    }
     fn generate_unary_app(
         scope: &mut ScopeInfo,
         code: &mut GeneratedCode,
