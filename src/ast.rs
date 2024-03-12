@@ -1,4 +1,3 @@
-use crate::ast::Type::{Any, BoolType, CharType, IntType, NestedPair, StringType};
 use crate::code_generator::asm::Scale;
 use crate::from_span;
 use crate::symbol_table::SymbolTable;
@@ -55,8 +54,8 @@ pub enum BinaryOperator {
 
 #[derive(PartialEq, Clone)]
 pub struct FuncSig {
-    pub return_type: Type,
-    pub parameters: Vec<(Type, Ident)>,
+    pub return_type: Spanned<Type>,
+    pub parameters: Vec<Spanned<(Spanned<Type>, Spanned<Ident>)>>,
 }
 
 #[derive(PartialEq, Clone)]
@@ -70,6 +69,7 @@ pub enum Type {
     NestedPair,
     Any,
     Func(Box<FuncSig>),
+    InferedType,
 }
 
 impl Debug for Type {
@@ -84,6 +84,7 @@ impl Debug for Type {
             Type::NestedPair => write!(f, "Pair"),
             Type::Any => write!(f, "Any"),
             Type::Func(_) => write!(f, "Function"),
+            Type::InferedType => write!(f, "Infered"),
         }
     }
 }
@@ -103,6 +104,7 @@ impl Type {
             IntType => 4,
             BoolType | CharType => 1,
             StringType | Array(_) | Func(_) | Pair(_, _) | NestedPair | Any => 8,
+            InferedType => 8, // if we don't know the type, we assume it's a quad
         }
     }
 
@@ -112,6 +114,7 @@ impl Type {
             IntType => Scale::Long,
             BoolType | CharType => Scale::Byte,
             StringType | Array(_) | Func(_) | Pair(_, _) | NestedPair | Any => Scale::Quad,
+            InferedType => unreachable!("Infered type has no size"),
         }
     }
 

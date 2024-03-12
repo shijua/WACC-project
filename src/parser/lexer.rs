@@ -197,6 +197,7 @@ pub fn lexer<'src>(
         .or(text::ascii::keyword("call"))
         .or(text::ascii::keyword("fst"))
         .or(text::ascii::keyword("snd"))
+        .or(text::ascii::keyword("val"))
         .labelled("WACC keywords");
 
     // A parser for keywords

@@ -175,16 +175,16 @@ fn main() {
 
     let mut program = ast.unwrap().0 .0;
 
-    // let mut program_interpreter = program.clone();
-
-    let result = program_checker(&mut program);
+    let mut result = program_checker(&mut program);
     if result.is_err() {
+        println!("Semantic Error: {}", result.unwrap_err());
         exit(SEMANTIC_ERROR_CODE);
     }
 
     program = program.simple_optimise();
 
     let code = code_generator::x86_generate::gen_x86_for_program(&mut program);
+    let code = code_generator::x86_generate::gen_x86_for_program(&mut result.unwrap());
 
     let mut asm_output = String::new();
 
@@ -206,8 +206,6 @@ fn main() {
 
         fs::write(destination_path, asm_output).unwrap();
     }
-
-    // interpret_program(&mut program_interpreter);
 
     exit(VALID_CODE);
 }
