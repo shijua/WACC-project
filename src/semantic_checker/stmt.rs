@@ -6,7 +6,7 @@ use crate::semantic_checker::program::{
 use crate::semantic_checker::stmt::ReturningInfo::{EndReturn, NoReturn, PartialReturn};
 use crate::semantic_checker::util::{match_given_type, same_type, Compatible, SemanticType};
 use crate::symbol_table::{ScopeInfo, SymbolTable};
-use crate::{new_spanned, MessageResult, Spanned};
+use crate::{create_span, new_spanned, MessageResult, Spanned};
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum ReturningInfo {
@@ -197,14 +197,11 @@ pub fn stmt_check(
             if new_name.is_err() {
                 return Err(new_name.err().unwrap());
             }
+            *expected = create_span(result_type.clone(), expected.1.clone());
 
             id.0 = new_name?;
 
-            stmts.push(Stmt::Declare(
-                new_spanned(result_type.clone()),
-                id.clone(),
-                value.clone(),
-            ));
+            stmts.push(Stmt::Declare(expected.clone(), id.clone(), value.clone()));
             Ok(NoReturn)
         }
         Stmt::Assign(expected, lhs, rhs) => {
