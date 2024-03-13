@@ -44,6 +44,7 @@ TEST_SOURCE =  wacc-examples-36/valid/basic \
 			wacc-examples-36/invalid/syntaxErr wacc-examples-36/invalid/semanticErr \
 			wacc-examples-36/function-type-inference \
 			wacc-examples-36/local-type-inference \
+			wacc-examples-36/optimise
 
 integration-test-local:
 	docker stop assembler || true
