@@ -97,12 +97,12 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     // at least one argument (for input path)
-    if args.len() < 2 {
+    if args.len() < 3 {
         println!("Error: expecting more arguments for file input");
         exit(READ_ERROR);
     }
 
-    let input_file = &args[1];
+    let input_file = &args[2];
 
     let is_wacc_file = input_file.clone().ends_with(".wacc");
 
@@ -181,7 +181,12 @@ fn main() {
         exit(SEMANTIC_ERROR_CODE);
     }
 
-    program = result.unwrap().simple_optimise();
+    program = result.unwrap();
+
+    if args[1] == "optimised" {
+        program = program.simple_optimise();
+        println!("Producing Optimised Output");
+    }
 
     let code = code_generator::x86_generate::gen_x86_for_program(&mut program);
 
@@ -190,7 +195,7 @@ fn main() {
     write!(&mut asm_output, "{}", code).unwrap();
 
     // now we need an output path
-    if args.len() < 3 {
+    if args.len() < 4 {
         // we do not have extra output,
         // therefore the output should be written to stdout
         // default path = file name prefix of the input wacc file + .s
@@ -201,7 +206,7 @@ fn main() {
         fs::write(&output_assembly, asm_output).unwrap();
     } else {
         // we have an output path
-        let destination_path = &args[2];
+        let destination_path = &args[3];
 
         fs::write(destination_path, asm_output).unwrap();
     }

@@ -5,7 +5,7 @@ import subprocess
 import platform
 
 # constant definition
-WACC_PATH: str = "target/debug/wacc_36"
+WACC_PATH: str = "./compile"
 TEST_PATH: str = "wacc-examples-36"
 REF_PATH: str = "wacc-examples-36/refCompile"
 OUT_PATH: str = "out"
