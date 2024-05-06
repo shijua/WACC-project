@@ -1,0 +1,21 @@
+# function calls function
+
+# Output:
+# 1
+#
+
+# Program:
+
+begin
+  val f(val x) is
+    val y = call g(x);
+    return y
+  end
+
+  val g(val x) is
+    return x
+  end
+
+  val x = call f(1);
+  println x
+end

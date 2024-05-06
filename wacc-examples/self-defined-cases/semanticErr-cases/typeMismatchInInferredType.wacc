@@ -1,0 +1,24 @@
+# type mismatch between inferred type(int) of y and assignment of y
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  val f(val x) is
+    val y = call g(x);
+    y = true;
+    return y
+  end
+
+  val g(val x) is
+    return x
+  end
+
+  val x = call f(0);
+  println x
+end

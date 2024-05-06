@@ -1,0 +1,17 @@
+# functions cannot define the same argument twice
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  val foo(val x, val x) is
+	return x
+  end
+
+  skip
+end

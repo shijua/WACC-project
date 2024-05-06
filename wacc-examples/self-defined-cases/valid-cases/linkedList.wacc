@@ -1,0 +1,28 @@
+# create and print a linked list using pairs
+
+# Output:
+# list = {1, 2, 4, 11}
+#
+
+# Program:
+
+begin
+  val p = newpair(11, null) ;
+    val q = newpair(4, p) ;
+    val r = newpair(2, q) ;
+    val s = newpair(1, r) ;
+    print "list = {" ;
+    val x = s ;
+    val y = snd x ;
+    int f = 0;
+    while y != null do
+      f = fst x ;
+      print f ;
+      print ", " ;
+      x = y ;
+      y = snd x
+    done ;
+    f = fst x ;
+    print f ;
+    println "}"
+end

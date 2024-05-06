@@ -1,0 +1,18 @@
+# function call with too many arguments
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+	val f(val a, val b) is
+		return 0 
+	end
+	val x = call f(1,2,3);
+	println x
+end
+	

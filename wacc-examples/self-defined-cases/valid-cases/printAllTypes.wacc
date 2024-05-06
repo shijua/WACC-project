@@ -1,0 +1,126 @@
+# Tests scoping with most variable types
+
+# Output:
+# ( [1, 2, 3] , [a, b, c] )
+# [ #addrs# = (a, true), #addrs# = (b, false) ]
+# 1, 2
+# array, of, strings
+# true, false, true
+# xyz
+# 1, 2, 3
+# this is a string
+# true
+# x
+# 5
+#
+
+# Program:
+
+begin
+
+  val comma = ", ";
+  val x = 5;
+  begin
+    val x = 'x';
+    begin
+      val x = true;
+      begin
+        val x = "this is a string";
+        begin
+          val x = [1,2,3];
+          begin
+            val x = ['x', 'y', 'z'];
+            begin
+              val x = [true, false, true];
+              begin
+                val x = ["array", "of", "strings"];
+                begin
+                  val x = newpair(1, 2);
+                  begin
+                    val y = newpair('a', true);
+                    val z = newpair('b', false);
+                    val x = [y, z];
+                    begin
+                      val y = [1, 2, 3];
+                      val z = ['a', 'b', 'c'];
+                      val x = newpair(y, z);
+                      begin
+                        skip
+                      end;
+                      val a = fst x;
+                      val b = snd x;
+                      print "( [";
+                      print a[0];
+                      print comma;
+                      print a[1];
+                      print comma;
+                      print a[2];
+                      print "] , [";
+                      print b[0];
+                      print comma;
+                      print b[1];
+                      print comma;
+                      print b[2];
+                      println "] )" # ( [fst x] , [snd x] )
+                    end;
+                    val a = x[0];
+                    val aa = fst a;
+                    val ab = snd a;
+                    val b = x[1];
+                    val ba = fst b;
+                    val bb = snd b;
+                    print "[ ";
+                    print a;
+                    print " = (";
+                    print aa;
+                    print comma;
+                    print ab;
+                    print "), ";
+                    print b;
+                    print " = (";
+                    print ba;
+                    print comma;
+                    print bb;
+                    println ") ]" # [ x[0], x[1] ]
+                  end;
+                  val y = fst x;
+                  val z = snd x;
+                  print y;
+                  print comma;
+                  println z # fst x, snd x
+                end;
+                val a = x[0];
+                val b = x[1];
+                val c = x[2];
+                print a;
+                print comma;
+                print b;
+                print comma;
+                println c # string[]
+              end;
+              print x[0];
+              print comma;
+              print x[1];
+              print comma;
+              println x[2] # bool[]
+            end;
+            println x # char[]
+          end;
+          val a = x[0];
+          val b = x[1];
+          val c = x[2];
+          print a;
+          print comma;
+          print b;
+          print comma;
+          println c # int[]
+        end;
+        println x # string
+      end;
+      println x # bool
+    end;
+    println x # char
+  end;
+  println x # int
+
+end

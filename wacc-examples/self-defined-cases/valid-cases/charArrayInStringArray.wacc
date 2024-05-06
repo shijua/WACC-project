@@ -1,0 +1,16 @@
+# a char[] can fit into a string[]
+# Thanks to Iurii Zamiatin for finding this
+
+# Output:
+# abc
+# a
+#
+
+# Program:
+
+begin
+    val testArr = ['a', 'b', 'c'];
+    val arr = [testArr, "box", "foo", "bar"];
+    println testArr;
+    println testArr[0]
+end

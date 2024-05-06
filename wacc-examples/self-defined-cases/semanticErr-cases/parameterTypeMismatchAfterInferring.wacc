@@ -1,0 +1,20 @@
+# type mismatch in parameter type when calling a function in line 17
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  val f(val x, val y) is
+    return 1
+  end
+
+  val s = call f(1, 2);
+  val w = call f('a', 'b');
+  println s;
+  println w
+end

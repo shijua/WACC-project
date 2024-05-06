@@ -1,0 +1,15 @@
+# declaration and assignment type mismatch
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  val x = 1;
+  x = 'c';
+  println x
+end

@@ -1,0 +1,19 @@
+# Illustrating Constant Folding Optimisations
+# For Integer Calculation
+
+# Output:
+# 202
+# 68
+#
+
+# Program:
+
+
+
+begin
+    int x = (1 * 2 * 3 + 4 - 6) + 198; # x = 202
+    println x;
+    int y = (777 - 433) % (5 - 1) + 68; # y = 68
+    println y;
+    skip
+end

@@ -1,0 +1,25 @@
+# tests a function with more arguments than fit into registers
+
+# Output:
+# 12
+# -4
+# 32
+#
+
+# Program:
+
+begin
+  val f(val u, val v) is
+    int x = call g(u + v, u - v, u * v) ;
+    return x
+  end
+
+  val g(val x, val y, val z) is
+    println(x) ;
+    println(y) ;
+    println(z) ;
+    return 0
+  end
+
+  int r = call f(4, 8)
+end

@@ -1,0 +1,18 @@
+# Arguments can be shadowed by the function body
+
+# Output:
+# true
+#
+
+#Program:
+
+begin
+  val f(val x) is
+    val x = true ;
+    return x
+  end
+
+  val x = call f(5);
+  println x
+
+end

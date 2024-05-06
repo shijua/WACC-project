@@ -1,0 +1,12 @@
+# print pair a null pair
+
+# Output:
+# (nil)
+#
+
+# Program:
+
+begin
+  val p = null ;
+  println p
+end

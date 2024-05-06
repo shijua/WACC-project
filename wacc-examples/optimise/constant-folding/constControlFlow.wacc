@@ -1,0 +1,35 @@
+# Illustrating Constant Folding Optimisations
+# For Constant Control Flow
+
+# Output:
+# 1
+# 0
+#
+
+# Program:
+
+
+
+begin
+    int x = 2;
+    if 2 == 2 # true
+    then
+      x = 1
+    else
+      x = 0
+    fi;
+    println x; # x = 1
+
+    if 1 == 0 # false
+    then
+      x = -1
+    else
+      x = 0
+    fi;
+    println x; # x = 0
+
+    string y = "Cannot reach here!";
+    while false do
+      println y
+    done
+end

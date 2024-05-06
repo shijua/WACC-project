@@ -1,0 +1,18 @@
+# function parameter misuse
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+	val f(val x) is
+    val b = x && true ;
+		return 0
+	end
+  val x = call f(0) 
+end
+	

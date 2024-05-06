@@ -1,0 +1,27 @@
+# return type mismatch
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  val f(val x) is
+    val y = call g(x);
+    return y
+  end
+
+  val g(val x) is
+    if true then
+      return x
+    else
+      return 's'
+    fi
+  end
+
+  val x = call f(0);
+  println x
+end

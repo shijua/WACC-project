@@ -1,0 +1,19 @@
+# creates a pair which is returned from a function
+
+# Output:
+# 10
+#
+
+# Program:
+
+begin
+
+  val getPair() is
+    val p = newpair(10,15);
+    return p
+  end
+
+  val p = call getPair();
+  int x = fst p;
+  println x
+end

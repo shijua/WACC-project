@@ -1,0 +1,20 @@
+# attempted redefinition of function
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+	val f() is
+		return 0
+	end
+  val f() is
+    return 1
+  end
+  val x = call f();
+  println x
+end
